@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
@@ -31,12 +31,14 @@ import { InspectorsTab } from "./InspectorsTab";
 import { AuditLogTab } from "./AuditLogTab";
 import { WilayaCircularTab } from "./WilayaCircularTab";
 import { ModerationTab } from "./ModerationTab";
+import { ApprovalsTab } from "./ApprovalsTab";
 import { DISTRICTS_INFO } from "./districts";
 
-type AdminTab = "overview" | "accounts" | "inspectors" | "schools" | "circular" | "moderation" | "log";
+type AdminTab = "overview" | "approvals" | "accounts" | "inspectors" | "schools" | "circular" | "moderation" | "log";
 
 const TABS: [AdminTab, string][] = [
   ["overview", "نظرة عامة"],
+  ["approvals", "طلبات الانضمام والتحقق 🔔"],
   ["accounts", "الحسابات"],
   ["inspectors", "المفتشون والمقاطعات"],
   ["schools", "المتوسطات"],
@@ -453,6 +455,7 @@ export default function SuperAdminPage() {
         </div>
 
         {tab === "overview" && <OverviewTab profiles={profiles} onOpenLog={() => setTab("log")} />}
+        {tab === "approvals" && <ApprovalsTab onUpdate={loadProfiles} />}
         {tab === "inspectors" && <InspectorsTab profiles={profiles} onChanged={loadProfiles} />}
         {tab === "schools" && <SchoolsManager />}
         {tab === "circular" && (

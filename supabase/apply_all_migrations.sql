@@ -1299,3 +1299,130 @@ END $$;
 
 REVOKE ALL ON FUNCTION public.admin_recent_announcements(INT) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.admin_recent_announcements(INT) TO authenticated;
+-- ====================================================================
+-- ظ†ط¸ط§ظ… ط§ظ„طھط­ظ‚ظ‚ ظˆط§ظ„ط§ط¹طھظ…ط§ط¯ ط§ظ„طµط§ط±ظ… ظ„ظ„ط£ط³ط§طھط°ط© (Teacher CV & Identity Verification)
+-- 1) ط­ظ‚ظˆظ„ ط§ظ„طھط­ظ‚ظ‚ ظ…ظ† ط§ظ„ظˆط«ط§ط¦ظ‚ (verification_doc_url, verification_status, rejection_reason)
+-- 2) ط§ظ„ط­ط³ط§ط¨ ط§ظ„ط¬ط¯ظٹط¯ ظ…ط؛ظ„ظ‚ ط§ظپطھط±ط§ط¶ظٹط§ظ‹ (is_verified = FALSE) ظˆظٹظ†طھط¸ط± ط§ط¹طھظ…ط§ط¯ ط§ظ„ظ…ط´ط±ظپ ط§ظ„ط¹ط§ظ…
+-- 3) ظ…ط®ط²ظ† ط³ط­ط§ط¨ظٹ ط®ط§طµ ظˆظ…ط­ظ…ظٹ ظ„ظ„ظˆط«ط§ط¦ظ‚ ظˆط§ظ„ط³ظٹط± ط§ظ„ط°ط§طھظٹط© (verification-docs)
+-- 4) ط¯ظˆط§ظ„ ط¢ظ…ظ†ط© ظ„ظ„ط£ط¯ظ…ظ† ظ„ظ„ط§ط¹طھظ…ط§ط¯ ط£ظˆ ط§ظ„ط±ظپط¶
+-- ====================================================================
+
+-- 1. ط¥ط¶ط§ظپط© ط£ط¹ظ…ط¯ط© ط§ظ„طھط­ظ‚ظ‚ ظ„ط¬ط¯ظˆظ„ profiles
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS verification_doc_url TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS verification_status TEXT NOT NULL DEFAULT 'approved';
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS rejection_reason TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS submitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+
+-- طھط؛ظٹظٹط± ط§ظ„ظ‚ظٹظ…ط© ط§ظ„ط§ظپطھط±ط§ط¶ظٹط© ظ„ظ€ is_verified ط¥ظ„ظ‰ FALSE (ظ„ظ„ط­ط³ط§ط¨ط§طھ ط§ظ„ط¬ط¯ظٹط¯ط© ظ…ط³طھظ‚ط¨ظ„ط§ظ‹)
+ALTER TABLE public.profiles ALTER COLUMN is_verified SET DEFAULT FALSE;
+
+-- 2. ظ…ط®ط²ظ† ط§ظ„ط³ظٹط± ط§ظ„ط°ط§طھظٹط© ظˆط§ظ„ظˆط«ط§ط¦ظ‚ ط§ظ„ط¥ط«ط¨ط§طھظٹط© ط§ظ„ط®ط§طµ
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('verification-docs', 'verification-docs', false)
+ON CONFLICT (id) DO NOTHING;
+
+DROP POLICY IF EXISTS "Teacher upload own verification doc" ON storage.objects;
+CREATE POLICY "Teacher upload own verification doc" ON storage.objects
+  FOR INSERT TO authenticated
+  WITH CHECK (bucket_id = 'verification-docs' AND (storage.foldername(name))[1] = auth.uid()::text);
+
+DROP POLICY IF EXISTS "Teacher and Admin read verification doc" ON storage.objects;
+CREATE POLICY "Teacher and Admin read verification doc" ON storage.objects
+  FOR SELECT TO authenticated
+  USING (
+    bucket_id = 'verification-docs'
+    AND ((storage.foldername(name))[1] = auth.uid()::text OR public.is_admin())
+  );
+
+DROP POLICY IF EXISTS "Admin and Teacher delete verification doc" ON storage.objects;
+CREATE POLICY "Admin and Teacher delete verification doc" ON storage.objects
+  FOR DELETE TO authenticated
+  USING (
+    bucket_id = 'verification-docs'
+    AND ((storage.foldername(name))[1] = auth.uid()::text OR public.is_admin())
+  );
+
+-- 3. طھط­ط¯ظٹط« ظ…ط­ظپط² ط§ظ„ظ…ط³طھط®ط¯ظ… ط§ظ„ط¬ط¯ظٹط¯ ظ„طھط¹ط·ظٹظ„ ط§ظ„ط­ط³ط§ط¨ ط§ظپطھط±ط§ط¶ظٹط§ظ‹ ظˆطھط®ط²ظٹظ† ط±ط§ط¨ط· ط§ظ„ظˆط«ظٹظ‚ط©
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger AS $$
+DECLARE
+  meta   JSONB := COALESCE(NEW.raw_user_meta_data, '{}'::jsonb);
+  v_slug TEXT  := COALESCE(NULLIF(meta->>'slug', ''), 'prof-' || SUBSTRING(NEW.id::text, 1, 6));
+  v_code TEXT  := COALESCE(NULLIF(meta->>'teacher_code', ''), 'MTH-' || UPPER(SUBSTRING(NEW.id::text, 1, 4)));
+  v_levels SMALLINT[];
+BEGIN
+  IF EXISTS (SELECT 1 FROM public.profiles WHERE slug = v_slug) THEN
+    v_slug := v_slug || '-' || SUBSTRING(NEW.id::text, 1, 4);
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.profiles WHERE teacher_code = v_code) THEN
+    v_code := v_code || '-' || UPPER(SUBSTRING(NEW.id::text, 1, 3));
+  END IF;
+
+  IF jsonb_typeof(meta->'levels_taught') = 'array' THEN
+    SELECT array_agg(DISTINCT lvl::SMALLINT ORDER BY lvl::SMALLINT)
+    INTO v_levels
+    FROM jsonb_array_elements_text(meta->'levels_taught') AS lvl
+    WHERE lvl IN ('1', '2', '3', '4');
+  END IF;
+
+  INSERT INTO public.profiles (
+    id, role, full_name, district_id, middle_school_id,
+    school_custom_name, teacher_code, slug, levels_taught,
+    is_verified, verification_status, verification_doc_url, submitted_at
+  )
+  VALUES (
+    NEW.id,
+    'teacher',
+    COALESCE(NULLIF(meta->>'full_name', ''), 'ط£ط³طھط§ط° ط¬ط¯ظٹط¯'),
+    NULLIF(meta->>'district_id', '')::INTEGER,
+    NULLIF(meta->>'middle_school_id', '')::UUID,
+    meta->>'school_custom_name',
+    v_code,
+    v_slug,
+    COALESCE(v_levels, ARRAY[1, 2, 3, 4]::SMALLINT[]),
+    false, -- ط§ظ„ط­ط³ط§ط¨ ظ…ط؛ظ„ظ‚ ط§ظپطھط±ط§ط¶ظٹط§ظ‹ ظ„ط­ظٹظ† ظ…ط±ط§ط¬ط¹ط© ط§ظ„ظˆط«ظٹظ‚ط© ظˆط§ط¹طھظ…ط§ط¯ظ‡ ظ…ظ† ط§ظ„ظ…ط´ط±ظپ
+    'pending',
+    NULLIF(meta->>'verification_doc_url', ''),
+    NOW()
+  )
+  ON CONFLICT (id) DO NOTHING;
+
+  IF NULLIF(btrim(COALESCE(meta->>'phone', '')), '') IS NOT NULL THEN
+    INSERT INTO public.profile_contacts (id, phone)
+    VALUES (NEW.id, btrim(meta->>'phone'))
+    ON CONFLICT (id) DO NOTHING;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+-- 4. ط¯ظˆط§ظ„ ط§ظ„ظ…ط´ط±ظپ ط§ظ„ط¹ط§ظ… ظ„ط§ط¹طھظ…ط§ط¯ ط£ظˆ ط±ظپط¶ ط§ظ„ط£ط³ط§طھط°ط©
+CREATE OR REPLACE FUNCTION public.approve_teacher(target_teacher_id UUID)
+RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+AS $$
+BEGIN
+  IF NOT public.is_admin() THEN
+    RAISE EXCEPTION 'ط؛ظٹط± ظ…طµط±ط­: ط§ظ„ظ…ط´ط±ظپ ط§ظ„ط¹ط§ظ… ظپظ‚ط· ظٹظ…ظƒظ†ظ‡ ط§ط¹طھظ…ط§ط¯ ط§ظ„ط£ط³ط§طھط°ط©';
+  END IF;
+
+  UPDATE public.profiles
+  SET is_verified = TRUE, verification_status = 'approved', rejection_reason = NULL
+  WHERE id = target_teacher_id;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.reject_teacher(target_teacher_id UUID, p_reason TEXT)
+RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+AS $$
+BEGIN
+  IF NOT public.is_admin() THEN
+    RAISE EXCEPTION 'ط؛ظٹط± ظ…طµط±ط­: ط§ظ„ظ…ط´ط±ظپ ط§ظ„ط¹ط§ظ… ظپظ‚ط· ظٹظ…ظƒظ†ظ‡ ط±ظپط¶ ط·ظ„ط¨ط§طھ ط§ظ„ط£ط³ط§طھط°ط©';
+  END IF;
+
+  UPDATE public.profiles
+  SET is_verified = FALSE, verification_status = 'rejected', rejection_reason = p_reason
+  WHERE id = target_teacher_id;
+END;
+$$;
