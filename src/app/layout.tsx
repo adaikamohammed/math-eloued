@@ -4,6 +4,7 @@ import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 import { TeacherAccess } from "@/components/TeacherAccess";
 import PWAInstallBanner from "@/components/PWAInstallBanner";
 import { AppShell } from "@/components/AppShell";
+import { GlobalNavbar } from "@/components/GlobalNavbar";
 
 export const metadata: Metadata = {
   title: "منصة رياضيات ولاية الوادي",
@@ -32,7 +33,7 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: "cover",
-  themeColor: "#059669",
+  themeColor: "#064e3b",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -42,10 +43,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="manifest" href="/manifest.json" />
         <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
       </head>
-      <body>
+      <body className="bg-slate-50 text-slate-900 antialiased selection:bg-emerald-500 selection:text-white">
         <ServiceWorkerRegister />
         <TeacherAccess />
         <PWAInstallBanner />
+        <GlobalNavbar />
         <AppShell>{children}</AppShell>
       </body>
     </html>
