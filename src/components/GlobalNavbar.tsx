@@ -101,7 +101,6 @@ export function GlobalNavbar() {
     { label: "الرئيسية", href: "/", icon: Sparkles },
     { label: "ملتقى الأساتذة", href: "/forum", icon: Users },
     { label: "فضاء الأولياء", href: "/my-children", icon: Heart },
-    { label: "دليل المتوسطات", href: "/t/schools", icon: Compass },
   ];
 
   const getWorkspaceUrl = () => {
@@ -210,14 +209,14 @@ export function GlobalNavbar() {
                 className="py-2 px-3.5 rounded-xl text-xs font-bold text-slate-300 hover:text-white hover:bg-slate-800 transition flex items-center gap-1.5"
               >
                 <LogIn className="w-3.5 h-3.5 text-emerald-400" />
-                <span>تسجيل الدخول</span>
+                <span>تسجيل دخول الأستاذ</span>
               </Link>
               <Link
                 href="/register"
                 className="py-2 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition flex items-center gap-1.5"
               >
                 <GraduationCap className="w-4 h-4" />
-                <span>انضمام أستاذ</span>
+                <span>إنشاء حساب الأستاذ</span>
               </Link>
             </div>
           )}
@@ -287,13 +286,13 @@ export function GlobalNavbar() {
                   href="/login"
                   className="py-2.5 px-3 rounded-xl bg-slate-800 text-center font-bold text-xs text-white"
                 >
-                  تسجيل الدخول
+                  تسجيل دخول الأستاذ
                 </Link>
                 <Link
                   href="/register"
                   className="py-2.5 px-3 rounded-xl bg-emerald-600 text-center font-bold text-xs text-white"
                 >
-                  انضمام أستاذ
+                  إنشاء حساب الأستاذ
                 </Link>
               </div>
             )}

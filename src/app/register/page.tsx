@@ -27,11 +27,11 @@ import {
 import { safeStorageName, validateUpload, compressIfImage } from "@/lib/compress";
 
 const DISTRICTS = [
-  { id: 1, name: "المقاطعة الأولى — الوادي 1" },
-  { id: 2, name: "المقاطعة الثانية — الوادي 2" },
-  { id: 3, name: "المقاطعة الثالثة — قمار" },
-  { id: 4, name: "المقاطعة الرابعة — الرقيبة" },
-  { id: 5, name: "المقاطعة الخامسة — الدبيلة والمقرن" },
+  { id: 1, name: "المقاطعة 1" },
+  { id: 2, name: "المقاطعة 2" },
+  { id: 3, name: "المقاطعة 3" },
+  { id: 4, name: "المقاطعة 4" },
+  { id: 5, name: "المقاطعة 5" },
 ];
 
 export default function RegisterTeacherPage() {
