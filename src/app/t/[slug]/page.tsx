@@ -47,14 +47,7 @@ export default async function TeacherPublicSpace({ params }: TeacherPageProps) {
     .slice(0, 3);
   const teacherLessons = publicData.lessons;
 
-  const districtNames: Record<number, string> = {
-    1: "المقاطعة 1 — الوادي 1",
-    2: "المقاطعة 2 — الوادي 2",
-    3: "المقاطعة 3 — قمار",
-    4: "المقاطعة 4 — الرقيبة",
-    5: "المقاطعة 5 — الدبيلة والمقرن",
-  };
-
+  
   const levelsTaught = profile.levels_taught || [1, 2, 3, 4];
 
   return (
@@ -95,7 +88,7 @@ export default async function TeacherPublicSpace({ params }: TeacherPageProps) {
             {profile.district_id && (
               <p className="text-[11px] text-emerald-200/90 flex items-center justify-center gap-1">
                 <MapPin className="w-3 h-3 text-emerald-300" />
-                {districtNames[profile.district_id]}
+                المقاطعة {profile.district_id}
               </p>
             )}
           </div>
@@ -222,7 +215,7 @@ export default async function TeacherPublicSpace({ params }: TeacherPageProps) {
           </Link>
         </div>
 
-        <TeacherQR path={`/t/${profile.slug || profile.id}`} teacherName={profile.full_name || "الأستاذ"} code={profile.teacher_code} />
+        <TeacherQR path={`/t/${profile.slug || profile.id}`} teacherName={profile.full_name || "الأستاذ"} code={profile.teacher_code} schoolName={profile.school_custom_name || ""} />
       </div>
     </div>
   );

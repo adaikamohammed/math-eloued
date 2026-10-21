@@ -131,7 +131,7 @@ export default function TeacherSettingsPage() {
         </div>
       </div>
 
-      <TeacherQR path={`/t/${profile.slug || profile.id}`} teacherName={profile.full_name || "الأستاذ"} code={profile.teacher_code} />
+      <TeacherQR path={`/t/${profile.slug || profile.id}`} teacherName={profile.full_name || "الأستاذ"} code={profile.teacher_code} schoolName={profile.school_custom_name || ""} />
 
       <form onSubmit={save} className="space-y-4">
         {message && (
