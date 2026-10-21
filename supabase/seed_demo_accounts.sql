@@ -586,6 +586,10 @@ ON CONFLICT (id) DO UPDATE SET
 -- --------------------------------------------------------------------
 -- 7. منشور رسمي من مفتش المقاطعة 1 إلى أساتذة المقاطعة
 -- --------------------------------------------------------------------
+ALTER TABLE public.inspector_circulars
+  ADD COLUMN IF NOT EXISTS event_date TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS event_place TEXT;
+
 INSERT INTO public.inspector_circulars (
   id, inspector_id, district_id, title, content, event_date, event_place, created_at
 )
@@ -614,17 +618,26 @@ ON CONFLICT (id) DO UPDATE SET
 -- --------------------------------------------------------------------
 -- 8. وثائق الملف البيداغوجي للأستاذ 1 مع مراجعة المفتش واعتمادها
 -- --------------------------------------------------------------------
+ALTER TABLE public.pedagogical_notes
+  ADD COLUMN IF NOT EXISTS doc_type TEXT NOT NULL DEFAULT 'lesson_plan',
+  ADD COLUMN IF NOT EXISTS field TEXT,
+  ADD COLUMN IF NOT EXISTS section TEXT,
+  ADD COLUMN IF NOT EXISTS session_number INTEGER;
+
 INSERT INTO public.pedagogical_notes (
-  id, teacher_id, district_id, level, title, doc_type, review_status,
-  inspector_feedback, reviewed_at, created_at
+  id, teacher_id, district_id, level, semester, lesson_title, file_path, file_name,
+  doc_type, status, inspector_feedback, reviewed_at, created_at
 )
 VALUES (
   'ed111111-1111-1111-1111-111111111111',
   'a1111111-1111-1111-1111-111111111111',
   1,
   1,
+  1,
   'مذكرة الدرس 01: قراءة وكتابة وتفكيك الأعداد الطبيعية والعشرية',
-  'note',
+  'a1111111-1111-1111-1111-111111111111/note_01_decimaux.pdf',
+  'note_01_decimaux.pdf',
+  'lesson_plan',
   'reviewed',
   'مذكرة تربوية جيدة ومطابقة لمؤشرات الكفاءة الختامية للمقطع. التوزيع الزمني مناسب جداً، وحبذا تكثيف أنشطة التعلم الذاتي في المرحلة الثانية. عمل موفق ومشكور.',
   NOW() - INTERVAL '1 day',
@@ -635,7 +648,10 @@ VALUES (
   'a1111111-1111-1111-1111-111111111111',
   1,
   4,
+  1,
   'التوزيع السنوي الرسمي لمادة الرياضيات — السنة الرابعة متوسط 2024/2025',
+  'a1111111-1111-1111-1111-111111111111/repartition_annuelle_4am.pdf',
+  'repartition_annuelle_4am.pdf',
   'annual_distribution',
   'reviewed',
   'التوزيع السنوي معتمد رسمياً ومطابق للحجم الساعي الأسبوعي (4.5 ساعات). يُرجى مراعاة فترات التقويم التشخيصي والمعالجة البيداغوجية.',
@@ -643,6 +659,10 @@ VALUES (
   NOW() - INTERVAL '7 days'
 )
 ON CONFLICT (id) DO UPDATE SET
-  title = EXCLUDED.title,
-  review_status = EXCLUDED.review_status,
-  inspector_feedback = EXCLUDED.inspector_feedback;
+  lesson_title = EXCLUDED.lesson_title,
+  file_path = EXCLUDED.file_path,
+  file_name = EXCLUDED.file_name,
+  doc_type = EXCLUDED.doc_type,
+  status = EXCLUDED.status,
+  inspector_feedback = EXCLUDED.inspector_feedback,
+  reviewed_at = EXCLUDED.reviewed_at;
