@@ -60,7 +60,7 @@ export function GlobalNavbar() {
   };
 
   return (
-    <header className="sticky top-0 z-30 w-full bg-white/95 backdrop-blur-md border-b border-slate-200/90 text-slate-800 shadow-xs transition-all" dir="rtl">
+    <>
       {/* الشريط العلوي الدقيق لمديرية التربية */}
       <div className="bg-slate-900 border-b border-slate-800 text-[11px] text-slate-300 py-1 px-4 sm:px-6">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -79,8 +79,9 @@ export function GlobalNavbar() {
         </div>
       </div>
 
-      {/* الشريط الرئيسي للتنقل */}
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 h-16 flex items-center justify-between gap-3">
+      {/* الشريط الرئيسي للتنقل بارتفاع ثابت تماماً */}
+      <header className="sticky top-0 z-30 w-full bg-white/95 backdrop-blur-md border-b border-slate-200/90 text-slate-800 shadow-xs transition-all" dir="rtl">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 h-16 flex items-center justify-between gap-3">
         {/* زر طي/توسيع الشريط الجانبي + الشعار */}
         <div className="flex items-center gap-2.5">
           {/* زر تبديل الشريط الجانبي للحاسوب */}
@@ -259,5 +260,6 @@ export function GlobalNavbar() {
         </div>
       )}
     </header>
+    </>
   );
 }

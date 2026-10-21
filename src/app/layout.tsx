@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
-import PWAInstallBanner from "@/components/PWAInstallBanner";
 import { AppShell } from "@/components/AppShell";
 
 export const metadata: Metadata = {
@@ -43,7 +42,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="bg-slate-50 text-slate-900 antialiased selection:bg-emerald-500 selection:text-white">
         <ServiceWorkerRegister />
-        <PWAInstallBanner />
         <AppShell>{children}</AppShell>
       </body>
     </html>

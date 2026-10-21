@@ -10,6 +10,7 @@ import {
   FileText,
   Layers,
   Key,
+  Scale,
   BookOpen,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -25,94 +26,87 @@ export default async function WilayaHomePage() {
   ]);
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 pb-20" dir="rtl">
+    <div className="space-y-6 pb-16" dir="rtl">
 
-      {/* ─── Hero Section ─── */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-slate-950 via-slate-900 to-emerald-950 text-white pt-10 pb-24 px-4 sm:px-6 rounded-b-[3rem] shadow-2xl border-b border-emerald-900/40">
-        {/* زخرفة رياضية خلفية */}
-        <div className="absolute inset-0 opacity-[0.035] pointer-events-none select-none overflow-hidden font-mono text-3xl tracking-widest">
-          <span className="absolute top-10 left-14">f(x) = ax² + bx + c</span>
-          <span className="absolute top-28 right-16">π ≈ 3.14159</span>
-          <span className="absolute bottom-20 left-1/4">∑(xᵢ − x̄)²</span>
-          <span className="absolute bottom-12 right-14">√a² + b² = c</span>
-          <span className="absolute top-1/2 left-8">cos²θ + sin²θ = 1</span>
-          <span className="absolute top-1/3 right-1/3">∫₀¹ x² dx = 1/3</span>
-        </div>
+      {/* ─── Hero Section الموحد والأنيق ─── */}
+      <section className="relative overflow-hidden bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-10 shadow-xs text-center space-y-6">
+        <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-emerald-500 via-teal-500 to-indigo-500" />
+        <div className="absolute top-0 right-1/4 w-72 h-72 bg-emerald-100/30 rounded-full blur-3xl pointer-events-none -z-10" />
+        <div className="absolute bottom-0 left-1/4 w-72 h-72 bg-teal-100/30 rounded-full blur-3xl pointer-events-none -z-10" />
 
-        <div className="max-w-4xl mx-auto text-center space-y-7 relative z-10">
-          {/* شارة رسمية */}
-          <div className="inline-flex items-center gap-2.5 bg-emerald-500/10 border border-emerald-400/25 px-4 py-1.5 rounded-full text-emerald-300 text-xs font-semibold backdrop-blur-md">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>مديرية التربية لولاية الوادي — مفتشية مادة الرياضيات</span>
+        <div className="max-w-3xl mx-auto space-y-5 relative z-10">
+          {/* شارة رسمية موحدة */}
+          <div className="inline-flex items-center gap-2 bg-emerald-50 border border-emerald-200/90 px-4 py-1.5 rounded-full text-emerald-800 text-xs font-bold shadow-xs">
+            <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
+            <span>مديرية التربية لولاية الوادي — المنصة الرقمية الموحدة للتعليم المتوسط</span>
           </div>
 
-          {/* العنوان */}
-          <div className="space-y-3">
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-tight text-white">
-              المنصة الرقمية الموحدة
-              <br />
-              <span className="text-emerald-400">لمادة الرياضيات</span>
+          {/* العنوان الرئيسي للمنصة */}
+          <div className="space-y-2">
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight leading-tight text-slate-900">
+              المنصة الرقمية الموحدة للتعليم المتوسط
+              <span className="text-emerald-700 block mt-1.5">«منصة جسور التعليمية»</span>
             </h1>
-            <p className="text-slate-400 text-sm sm:text-base max-w-xl mx-auto leading-relaxed font-light">
-              فضاء تربوي مشترك يجمع الأساتذة، الأولياء، والتلاميذ في منصة رقمية واحدة لمتابعة دروس مرحلة التعليم المتوسط بولاية الوادي.
+            <p className="text-slate-600 text-xs sm:text-sm max-w-2xl mx-auto leading-relaxed font-medium">
+              فضاء بيداغوجي مستقل يجمع الأستاذ، الولي، والتلميذ في كافة المواد؛ لمتابعة كراس القسم، السبورات اليومية، وميثاق التقويم المستمر بشفافية تامة.
             </p>
           </div>
 
-          {/* أزرار CTA */}
-          <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+          {/* أزرار الإجراءات السريعة */}
+          <div className="flex flex-wrap items-center justify-center gap-2.5 pt-1">
             <Link
               href="/login"
-              className="py-3 px-7 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold text-sm shadow-xl shadow-emerald-700/30 hover:shadow-emerald-600/50 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-2.5"
+              className="py-3 px-6 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm shadow-md shadow-emerald-600/20 active:scale-98 transition-all flex items-center gap-2"
             >
-              <ShieldCheck className="w-4 h-4 text-emerald-200" />
+              <ShieldCheck className="w-4 h-4 text-emerald-100" />
               <span>تسجيل دخول الأستاذ</span>
             </Link>
             <Link
               href="/register"
-              className="py-3 px-7 rounded-2xl bg-white/8 hover:bg-white/12 text-white border border-white/15 font-semibold text-sm backdrop-blur-md hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-2.5"
+              className="py-3 px-6 rounded-2xl bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 font-bold text-xs sm:text-sm shadow-xs active:scale-98 transition-all flex items-center gap-2"
             >
-              <GraduationCap className="w-4 h-4 text-emerald-300" />
+              <GraduationCap className="w-4 h-4 text-emerald-700" />
               <span>إنشاء حساب الأستاذ</span>
             </Link>
             <Link
               href="/forum"
-              className="py-3 px-5 rounded-2xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/20 font-semibold text-sm hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-2"
+              className="py-3 px-5 rounded-2xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold text-xs sm:text-sm active:scale-98 transition-all flex items-center gap-2"
             >
-              <MessageSquare className="w-4 h-4" />
-              <span>ملتقى الأساتذة</span>
+              <MessageSquare className="w-4 h-4 text-indigo-600" />
+              <span>الملتقى البيداغوجي</span>
             </Link>
           </div>
 
-          {/* إحصائيات */}
-          <div className="pt-4 grid grid-cols-2 sm:grid-cols-3 gap-3 max-w-2xl mx-auto">
-            <div className="bg-slate-900/60 border border-emerald-900/40 p-3.5 rounded-2xl backdrop-blur-sm text-right">
-              <div className="text-2xl font-bold text-white">{teacherCount || "—"}+</div>
-              <div className="text-[11px] text-emerald-400 font-medium mt-0.5">أستاذ مسجّل</div>
+          {/* بطاقات الإحصائيات المضيئة */}
+          <div className="pt-2 grid grid-cols-2 sm:grid-cols-3 gap-3 max-w-xl mx-auto">
+            <div className="bg-slate-50 border border-slate-200/80 p-3.5 rounded-2xl text-right">
+              <div className="text-2xl font-black text-slate-900">{teacherCount || "—"}+</div>
+              <div className="text-[11px] text-emerald-700 font-bold mt-0.5">أستاذ مسجّل في المنصة</div>
             </div>
-            <div className="bg-slate-900/60 border border-emerald-900/40 p-3.5 rounded-2xl backdrop-blur-sm text-right">
-              <div className="text-2xl font-bold text-white">{topicCount || "—"}+</div>
-              <div className="text-[11px] text-amber-400 font-medium mt-0.5">موضوع في الملتقى</div>
+            <div className="bg-slate-50 border border-slate-200/80 p-3.5 rounded-2xl text-right">
+              <div className="text-2xl font-black text-slate-900">{topicCount || "—"}+</div>
+              <div className="text-[11px] text-indigo-700 font-bold mt-0.5">موضوع وتبادل بيداغوجي</div>
             </div>
-            <div className="bg-slate-900/60 border border-emerald-900/40 p-3.5 rounded-2xl backdrop-blur-sm text-right col-span-2 sm:col-span-1">
-              <div className="text-2xl font-bold text-white">4 مستويات</div>
-              <div className="text-[11px] text-sky-400 font-medium mt-0.5">1م · 2م · 3م · 4م</div>
+            <div className="bg-slate-50 border border-slate-200/80 p-3.5 rounded-2xl text-right col-span-2 sm:col-span-1">
+              <div className="text-2xl font-black text-slate-900">4 أطوار</div>
+              <div className="text-[11px] text-teal-700 font-bold mt-0.5">1م • 2م • 3م • 4م (BEM)</div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ─── قسم الولي / التلميذ ─── */}
-      <div className="max-w-4xl mx-auto px-4 -mt-10 space-y-6 relative z-20">
+      {/* ─── قسم الولي / التلميذ: البحث بكود الأستاذ ─── */}
+      <div className="space-y-6">
 
-        {/* بطاقة البحث بالكود */}
-        <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xl shadow-slate-200/50 overflow-hidden">
-          <div className="bg-gradient-to-l from-emerald-50 to-white px-6 py-4 border-b border-slate-100 flex items-center gap-3">
+        {/* بطاقة البحث بكود الأستاذ */}
+        <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs overflow-hidden">
+          <div className="bg-slate-50 px-6 py-4 border-b border-slate-200/80 flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0">
               <Key className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-base font-semibold text-slate-900">فضاء الولي والتلميذ</h2>
-              <p className="text-xs text-slate-500 mt-0.5">أدخل الكود الذي منحك إياه الأستاذ للوصول إلى دروسه وسبورته</p>
+              <h2 className="text-base font-bold text-slate-900">فضاء الولي والتلميذ</h2>
+              <p className="text-xs text-slate-500 mt-0.5">أدخل الكود الذي يمنحه الأستاذ للوصول إلى دروسه، سبورته، ونقاط ابنه</p>
             </div>
           </div>
 
@@ -122,94 +116,89 @@ export default async function WilayaHomePage() {
                 <input
                   type="text"
                   name="q"
-                  placeholder="كود الأستاذ  (مثال: MTH-102)"
-                  className="w-full pr-11 pl-4 py-3.5 rounded-2xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition bg-slate-50/60 font-mono tracking-widest placeholder:font-sans placeholder:tracking-normal"
+                  placeholder="كود الأستاذ  (مثال: MTH-101 أو PHY-102)"
+                  className="w-full pr-11 pl-4 py-3.5 rounded-2xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition bg-slate-50/70 font-mono tracking-widest placeholder:font-sans placeholder:tracking-normal text-slate-900"
                 />
                 <Search className="w-4.5 h-4.5 text-slate-400 absolute right-3.5 top-3.5" />
               </div>
               <button
                 type="submit"
-                className="py-3.5 px-7 rounded-2xl bg-emerald-700 hover:bg-emerald-600 text-white font-semibold text-sm shadow-md shadow-emerald-700/20 transition-all flex items-center justify-center gap-2 hover:scale-[1.01] cursor-pointer"
+                className="py-3.5 px-7 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-md shadow-emerald-600/20 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98"
               >
-                <span>عرض الدروس</span>
+                <span>عرض فضاء الأستاذ</span>
                 <ArrowLeft className="w-4 h-4" />
               </button>
             </form>
 
-            <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-200/70 rounded-xl px-4 py-3">
-              <span className="text-amber-500 text-lg leading-none mt-0.5">💡</span>
-              <p className="text-xs text-amber-800 leading-relaxed">
-                <strong>كيف أحصل على الكود؟</strong> الكود يُرسل لك مباشرة من أستاذ ابنك أو ابنتك عبر الرسالة المدرسية أو الكراس. لا يمكن البحث باسم الأستاذ حفاظاً على الخصوصية.
+            <div className="flex items-start gap-2.5 bg-emerald-50/70 border border-emerald-200/80 rounded-2xl px-4 py-3">
+              <span className="text-emerald-700 text-lg leading-none mt-0.5">💡</span>
+              <p className="text-xs text-emerald-950 leading-relaxed font-medium">
+                <strong>كيف أحصل على الكود؟</strong> يمنح الأستاذ الكود لولي الأمر مباشرة (عبر الكراس المدرسي أو الرسالة). لا تظهر أسماء الأساتذة للعموم حفاظاً على استقلالية كل أستاذ وخصوصية تلاميذه.
               </p>
             </div>
           </div>
         </div>
 
-        {/* محفظة الولي المحفوظة */}
+        {/* محفظة الولي المحفوظة للوصول السريع للأبناء */}
         <TeacherWallet />
 
-        {/* ─── مميزات المنصة ─── */}
-        <div className="bg-gradient-to-br from-slate-900 via-emerald-950 to-slate-900 rounded-3xl p-6 sm:p-8 text-white space-y-5 shadow-xl border border-emerald-900/30">
-          <div className="border-b border-emerald-800/30 pb-4">
-            <p className="text-xs font-semibold text-emerald-400 mb-1">رؤية بيداغوجية حديثة</p>
-            <h3 className="text-lg sm:text-xl font-semibold text-white">
-              ماذا تقدم المنصة؟
-            </h3>
+        {/* ─── مميزات وخدمات المنصة الموحدة ─── */}
+        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/90 shadow-xs space-y-5">
+          <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
+            <div>
+              <p className="text-xs font-bold text-emerald-700 mb-0.5">رؤية بيداغوجية حديثة</p>
+              <h3 className="text-base sm:text-lg font-black text-slate-900">
+                ماذا تقدم المنصة للأستاذ والأسرة التربوية؟
+              </h3>
+            </div>
+            <span className="text-[10px] bg-slate-100 text-slate-700 font-bold px-2 py-0.5 rounded-md border border-slate-200">
+              لكافة المواد 📚
+            </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-            <div className="bg-white/5 border border-white/8 p-4 rounded-2xl space-y-2 hover:bg-white/8 transition">
-              <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-300 flex items-center justify-center">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
+            <div className="bg-slate-50 border border-slate-200/80 p-4 rounded-2xl space-y-2 hover:bg-slate-100/70 transition">
+              <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
                 <FileText className="w-4 h-4" />
               </div>
-              <h4 className="font-semibold text-sm text-emerald-200">الملف البيداغوجي الرقمي</h4>
-              <p className="text-slate-400 leading-relaxed">
-                المذكرات، التوزيع السنوي، ودفتر النصوص — متاحة للمفتش مباشرة وبسرية تامة.
+              <h4 className="font-bold text-sm text-slate-900">الملف البيداغوجي الرقمي</h4>
+              <p className="text-slate-600 leading-relaxed">
+                المذكرات، التوزيع السنوي، ودفتر النصوص — تنسيق سلس مع المفتشية البيداغوجية بسرية تامة.
               </p>
             </div>
 
-            <div className="bg-white/5 border border-white/8 p-4 rounded-2xl space-y-2 hover:bg-white/8 transition">
-              <div className="w-8 h-8 rounded-xl bg-teal-500/20 text-teal-300 flex items-center justify-center">
+            <div className="bg-slate-50 border border-slate-200/80 p-4 rounded-2xl space-y-2 hover:bg-slate-100/70 transition">
+              <div className="w-8 h-8 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center">
                 <Layers className="w-4 h-4" />
               </div>
-              <h4 className="font-semibold text-sm text-teal-200">سبورة الدروس</h4>
-              <p className="text-slate-400 leading-relaxed">
-                تصوير لوحة الدرس ورفعها بضغط ذكي ليطلع عليها الأولياء والتلاميذ من المنزل فوراً.
+              <h4 className="font-bold text-sm text-slate-900">كراس القسم وصور السبورة</h4>
+              <p className="text-slate-600 leading-relaxed">
+                توثيق لوحة الدرس والكراس النموذجي ليطلع عليها الأولياء والتلاميذ من المنزل وتدارك الغيابات فوراً.
               </p>
             </div>
 
-            <div className="bg-white/5 border border-white/8 p-4 rounded-2xl space-y-2 hover:bg-white/8 transition">
-              <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-300 flex items-center justify-center">
-                <MessageSquare className="w-4 h-4" />
+            <div className="bg-slate-50 border border-slate-200/80 p-4 rounded-2xl space-y-2 hover:bg-slate-100/70 transition">
+              <div className="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center">
+                <Scale className="w-4 h-4" />
               </div>
-              <h4 className="font-semibold text-sm text-amber-200">ملتقى الأساتذة</h4>
-              <p className="text-slate-400 leading-relaxed">
-                طرح الإشكاليات البيداغوجية، تبادل الوضعيات الانطلاقية، وتثبيت توجيهات المفتش رسمياً.
+              <h4 className="font-bold text-sm text-slate-900">ميثاق التقويم المستمر (20 / 20)</h4>
+              <p className="text-slate-600 leading-relaxed">
+                معايير واضحة ومعلنة (كراس، سلوك، واجبات، استجوابات) تحقق الشفافية الكاملة مع الولي والتلميذ.
               </p>
             </div>
 
-            <div className="bg-white/5 border border-white/8 p-4 rounded-2xl space-y-2 hover:bg-white/8 transition">
-              <div className="w-8 h-8 rounded-xl bg-sky-500/20 text-sky-300 flex items-center justify-center">
-                <ShieldCheck className="w-4 h-4" />
+            <div className="bg-slate-50 border border-slate-200/80 p-4 rounded-2xl space-y-2 hover:bg-slate-100/70 transition">
+              <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center">
+                <Users className="w-4 h-4" />
               </div>
-              <h4 className="font-semibold text-sm text-sky-200">حماية وخصوصية تامة</h4>
-              <p className="text-slate-400 leading-relaxed">
-                عزل تقني بقواعد أمان RLS: بيانات الأستاذ لا تُرى إلا للمفتش والمشرف العام.
+              <h4 className="font-bold text-sm text-slate-900">الملتقى المهني للأساتذة</h4>
+              <p className="text-slate-600 leading-relaxed">
+                طرح الإشكاليات البيداغوجية، تبادل الوضعيات التعليمية، وتثبيت التوجيهات الرسمية للمفتشية.
               </p>
             </div>
           </div>
         </div>
 
-        {/* ─── تذييل ─── */}
-        <footer className="pt-6 border-t border-slate-200 text-center space-y-2">
-          <div className="flex items-center justify-center gap-2 text-xs font-medium text-slate-500">
-            <GraduationCap className="w-4 h-4 text-emerald-600" />
-            <span>المنصة الرقمية الموحدة لمادة الرياضيات — مديرية التربية لولاية الوادي</span>
-          </div>
-          <p className="text-[11px] text-slate-400">
-            مشروع تربوي بيداغوجي — مرحلة التعليم المتوسط — ولاية الوادي (39) • {new Date().getFullYear()}
-          </p>
-        </footer>
       </div>
     </div>
   );
