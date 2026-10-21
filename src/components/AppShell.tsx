@@ -42,7 +42,7 @@ function AppShellContent({ children }: { children: React.ReactNode }) {
           </main>
 
           <footer className="text-center text-xs text-slate-400 py-4 border-t border-slate-200/60 hidden md:block">
-            منصة رياضيات ولاية الوادي — مديرية التربية للجمهورية الجزائرية الديمقراطية الشعبية
+            منصة جسور التعليمية — المنصة الرقمية الموحدة للتعليم المتوسط • مديرية التربية لولاية الوادي
           </footer>
         </div>
       </div>

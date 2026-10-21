@@ -27,7 +27,7 @@ export async function GET(
   // نتركهم ككوكبة واحدة متألقة
 
   return NextResponse.json(
-    { honors },
+    { honors, customClasses: data.customClasses || [] },
     {
       headers: {
         "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",

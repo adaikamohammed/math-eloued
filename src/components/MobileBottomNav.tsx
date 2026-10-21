@@ -35,7 +35,7 @@ export function MobileBottomNav() {
 
   return (
     <nav
-      className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-slate-900/95 backdrop-blur-xl border-t border-slate-800/90 shadow-2xl pb-safe"
+      className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-xl border-t border-slate-200/90 shadow-lg pb-safe"
       aria-label="شريط التنقل السفلي للهاتف"
     >
       <div className="flex items-center justify-around h-16 px-1">
@@ -48,12 +48,12 @@ export function MobileBottomNav() {
               key={item.href}
               href={item.href}
               className={`flex-1 flex flex-col items-center justify-center py-1 transition-transform active:scale-90 ${
-                isActive ? "text-emerald-400 font-black" : "text-slate-400 hover:text-slate-200 font-medium"
+                isActive ? "text-emerald-700 font-black" : "text-slate-500 hover:text-slate-800 font-medium"
               }`}
             >
               <div
                 className={`w-9 h-7 rounded-xl flex items-center justify-center transition-colors ${
-                  isActive ? "bg-emerald-500/20 text-emerald-400" : ""
+                  isActive ? "bg-emerald-50 text-emerald-700" : ""
                 }`}
               >
                 <Icon className={`w-4 h-4 ${isActive ? "scale-110" : ""}`} />
@@ -64,7 +64,7 @@ export function MobileBottomNav() {
               </span>
 
               {isActive && (
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 -mt-0.5 shadow-xs shadow-emerald-400" />
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 -mt-0.5 shadow-xs shadow-emerald-600" />
               )}
             </Link>
           );

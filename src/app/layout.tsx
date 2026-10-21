@@ -5,8 +5,8 @@ import PWAInstallBanner from "@/components/PWAInstallBanner";
 import { AppShell } from "@/components/AppShell";
 
 export const metadata: Metadata = {
-  title: "منصة رياضيات ولاية الوادي",
-  description: "المنصة الرقمية الموحدة لمادة الرياضيات في التعليم المتوسط — ولاية الوادي: دروس وسبورة الأساتذة للأولياء والتلاميذ، وفضاء بيداغوجي مع مفتشي المقاطعات.",
+  title: "منصة جسور التعليمية — فضاء الأستاذ، الولي، والتلميذ",
+  description: "المنصة الرقمية الموحدة للتعليم المتوسط — فضاء دراسي وبيداغوجي مستقل للأستاذ للتواصل اليومي مع الأولياء، نشر كراس القسم، الواجبات، وميثاق التقويم المستمر بشفافية.",
   manifest: "/manifest.json",
   icons: {
     icon: [
@@ -21,7 +21,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "رياضيات الوادي",
+    title: "منصة جسور",
   },
 };
 

@@ -66,6 +66,15 @@ export type HonorStudent = {
 export const HONOR_CLASSES = ["1 م 1", "1 م 2", "1 م 3", "2 م 3"] as const;
 export type HonorClass = (typeof HONOR_CLASSES)[number];
 
+export const DEFAULT_CLASSES = ["1 م 1", "1 م 2", "1 م 3", "2 م 3"];
+
+export function getTeacherClasses(data?: LessonsData | null): string[] {
+  if (data?.customClasses && Array.isArray(data.customClasses) && data.customClasses.length > 0) {
+    return data.customClasses;
+  }
+  return [...DEFAULT_CLASSES];
+}
+
 export type Penalty = {
   id: string;
   studentName: string; // اسم التلميذ
@@ -216,6 +225,7 @@ export type LessonsData = {
   anonymousMessages?: AnonymousMessage[];
   featureFlags?: TeacherFeatureFlags;
   subject?: SubjectId | string;
+  customClasses?: string[];
 };
 
 export const LEVELS = {

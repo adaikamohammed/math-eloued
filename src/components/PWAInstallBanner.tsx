@@ -90,21 +90,21 @@ export default function PWAInstallBanner() {
   if (!showBanner || installed) return null;
 
   return (
-    <div className="fixed bottom-3 left-3 right-3 sm:left-auto sm:right-4 sm:max-w-md z-45 fade-up">
-      <div className="bg-gradient-to-r from-emerald-850 via-teal-900 to-slate-900 text-white p-3.5 rounded-2xl shadow-xl border border-emerald-500/40 backdrop-blur-md space-y-2">
+    <div className="fixed bottom-20 md:bottom-4 left-3 right-3 sm:left-auto sm:right-4 sm:max-w-md z-45 fade-up">
+      <div className="bg-slate-900/95 text-white p-3.5 rounded-2xl shadow-xl border border-slate-700/80 backdrop-blur-md space-y-2">
         <div className="flex items-start justify-between gap-2.5">
           <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-black text-xl shrink-0 shadow-md shadow-emerald-950/40">
-              ∑
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center text-white font-black text-xl shrink-0 shadow-md">
+              <Sparkles className="w-5 h-5 text-white" />
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
-                <span className="font-black text-xs text-white">تطبيق رياضيات الوادي</span>
+                <span className="font-black text-xs text-white">تطبيق منصة جسور التعليمية</span>
                 <span className="text-[10px] bg-emerald-500/30 text-emerald-200 px-1.5 py-0.2 rounded font-bold border border-emerald-400/30">
                   PWA ⚡
                 </span>
               </div>
-              <p className="text-[11px] text-emerald-100/80 leading-tight mt-0.5 font-medium">
+              <p className="text-[11px] text-slate-300 leading-tight mt-0.5 font-medium">
                 نزّل التطبيق على شاشة هاتفك ليعمل معك بسرعة وبدون إنترنت
               </p>
             </div>

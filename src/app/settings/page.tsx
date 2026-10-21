@@ -15,6 +15,16 @@ import {
   Megaphone,
   MessageSquare,
   ShieldAlert,
+  Plus,
+  Trash2,
+  FileText,
+  Image as ImageIcon,
+  Video,
+  Eye,
+  Layers,
+  GraduationCap,
+  Sparkles,
+  CheckCircle,
 } from "lucide-react";
 import { LoginRequired } from "@/components/LoginRequired";
 import { TeacherQR } from "@/components/TeacherQR";
@@ -45,8 +55,30 @@ export default function TeacherSettingsPage() {
   const [schoolName, setSchoolName] = useState("");
   const [levels, setLevels] = useState<number[]>([]);
   const [reception, setReception] = useState<ReceptionInfo>({});
+  const [customClasses, setCustomClasses] = useState<string[]>(["1 م 1", "1 م 2", "1 م 3", "2 م 3"]);
+  const [newClassInput, setNewClassInput] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+
+  const handleAddClass = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const clean = newClassInput.trim();
+    if (!clean) return;
+    if (customClasses.includes(clean)) {
+      setMessage({ type: "err", text: "هذا القسم موجود بالفعل في قائمتك" });
+      return;
+    }
+    setCustomClasses((prev) => [...prev, clean]);
+    setNewClassInput("");
+  };
+
+  const handleRemoveClass = (clsToRemove: string) => {
+    setCustomClasses((prev) => prev.filter((c) => c !== clsToRemove));
+  };
+
+  const handleApplyPreset = (preset: string[]) => {
+    setCustomClasses(preset);
+  };
 
   useEffect(() => {
     if (!profile) return;
@@ -73,6 +105,26 @@ export default function TeacherSettingsPage() {
         .order("name")
         .then(({ data }) => setSchools(data || []));
     }
+
+    // جلب الأقسام المخصصة للأستاذ من فضاء البيانات العامة
+    supabase
+      .from("teacher_public_data")
+      .select("data")
+      .eq("teacher_id", profile.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.data?.customClasses && Array.isArray(data.data.customClasses) && data.data.customClasses.length > 0) {
+          setCustomClasses(data.data.customClasses);
+        } else if (typeof window !== "undefined") {
+          const saved = localStorage.getItem(`custom_classes_${profile.id}`);
+          if (saved) {
+            try {
+              const parsed = JSON.parse(saved);
+              if (Array.isArray(parsed) && parsed.length > 0) setCustomClasses(parsed);
+            } catch (_) {}
+          }
+        }
+      });
   }, [profile]);
 
   if (loading) {
@@ -135,6 +187,24 @@ export default function TeacherSettingsPage() {
     const { error: contactError } = await supabase
       .from("profile_contacts")
       .upsert({ id: profile.id, phone: phone.trim() || null, updated_at: new Date().toISOString() });
+
+    // حفظ الأقسام المخصصة للأستاذ
+    if (typeof window !== "undefined") {
+      localStorage.setItem(`custom_classes_${profile.id}`, JSON.stringify(customClasses));
+    }
+    const { data: pubData } = await supabase
+      .from("teacher_public_data")
+      .select("data")
+      .eq("teacher_id", profile.id)
+      .maybeSingle();
+
+    if (pubData) {
+      const merged = { ...(pubData.data || {}), customClasses, featureFlags, subject };
+      await supabase
+        .from("teacher_public_data")
+        .update({ data: merged, updated_at: new Date().toISOString() })
+        .eq("teacher_id", profile.id);
+    }
 
     setSaving(false);
     if (error || contactError) setMessage({ type: "err", text: (error || contactError)!.message });
@@ -225,6 +295,95 @@ export default function TeacherSettingsPage() {
                 </button>
               ))}
             </div>
+          </div>
+        </section>
+
+        {/* قسم إدارة وتحديد الأقسام المعتمدة للأستاذ */}
+        <section className="bg-white p-4 rounded-2xl border border-emerald-100 shadow-2xs space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-extrabold text-slate-800 flex items-center gap-2">
+                <GraduationCap className="w-4 h-4 text-emerald-600" />
+                أقسامي المعتمدة (يحددها الأستاذ بحرية)
+              </h2>
+              <p className="text-[11px] text-slate-500">
+                حدد أقسامك بدقة (مثلاً: 1م1، 4م2، فوج 1...)؛ ستظهر تلقائياً في لوحة الشرف، كراس الدروس، وجداول التقويم.
+              </p>
+            </div>
+            <span className="text-[10px] bg-emerald-50 text-emerald-700 font-bold px-2 py-0.5 rounded-md border border-emerald-200">
+              {customClasses.length} أقسام
+            </span>
+          </div>
+
+          {/* قائمة الأقسام الحالية مع زر الحذف */}
+          <div className="flex flex-wrap gap-2 pt-1">
+            {customClasses.map((cls) => (
+              <span
+                key={cls}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 border border-slate-200 text-xs font-black text-slate-800"
+              >
+                <span>{cls}</span>
+                <button
+                  type="button"
+                  onClick={() => handleRemoveClass(cls)}
+                  className="text-slate-400 hover:text-red-600 transition"
+                  title={`حذف القسم ${cls}`}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </span>
+            ))}
+          </div>
+
+          {/* حقل إضافة قسم جديد */}
+          <div className="flex items-center gap-2 pt-1">
+            <input
+              type="text"
+              value={newClassInput}
+              onChange={(e) => setNewClassInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleAddClass();
+                }
+              }}
+              placeholder="اكتب اسم القسم (مثلاً: 4 م 3 أو 1 م 1)..."
+              className="flex-1 py-2 px-3 rounded-xl border border-slate-200 bg-slate-50 text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+            <button
+              type="button"
+              onClick={() => handleAddClass()}
+              className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 transition"
+            >
+              <Plus className="w-4 h-4" />
+              <span>إضافة قسم</span>
+            </button>
+          </div>
+
+          {/* نماذج سريعة جاهزة */}
+          <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500">
+            <span className="font-bold">نماذج سريعة:</span>
+            <button
+              type="button"
+              onClick={() => handleApplyPreset(["1 م 1", "1 م 2", "1 م 3", "1 م 4"])}
+              className="px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold transition"
+            >
+              أقسام 1 متوسط (1م1 - 1م4)
+            </button>
+            <button
+              type="button"
+              onClick={() => handleApplyPreset(["4 م 1", "4 م 2", "4 م 3"])}
+              className="px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold transition"
+            >
+              أقسام 4 متوسط BEM
+            </button>
+            <button
+              type="button"
+              onClick={() => handleApplyPreset(["1 م 1", "2 م 2", "3 م 1", "4 م 2"])}
+              className="px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold transition"
+            >
+              مستويات متنوعة (1م1، 2م2، 3م1، 4م2)
+            </button>
           </div>
         </section>
 
@@ -394,6 +553,78 @@ export default function TeacherSettingsPage() {
                 className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 shrink-0"
               />
             </label>
+          </div>
+        </section>
+
+        {/* قسم دليل ما يظهر لولي الأمر وأنواع الملفات التي يرفعها الأستاذ */}
+        <section className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-extrabold text-slate-800 flex items-center gap-2">
+                <Eye className="w-4 h-4 text-emerald-600" />
+                دليل ما يظهر للولي والتلميذ وأنواع ملفات الأستاذ
+              </h2>
+              <p className="text-[11px] text-slate-500">
+                تفصيل شامل لأنواع المحتويات والملفات المدعومة التي يمكن للأستاذ نشرها في فضائه المستقل.
+              </p>
+            </div>
+            <span className="text-[10px] bg-slate-100 text-slate-700 font-bold px-2 py-0.5 rounded-md border border-slate-200">
+              دليل المحتوى 📁
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            {/* 1. صور السبورة والكراس */}
+            <div className="p-3.5 rounded-xl border border-emerald-100 bg-emerald-50/40 space-y-1.5">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                  <ImageIcon className="w-4 h-4" />
+                </div>
+                <h3 className="text-xs font-black text-emerald-950">1. صور السبورة وكراس القسم اليومي</h3>
+              </div>
+              <p className="text-[11px] text-slate-600 leading-relaxed">
+                يلتقط الأستاذ صور السبورة أو كراس التلميذ المتميز ويرفعها (صيغ JPG, PNG, WebP)؛ تظهر للولي ليطمئن على نقل ابنه للدروس وتدارك الغيابات فوراً.
+              </p>
+            </div>
+
+            {/* 2. وثائق ومستندات PDF */}
+            <div className="p-3.5 rounded-xl border border-blue-100 bg-blue-50/40 space-y-1.5">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0">
+                  <FileText className="w-4 h-4" />
+                </div>
+                <h3 className="text-xs font-black text-blue-950">2. مستندات وسلاسل بصيغة PDF</h3>
+              </div>
+              <p className="text-[11px] text-slate-600 leading-relaxed">
+                رفع سلاسل التمارين، ملخصات المقاطع المعرفية، مطويات القوانين، ونماذج الفروض والشهادات السابقة بصيغة PDF قابلة للتحميل والطباعة.
+              </p>
+            </div>
+
+            {/* 3. شروحات الفيديو واليوتيوب */}
+            <div className="p-3.5 rounded-xl border border-rose-100 bg-rose-50/40 space-y-1.5">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-rose-600 text-white flex items-center justify-center shrink-0">
+                  <Video className="w-4 h-4" />
+                </div>
+                <h3 className="text-xs font-black text-rose-950">3. روابط فيديوهات الشرح (YouTube)</h3>
+              </div>
+              <p className="text-[11px] text-slate-600 leading-relaxed">
+                تضمين روابط الشروحات المصورة من قناة الأستاذ أو المنصات التعليمية المعتمدة لتظهر كمشغل فيديو مدمج يشاهده التلميذ في المنزل.
+              </p>
+            </div>
+
+            {/* 4. الواجبات مع ميزة حظر الحل النموذجي */}
+            <div className="p-3.5 rounded-xl border border-amber-100 bg-amber-50/40 space-y-1.5">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-amber-600 text-white flex items-center justify-center shrink-0">
+                  <CheckCircle className="w-4 h-4" />
+                </div>
+                <h3 className="text-xs font-black text-amber-950">4. واجبات مع حظر الحل النموذجي</h3>
+              </div>
+              <p className="text-[11px] text-slate-600 leading-relaxed">
+                يحدد الأستاذ نص الواجب وتاريخ الاستلام؛ ويمكنه جدولة الحل النموذجي ليظل محجوباً تماماً عن الأولياء والتلاميذ حتى انقضاء مهلة التسليم.
+              </p>
+            </div>
           </div>
         </section>
 

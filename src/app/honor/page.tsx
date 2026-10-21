@@ -21,6 +21,7 @@ export default function HonorRollPage() {
   const teacherId = useTeacherId();
   const teacherInfo = useTeacherInfo(teacherId);
   const [honors, setHonors] = useState<HonorStudent[]>([]);
+  const [classesList, setClassesList] = useState<string[]>([...HONOR_CLASSES]);
   const [selectedClass, setSelectedClass] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -36,7 +37,15 @@ export default function HonorRollPage() {
         headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
       });
       const data = await res.json();
-      setHonors(Array.isArray(data.honors) ? data.honors : []);
+      const honorsData: HonorStudent[] = Array.isArray(data.honors) ? data.honors : [];
+      setHonors(honorsData);
+
+      if (Array.isArray(data.customClasses) && data.customClasses.length > 0) {
+        setClassesList(data.customClasses);
+      } else {
+        const unique = Array.from(new Set(honorsData.map((h) => h.className).filter(Boolean)));
+        if (unique.length > 0) setClassesList(unique);
+      }
     } catch (e) {
       console.error("Error fetching honors:", e);
     } finally {
@@ -78,7 +87,7 @@ export default function HonorRollPage() {
         </Link>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
-            <h1 className="text-base font-black text-slate-900 truncate">لوحة الشرف | نجوم الرياضيات</h1>
+            <h1 className="text-base font-black text-slate-900 truncate">لوحة الشرف وتكريم النوابغ</h1>
             <span className="text-amber-500 text-sm">✨</span>
           </div>
           <p className="text-[11px] text-slate-500 font-bold truncate">
@@ -87,57 +96,57 @@ export default function HonorRollPage() {
         </div>
       </div>
 
-      {/* بنر تشجيعي جذاب وراقي */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-amber-500 via-amber-600 to-emerald-700 rounded-3xl p-5 text-white shadow-lg shadow-amber-500/15">
-        <div className="absolute top-0 left-0 -translate-x-4 -translate-y-4 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none" />
-        <div className="absolute bottom-0 right-0 translate-x-4 translate-y-4 w-32 h-32 bg-emerald-400/20 rounded-full blur-2xl pointer-events-none" />
+      {/* بنر تشجيعي جذاب وراقي متناسق مع هوية المنصة */}
+      <div className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-950 rounded-3xl p-5 text-white shadow-md border border-slate-800">
+        <div className="absolute top-0 left-0 -translate-x-4 -translate-y-4 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
+        <div className="absolute bottom-0 right-0 translate-x-4 translate-y-4 w-32 h-32 bg-amber-400/10 rounded-full blur-2xl pointer-events-none" />
 
         <div className="relative flex items-start gap-3.5">
-          <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-xs flex items-center justify-center text-2xl shrink-0 shadow-inner">
+          <div className="w-12 h-12 rounded-2xl bg-amber-400/20 text-amber-300 border border-amber-400/30 flex items-center justify-center text-2xl shrink-0 shadow-inner">
             🏆
           </div>
           <div className="flex-1 space-y-1">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-black bg-white/25 px-2.5 py-0.5 rounded-full text-amber-50 tracking-wide uppercase">
+              <span className="text-xs font-black bg-amber-400/20 text-amber-200 border border-amber-400/30 px-2.5 py-0.5 rounded-full tracking-wide uppercase">
                 لوحة التميز والإتقان
               </span>
             </div>
-            <h2 className="text-sm font-black leading-snug">
-              نوابغ وأبطال أقسامنا في مادة الرياضيات
+            <h2 className="text-sm font-black leading-snug text-white">
+              نوابغ وأبطال أقسامنا المتميزة
             </h2>
-            <p className="text-[11px] text-amber-50 leading-relaxed font-medium">
+            <p className="text-[11px] text-slate-300 leading-relaxed font-medium">
               «هنيئاً لتلاميذنا الأفاضل الذين تميزوا بحسن الانضباط، إتقان الكراس والاجتهاد المستمر.. والفرصة مفتوحة دائماً لبقية زملائهم للانضمام!»
             </p>
           </div>
         </div>
 
         {/* إحصائية سريعة بدون ترتيب */}
-        <div className="mt-4 pt-3 border-t border-white/15 flex items-center justify-between text-xs font-bold text-amber-100">
+        <div className="mt-4 pt-3 border-t border-slate-700/60 flex items-center justify-between text-xs font-bold text-slate-300">
           <span className="flex items-center gap-1.5">
-            <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
             <span>كوكبة متميزة دون ترتيب تفضيلي</span>
           </span>
-          <span className="bg-white/20 px-2.5 py-0.5 rounded-lg text-white font-black text-[11px]">
+          <span className="bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 px-2.5 py-0.5 rounded-lg font-black text-[11px]">
             {honors.length} متميز ومتميزة
           </span>
         </div>
       </div>
 
-      {/* أقسام الأستاذ: 1م1، 1م2، 1م3، 2م3 */}
+      {/* أقسام الأستاذ المحددة تلقائياً */}
       <div className="space-y-2">
         <div className="flex items-center justify-between px-1">
           <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
             <GraduationCap className="w-4 h-4 text-emerald-600" />
             <span>اختر القسم لعرض نوابغه:</span>
           </span>
-          <span className="text-[11px] text-slate-400 font-bold">أقسام الأستاذ</span>
+          <span className="text-[11px] text-slate-400 font-bold">أقسام الأستاذ المعتمدة</span>
         </div>
 
-        {/* أزرار الأقسام الأربعة */}
-        <div className="grid grid-cols-5 gap-1.5">
+        {/* أزرار الأقسام المعرفة للأستاذ */}
+        <div className="flex flex-wrap gap-1.5">
           <button
             onClick={() => setSelectedClass("all")}
-            className={`py-2 px-1 rounded-xl text-xs font-black transition-all flex flex-col items-center justify-center gap-0.5 border ${
+            className={`py-2 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 border ${
               selectedClass === "all"
                 ? "bg-slate-900 text-white border-slate-900 shadow-xs"
                 : "bg-white text-slate-700 border-slate-200 hover:border-slate-300"
@@ -155,14 +164,14 @@ export default function HonorRollPage() {
             </span>
           </button>
 
-          {HONOR_CLASSES.map((cls) => {
+          {classesList.map((cls) => {
             const count = getClassCount(cls);
             const isSelected = selectedClass === cls;
             return (
               <button
                 key={cls}
                 onClick={() => setSelectedClass(cls)}
-                className={`py-2 px-1 rounded-xl text-xs font-black transition-all flex flex-col items-center justify-center gap-0.5 border ${
+                className={`py-2 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 border ${
                   isSelected
                     ? "bg-emerald-600 text-white border-emerald-600 shadow-xs shadow-emerald-600/20"
                     : "bg-white text-slate-700 border-slate-200 hover:border-emerald-300"
