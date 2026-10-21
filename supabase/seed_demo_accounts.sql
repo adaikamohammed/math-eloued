@@ -505,7 +505,7 @@ INSERT INTO public.forum_replies (
   id, topic_id, author_id, author_name, author_role, body, is_official, votes, created_at
 )
 VALUES (
-  'r1111111-1111-1111-1111-111111111111',
+  'de111111-1111-1111-1111-111111111111',
   'f1111111-1111-1111-1111-111111111111',
   'a2222222-2222-2222-2222-222222222222',
   'الأستاذة مريم عدايكة',
@@ -525,7 +525,7 @@ INSERT INTO public.forum_replies (
   id, topic_id, author_id, author_name, author_role, body, is_official, votes, created_at
 )
 VALUES (
-  'r2222222-2222-2222-2222-222222222222',
+  'de222222-2222-2222-2222-222222222222',
   'f1111111-1111-1111-1111-111111111111',
   'b1111111-1111-1111-1111-111111111111',
   'الأستاذ عبد القادر لعموري',
@@ -619,7 +619,7 @@ INSERT INTO public.pedagogical_notes (
   inspector_feedback, reviewed_at, created_at
 )
 VALUES (
-  'p1111111-1111-1111-1111-111111111111',
+  'ed111111-1111-1111-1111-111111111111',
   'a1111111-1111-1111-1111-111111111111',
   1,
   1,
@@ -631,7 +631,7 @@ VALUES (
   NOW() - INTERVAL '5 days'
 ),
 (
-  'p2222222-2222-2222-2222-222222222222',
+  'ed222222-2222-2222-2222-222222222222',
   'a1111111-1111-1111-1111-111111111111',
   1,
   4,
