@@ -165,6 +165,45 @@ export type AnonymousMessage = {
   read?: boolean; // هل تمت قراءتها من الأستاذ
 };
 
+export type TeacherFeatureFlags = {
+  boardLessons?: boolean;          // كراس القسم وصور السبورة
+  homework?: boolean;              // الواجبات والأنشطة المنزلية
+  continuousAssessment?: boolean;  // دفتر نقاط وميثاق التقويم المستمر
+  honors?: boolean;                // لوحة الشرف والمتفوقين
+  reception?: boolean;             // مواعيد واستدعاءات الأولياء
+  announcements?: boolean;         // الإعلانات المدرسية
+  messages?: boolean;              // صندوق الرسائل المجهولة
+  penalties?: boolean;             // سجل الملاحظات والخصومات
+  inspectorSync?: boolean;         // الربط مع المفتشية البيداغوجية
+};
+
+export const DEFAULT_FEATURE_FLAGS: TeacherFeatureFlags = {
+  boardLessons: true,
+  homework: true,
+  continuousAssessment: true,
+  honors: true,
+  reception: true,
+  announcements: true,
+  messages: true,
+  penalties: true,
+  inspectorSync: true,
+};
+
+export const MIDDLE_SCHOOL_SUBJECTS = [
+  { id: "mathematics", name: "الرياضيات", icon: "∑", codePrefix: "MTH" },
+  { id: "physics", name: "العلوم الفيزيائية والتكنولوجيا", icon: "⚛️", codePrefix: "PHY" },
+  { id: "science", name: "علوم الطبيعة والحياة", icon: "🔬", codePrefix: "SCI" },
+  { id: "arabic", name: "اللغة العربية وآدابها", icon: "📖", codePrefix: "ARA" },
+  { id: "french", name: "اللغة الفرنسية", icon: "🇫🇷", codePrefix: "FRN" },
+  { id: "english", name: "اللغة الإنجليزية", icon: "🇬🇧", codePrefix: "ENG" },
+  { id: "history_geo", name: "التاريخ والجغرافيا", icon: "🗺️", codePrefix: "HIS" },
+  { id: "islamic", name: "التربية الإسلامية", icon: "🕌", codePrefix: "ISL" },
+  { id: "civics", name: "التربية المدنية", icon: "⚖️", codePrefix: "CIV" },
+  { id: "pe", name: "التربية البدنية والرياضية", icon: "🏃", codePrefix: "EPS" },
+] as const;
+
+export type SubjectId = (typeof MIDDLE_SCHOOL_SUBJECTS)[number]["id"];
+
 export type LessonsData = {
   lessons: Lesson[];
   summons?: ParentSummons[];
@@ -175,6 +214,8 @@ export type LessonsData = {
   studentRoster?: StudentRosterItem[];
   announcements?: Announcement[];
   anonymousMessages?: AnonymousMessage[];
+  featureFlags?: TeacherFeatureFlags;
+  subject?: SubjectId | string;
 };
 
 export const LEVELS = {
@@ -237,6 +278,9 @@ export interface UserProfile {
   is_verified?: boolean;
   isVerified?: boolean;
   reception?: ReceptionInfo | null;
+  subject?: string;
+  feature_flags?: TeacherFeatureFlags;
+  terms_accepted_at?: string;
   created_at?: string;
   createdAt?: string;
 }

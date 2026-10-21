@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   ArrowRight,
   Award,
@@ -18,9 +19,48 @@ import {
   Info,
   Clock,
   HeartHandshake,
+  Loader2,
 } from "lucide-react";
+import { SafeHarborDisclaimer } from "@/components/SafeHarborDisclaimer";
+import { supabase } from "@/lib/supabase";
 
 export default function AssessmentPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex justify-center py-20">
+          <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
+        </div>
+      }
+    >
+      <AssessmentContent />
+    </Suspense>
+  );
+}
+
+function AssessmentContent() {
+  const searchParams = useSearchParams();
+  const teacherId = searchParams.get("teacher");
+  const [teacherProfile, setTeacherProfile] = useState<{ fullName?: string; schoolName?: string; slug?: string } | null>(null);
+
+  useEffect(() => {
+    if (!teacherId) return;
+    supabase
+      .from("profiles")
+      .select("full_name, school_custom_name, slug")
+      .eq("id", teacherId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) {
+          setTeacherProfile({
+            fullName: data.full_name,
+            schoolName: data.school_custom_name,
+            slug: data.slug,
+          });
+        }
+      });
+  }, [teacherId]);
+
   // حاسبة تقديرية تفاعلية
   const [calcNotebook, setCalcNotebook] = useState(5);
   const [calcHomework, setCalcHomework] = useState(5);
@@ -39,12 +79,14 @@ export default function AssessmentPage() {
 
   const ratingInfo = getRatingInfo(totalCalc);
 
+  const backUrl = teacherProfile?.slug ? `/t/${teacherProfile.slug}` : teacherId ? `/t/${teacherId}` : "/";
+
   return (
     <div className="pb-16 pt-3 fade-up space-y-4">
       {/* رأس الصفحة مع زر الرجوع */}
       <div className="flex items-center gap-3 bg-white p-3.5 rounded-2xl border border-emerald-100 shadow-2xs">
         <Link
-          href="/"
+          href={backUrl}
           className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-700 hover:bg-emerald-100 active:scale-95 transition shrink-0"
           aria-label="الرجوع"
         >
@@ -60,7 +102,7 @@ export default function AssessmentPage() {
             </span>
           </div>
           <p className="text-[11px] text-slate-500 font-bold truncate">
-            ميثاق التقويم المستمر — مادة الرياضيات (التعليم المتوسط)
+            {teacherProfile?.fullName ? `فضاء الأستاذ(ة) ${teacherProfile.fullName} — ${teacherProfile.schoolName || ""}` : "ميثاق التقويم المستمر — مادة الرياضيات (التعليم المتوسط)"}
           </p>
         </div>
       </div>
@@ -375,6 +417,13 @@ export default function AssessmentPage() {
           «حرصك كولي أمر يبدأ من اليوم بتفقد كراس ابنك وواجباته في البيت.. أهلاً وسهلاً بكم في ساعات الاستقبال الأسبوعية (الأربعاء 10:00-11:00 صباحاً أو الأحد 08:00-09:00 صباحاً كفترة إضافية)، ويسعدني دائماً التعاون معكم لصالح أبنائكم.»
         </p>
       </div>
+
+      {/* درع الحماية القانونية وإخلاء المسؤولية */}
+      <SafeHarborDisclaimer
+        teacherName={teacherProfile?.fullName}
+        schoolName={teacherProfile?.schoolName}
+        subjectName="مادة الرياضيات"
+      />
     </div>
   );
 }

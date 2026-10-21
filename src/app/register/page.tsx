@@ -23,8 +23,10 @@ import {
   ShieldCheck,
   X,
   FileCheck,
+  Scale,
 } from "lucide-react";
 import { safeStorageName, validateUpload, compressIfImage } from "@/lib/compress";
+import { MIDDLE_SCHOOL_SUBJECTS } from "@/lib/types";
 
 const DISTRICTS = [
   { id: 1, name: "المقاطعة 1" },
@@ -37,6 +39,7 @@ const DISTRICTS = [
 export default function RegisterTeacherPage() {
   const router = useRouter();
   const [fullName, setFullName] = useState("");
+  const [subject, setSubject] = useState("mathematics");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [phone, setPhone] = useState("");
@@ -45,6 +48,9 @@ export default function RegisterTeacherPage() {
   const [middleSchoolId, setMiddleSchoolId] = useState("");
   const [schools, setSchools] = useState<{ id: string; name: string; commune: string }[]>([]);
   const [selectedLevels, setSelectedLevels] = useState<number[]>([1, 2]);
+
+  // تعهد المسؤولية البيداغوجية والقانونية
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   // ملف الإثبات / السيرة الذاتية
   const [docFile, setDocFile] = useState<File | null>(null);
@@ -96,6 +102,11 @@ export default function RegisterTeacherPage() {
       return;
     }
 
+    if (!agreedToTerms) {
+      setErrorMsg("يرجى الموافقة على ميثاق وتعهد المسؤولية البيداغوجية والقانونية للأستاذ للمتابعة");
+      return;
+    }
+
     const invalid = validateUpload(docFile);
     if (invalid) {
       setErrorMsg(invalid);
@@ -105,8 +116,9 @@ export default function RegisterTeacherPage() {
     setLoading(true);
 
     try {
-      // توليد كود ورابط فريد للأستاذ
-      const randomCode = "MTH-" + Math.floor(1000 + Math.random() * 9000);
+      // توليد كود ورابط فريد للأستاذ بحسب المادة
+      const prefix = MIDDLE_SCHOOL_SUBJECTS.find((s) => s.id === subject)?.codePrefix || "MTH";
+      const randomCode = prefix + "-" + Math.floor(1000 + Math.random() * 9000);
       const cleanSlug = "prof-" + Math.random().toString(36).substring(2, 8);
 
       // تجهيز ملف الوثيقة (ضغط إذا كان صورة)
@@ -120,6 +132,8 @@ export default function RegisterTeacherPage() {
           data: {
             role: "teacher",
             full_name: fullName.trim(),
+            subject: subject,
+            terms_accepted_at: new Date().toISOString(),
             phone: phone.trim(),
             district_id: Number(districtId),
             middle_school_id: middleSchoolId || "",
@@ -261,21 +275,43 @@ export default function RegisterTeacherPage() {
           )}
 
           <form className="space-y-4" onSubmit={handleRegister}>
-            {/* 1. الاسم واللقب */}
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                الاسم واللقب الكامل <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  required
-                  placeholder="مثال: محمد بن عمارة"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  className="w-full py-2.5 pl-3 pr-10 rounded-xl border border-slate-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 transition bg-slate-50/50"
-                />
-                <User className="w-4 h-4 text-slate-400 absolute right-3.5 top-3" />
+            {/* 1. الاسم واللقب والمادة */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  الاسم واللقب الكامل <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    required
+                    placeholder="مثال: محمد بن عمارة"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    className="w-full py-2.5 pl-3 pr-10 rounded-xl border border-slate-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 transition bg-slate-50/50"
+                  />
+                  <User className="w-4 h-4 text-slate-400 absolute right-3.5 top-3" />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  المادة التعليمية <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <select
+                    value={subject}
+                    onChange={(e) => setSubject(e.target.value)}
+                    className="w-full py-2.5 pl-3 pr-10 rounded-xl border border-slate-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 transition bg-slate-50/50 font-bold text-slate-800"
+                  >
+                    {MIDDLE_SCHOOL_SUBJECTS.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.icon} {s.name} ({s.codePrefix})
+                      </option>
+                    ))}
+                  </select>
+                  <GraduationCap className="w-4 h-4 text-slate-400 absolute right-3.5 top-3" />
+                </div>
               </div>
             </div>
 
@@ -477,6 +513,23 @@ export default function RegisterTeacherPage() {
                   </button>
                 </div>
               )}
+            </div>
+
+            {/* تعهد المسؤولية البيداغوجية والقانونية للأستاذ */}
+            <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-2">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  required
+                  checked={agreedToTerms}
+                  onChange={(e) => setAgreedToTerms(e.target.checked)}
+                  className="mt-1 w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 shrink-0"
+                />
+                <span className="text-xs text-slate-700 leading-relaxed font-medium">
+                  <strong className="text-amber-900 block mb-0.5">تعهد المسؤولية البيداغوجية والقانونية:</strong>
+                  أقر بأن كافة الدروس، صور السبورة، الواجبات، ونقاط التقويم المنشورة عبر فضائي تقع تحت مسؤوليتي التربوية والقانونية الحصرية كأستاذ ممارس، وأن المنصة مجرد وسيط تقني لا يتحمل أي مسؤولية إدارية أو قانونية عن أي محتوى غير لائق.
+                </span>
+              </label>
             </div>
 
             {/* زر الإرسال */}

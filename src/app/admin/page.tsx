@@ -1137,7 +1137,7 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
             <span>الموقع الرئيسي</span>
           </Link>
           <Link
-            href="/assessment"
+            href={withTeacher("/assessment", profile.id)}
             target="_blank"
             className="flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200/70 hover:bg-emerald-100 transition text-[11px]"
           >
