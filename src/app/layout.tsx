@@ -1,10 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
-import { TeacherAccess } from "@/components/TeacherAccess";
 import PWAInstallBanner from "@/components/PWAInstallBanner";
 import { AppShell } from "@/components/AppShell";
-import { GlobalNavbar } from "@/components/GlobalNavbar";
 
 export const metadata: Metadata = {
   title: "منصة رياضيات ولاية الوادي",
@@ -45,9 +43,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="bg-slate-50 text-slate-900 antialiased selection:bg-emerald-500 selection:text-white">
         <ServiceWorkerRegister />
-        <TeacherAccess />
         <PWAInstallBanner />
-        <GlobalNavbar />
         <AppShell>{children}</AppShell>
       </body>
     </html>
