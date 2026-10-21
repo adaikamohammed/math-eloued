@@ -6,12 +6,14 @@ import Link from "next/link";
 import { LoginRequired } from "@/components/LoginRequired";
 import { withTeacher } from "@/lib/teacherParam";
 import { PedagogyAlerts } from "@/components/PedagogyAlerts";
+import { ParentShareModal } from "@/components/ParentShareModal";
 import { BOARD_IMAGE_OPTIONS } from "@/lib/compress";
 import {
   Plus,
   Trash2,
   Upload,
   LogOut,
+  Share2,
   ChevronDown,
   Loader2,
   Pencil,
@@ -121,6 +123,7 @@ export default function AdminPage() {
 
 /* ---------------- 2. لوحة التحكم الرئيسية ---------------- */
 function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: () => void }) {
+  const [shareModalOpen, setShareModalOpen] = useState(false);
   const levelsTaught = (
     profile.levels_taught && profile.levels_taught.length > 0 ? profile.levels_taught : [1, 2, 3, 4]
   ).filter((lv): lv is 1 | 2 | 3 | 4 => [1, 2, 3, 4].includes(lv));
@@ -1055,6 +1058,17 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
         </div>
       )}
 
+      {profile && (
+        <ParentShareModal
+          isOpen={shareModalOpen}
+          onClose={() => setShareModalOpen(false)}
+          teacherName={profile.full_name || "الأستاذ"}
+          teacherCode={profile.teacher_code || "MTH"}
+          schoolName={profile.school_custom_name || ""}
+          slug={profile.slug || profile.teacher_code || ""}
+        />
+      )}
+
       {/* الشريط العلوي */}
       <div className="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-2xs space-y-3">
         <div className="flex items-center justify-between">
@@ -1066,6 +1080,14 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
             </p>
           </div>
           <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setShareModalOpen(true)}
+              className="flex items-center gap-1.5 text-xs text-white bg-emerald-600 hover:bg-emerald-500 font-bold px-3 py-1.5 rounded-xl shadow-md shadow-emerald-700/20 transition cursor-pointer"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              <span>إرسال الكود للأولياء 📲</span>
+            </button>
             <Link
               href={`/t/${profile.slug || profile.id}`}
               target="_blank"

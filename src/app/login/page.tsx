@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import { Lock, Mail, Loader2, AlertCircle, ArrowLeft, GraduationCap, ShieldCheck, Clock } from "lucide-react";
+import { Lock, Mail, Loader2, AlertCircle, ArrowLeft, GraduationCap, ShieldCheck, Clock, Sparkles } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -181,6 +181,70 @@ export default function LoginPage() {
             <Link href="/register" className="text-emerald-700 font-bold hover:underline">
               تسجيل حساب أستاذ جديد هنا
             </Link>
+          </div>
+
+          {/* حسابات العرض التجريبي للمقاطعة 1 */}
+          <div className="mt-6 pt-5 border-t border-slate-100 space-y-3">
+            <div className="flex items-center justify-between text-xs font-bold text-slate-700">
+              <span className="flex items-center gap-1.5 text-emerald-800">
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                حسابات العرض التجريبي (المقاطعة 1):
+              </span>
+              <span className="text-[10px] text-slate-400 font-normal">نقرة واحدة للتعبئة</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-right">
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail("prof.kaddouri@eloued-math.dz");
+                  setPassword("ProfKaddouri2026!");
+                }}
+                className="p-2.5 rounded-xl border border-emerald-100 bg-emerald-50/70 hover:bg-emerald-100/70 text-right text-xs transition cursor-pointer"
+              >
+                <div className="font-bold text-emerald-900">الأستاذ بلقاسم قدوري</div>
+                <div className="text-[10px] text-emerald-700 font-mono">MTH-101 • 1م و 4م</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail("prof.adaika@eloued-math.dz");
+                  setPassword("ProfAdaika2026!");
+                }}
+                className="p-2.5 rounded-xl border border-teal-100 bg-teal-50/70 hover:bg-teal-100/70 text-right text-xs transition cursor-pointer"
+              >
+                <div className="font-bold text-teal-900">الأستاذة مريم عدايكة</div>
+                <div className="text-[10px] text-teal-700 font-mono">MTH-102 • 2م و 3م</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail("prof.tidjani@eloued-math.dz");
+                  setPassword("ProfTidjani2026!");
+                }}
+                className="p-2.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-right text-xs transition cursor-pointer"
+              >
+                <div className="font-bold text-slate-800">الأستاذ إبراهيم التجاني</div>
+                <div className="text-[10px] text-slate-600 font-mono">MTH-103 • 3م و 4م</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail("inspecteur.laamouri@eloued-math.dz");
+                  setPassword("Inspecteur2026!");
+                }}
+                className="p-2.5 rounded-xl border border-amber-200 bg-amber-50/80 hover:bg-amber-100 text-right text-xs transition cursor-pointer"
+              >
+                <div className="font-bold text-amber-900 flex items-center justify-between">
+                  <span>المفتش عبد القادر لعموري</span>
+                  <span className="text-[9px] bg-amber-200/80 text-amber-900 px-1 py-0.2 rounded font-bold">مفتش 1</span>
+                </div>
+                <div className="text-[10px] text-amber-700">مفتشية المقاطعة 1</div>
+              </button>
+            </div>
           </div>
         </div>
       </div>
