@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import { Lock, Mail, Loader2, AlertCircle, ArrowLeft, GraduationCap, ShieldCheck, Clock, Sparkles } from "lucide-react";
+import { Lock, Mail, Loader2, AlertCircle, ArrowLeft, ArrowRight, GraduationCap, ShieldCheck, Clock, Sparkles } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -85,6 +85,16 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 font-sans" dir="rtl">
+      <div className="sm:mx-auto sm:w-full sm:max-w-md mb-2 text-right">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 font-bold transition bg-white px-3 py-1.5 rounded-xl border border-slate-200"
+        >
+          <ArrowRight className="w-3.5 h-3.5" />
+          <span>العودة لصفحة الهبوط الرئيسية</span>
+        </Link>
+      </div>
+
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center space-y-2">
         <div className="inline-flex items-center justify-center w-14 h-14 rounded-3xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white shadow-lg shadow-emerald-500/20 mb-2">
           <GraduationCap className="w-7 h-7" />
@@ -97,7 +107,7 @@ export default function LoginPage() {
           تسجيل الدخول
         </h1>
         <p className="text-xs text-slate-500">
-          دخول الأساتذة ومفتشي التعليم المتوسط لمادة الرياضيات
+          دخول الأساتذة ومفتشي التعليم المتوسط لكافة المواد
         </p>
       </div>
 

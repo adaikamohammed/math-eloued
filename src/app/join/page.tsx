@@ -15,6 +15,7 @@ import {
   AlertCircle,
   CheckCircle2,
   ArrowLeft,
+  ArrowRight,
   KeyRound,
   ShieldCheck,
   BookOpen,
@@ -273,8 +274,22 @@ export default function JoinTeacherPage() {
 
   // ─── الشاشة الثالثة: استمارة التسجيل السريعة والفورية ───
   return (
-    <div className="max-w-2xl mx-auto py-8 px-4 font-sans" dir="rtl">
-      <div className="bg-white rounded-3xl p-6 sm:p-10 border border-[#e8e8e0] shadow-xl space-y-6">
+    <div className="min-h-screen bg-[#fafaf7] py-6 sm:py-10 px-4 font-sans" dir="rtl">
+      <div className="max-w-2xl mx-auto space-y-4">
+        <div className="flex items-center justify-between">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 text-xs text-gray-600 hover:text-gray-900 font-bold transition bg-white px-3 py-1.5 rounded-xl border border-[#e8e8e0] shadow-2xs"
+          >
+            <ArrowRight className="w-3.5 h-3.5" />
+            <span>العودة للرئيسية</span>
+          </Link>
+          <span className="text-[11px] font-mono text-[#107a57] bg-[#e6f4ee] px-2.5 py-1 rounded-lg border border-[#107a57]/20 font-bold">
+            رابط دعوة معتمد 🔒
+          </span>
+        </div>
+
+        <div className="bg-white rounded-3xl p-6 sm:p-10 border border-[#e8e8e0] shadow-xl space-y-6">
         {/* رأس الاستمارة */}
         <div className="border-b border-[#e8e8e0] pb-5 space-y-2">
           <div className="inline-flex items-center gap-2 bg-[#e6f4ee] text-[#107a57] border border-[#107a57]/20 px-3 py-1 rounded-full text-xs font-bold">
@@ -472,5 +487,6 @@ export default function JoinTeacherPage() {
         </form>
       </div>
     </div>
+  </div>
   );
 }
