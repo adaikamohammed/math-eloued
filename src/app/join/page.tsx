@@ -148,7 +148,23 @@ export default function JoinTeacherPage() {
       }, 1800);
     } catch (err: any) {
       console.error("Join error:", err);
-      setErrorMsg(err.message || "حدث خطأ أثناء إنشاء الحساب، يرجى المحاولة مجدداً");
+      const raw = String(err?.message || "");
+
+      if (raw.includes("rate limit") || raw.includes("over_email_send_rate_limit")) {
+        setErrorMsg(
+          "تم تجاوز الحد التجريبي لإرسال الرسائل في خادم Supabase. للحل الفوري: يرجى فتح Supabase Dashboard -> Authentication -> Providers -> Email وتعطيل خيار 'Confirm email' ليتم التسجيل فورياً بدون انتظار بريد."
+        );
+      } else if (raw.includes("is invalid") || raw.includes("Email address")) {
+        setErrorMsg(
+          "عنوان البريد الإلكتروني غير صالح (خادم Supabase يحظر العناوين الافتراضية مثل admin@). يرجى استخدام بريد شخصي صالح مثل: اسمك@gmail.com"
+        );
+      } else if (raw.includes("already registered") || raw.includes("User already registered")) {
+        setErrorMsg(
+          "هذا البريد مسجل مسبقاً في المنصة. إذا كان هذا حسابك، يمكنك التوجه لصفحة تسجيل الدخول مباشرة."
+        );
+      } else {
+        setErrorMsg(raw || "حدث خطأ أثناء إنشاء الحساب، يرجى المحاولة مجدداً");
+      }
       setLoading(false);
     }
   };
