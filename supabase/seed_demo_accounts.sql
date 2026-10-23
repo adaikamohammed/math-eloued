@@ -36,7 +36,7 @@ INSERT INTO auth.users (
   id, instance_id, email, encrypted_password, email_confirmed_at,
   raw_app_meta_data, raw_user_meta_data, aud, role, created_at, updated_at,
   confirmation_token, recovery_token, email_change, email_change_token_new,
-  email_change_token_current, phone, phone_change, phone_change_token, reauthentication_token
+  email_change_token_current, reauthentication_token
 )
 VALUES (
   'a1111111-1111-1111-1111-111111111111',
@@ -50,7 +50,7 @@ VALUES (
   'authenticated',
   NOW(),
   NOW(),
-  '', '', '', '', '', '', '', '', ''
+  '', '', '', '', '', ''
 )
 ON CONFLICT (id) DO UPDATE SET
   encrypted_password = extensions.crypt('ProfKaddouri2026!', extensions.gen_salt('bf')),
@@ -58,15 +58,14 @@ ON CONFLICT (id) DO UPDATE SET
   email_confirmed_at = NOW(),
   confirmation_token = '',
   recovery_token = '',
-  email_change = '',
-  phone = '';
+  email_change = '';
 
 -- ب) الأستاذة 2: مريم عدايكة (MTH-102)
 INSERT INTO auth.users (
   id, instance_id, email, encrypted_password, email_confirmed_at,
   raw_app_meta_data, raw_user_meta_data, aud, role, created_at, updated_at,
   confirmation_token, recovery_token, email_change, email_change_token_new,
-  email_change_token_current, phone, phone_change, phone_change_token, reauthentication_token
+  email_change_token_current, reauthentication_token
 )
 VALUES (
   'a2222222-2222-2222-2222-222222222222',
@@ -80,7 +79,7 @@ VALUES (
   'authenticated',
   NOW(),
   NOW(),
-  '', '', '', '', '', '', '', '', ''
+  '', '', '', '', '', ''
 )
 ON CONFLICT (id) DO UPDATE SET
   encrypted_password = extensions.crypt('ProfAdaika2026!', extensions.gen_salt('bf')),
@@ -88,15 +87,14 @@ ON CONFLICT (id) DO UPDATE SET
   email_confirmed_at = NOW(),
   confirmation_token = '',
   recovery_token = '',
-  email_change = '',
-  phone = '';
+  email_change = '';
 
 -- ج) الأستاذ 3: إبراهيم التجاني (MTH-103)
 INSERT INTO auth.users (
   id, instance_id, email, encrypted_password, email_confirmed_at,
   raw_app_meta_data, raw_user_meta_data, aud, role, created_at, updated_at,
   confirmation_token, recovery_token, email_change, email_change_token_new,
-  email_change_token_current, phone, phone_change, phone_change_token, reauthentication_token
+  email_change_token_current, reauthentication_token
 )
 VALUES (
   'a3333333-3333-3333-3333-333333333333',
@@ -110,7 +108,7 @@ VALUES (
   'authenticated',
   NOW(),
   NOW(),
-  '', '', '', '', '', '', '', '', ''
+  '', '', '', '', '', ''
 )
 ON CONFLICT (id) DO UPDATE SET
   encrypted_password = extensions.crypt('ProfTidjani2026!', extensions.gen_salt('bf')),
@@ -118,15 +116,14 @@ ON CONFLICT (id) DO UPDATE SET
   email_confirmed_at = NOW(),
   confirmation_token = '',
   recovery_token = '',
-  email_change = '',
-  phone = '';
+  email_change = '';
 
 -- د) المفتش: عبد القادر لعموري (مفتش المقاطعة 1)
 INSERT INTO auth.users (
   id, instance_id, email, encrypted_password, email_confirmed_at,
   raw_app_meta_data, raw_user_meta_data, aud, role, created_at, updated_at,
   confirmation_token, recovery_token, email_change, email_change_token_new,
-  email_change_token_current, phone, phone_change, phone_change_token, reauthentication_token
+  email_change_token_current, reauthentication_token
 )
 VALUES (
   'b1111111-1111-1111-1111-111111111111',
@@ -140,7 +137,7 @@ VALUES (
   'authenticated',
   NOW(),
   NOW(),
-  '', '', '', '', '', '', '', '', ''
+  '', '', '', '', '', ''
 )
 ON CONFLICT (id) DO UPDATE SET
   encrypted_password = extensions.crypt('Inspecteur2026!', extensions.gen_salt('bf')),
@@ -148,8 +145,7 @@ ON CONFLICT (id) DO UPDATE SET
   email_confirmed_at = NOW(),
   confirmation_token = '',
   recovery_token = '',
-  email_change = '',
-  phone = '';
+  email_change = '';
 
 -- --------------------------------------------------------------------
 -- 3. تحديث وضبط الملفات الشخصية profiles (معتمدة وموثقة فوراً)
