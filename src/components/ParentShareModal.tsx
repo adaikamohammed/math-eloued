@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import QRCode from "qrcode";
 import {
   X,
@@ -36,6 +37,7 @@ export function ParentShareModal({
   slug,
   levelsTaught,
 }: ParentShareModalProps) {
+  const [mounted, setMounted] = useState(false);
   const [dataUrl, setDataUrl] = useState("");
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedMsg, setCopiedMsg] = useState(false);
@@ -65,7 +67,21 @@ export function ParentShareModal({
     }
   }, [isOpen, publicUrl]);
 
-  if (!isOpen) return null;
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      const orig = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = orig;
+      };
+    }
+  }, [isOpen]);
+
+  if (!isOpen || !mounted) return null;
 
   // نص الرسالة العامة الموجهة للأولياء
   const whatsappMessage = `السلام عليكم ورحمة الله وبركاته،
@@ -141,10 +157,10 @@ ${schoolName}`;
     window.print();
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200" dir="rtl">
+  return createPortal(
+    <div className="fixed inset-0 z-[999999] flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto animate-in fade-in duration-200" dir="rtl">
       {/* نافذة المودال */}
-      <div className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden max-h-[92vh] flex flex-col">
+      <div className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden my-auto max-h-[92vh] flex flex-col">
         {/* الترويسة */}
         <div className="bg-gradient-to-l from-emerald-900 via-emerald-800 to-teal-900 text-white px-6 py-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -344,6 +360,7 @@ ${schoolName}`;
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
