@@ -17,6 +17,8 @@ import {
   HeartHandshake,
   MapPin,
   MessageCircle,
+  ArrowLeft,
+  Mail,
 } from "lucide-react";
 import { Loading } from "@/components/ui";
 
@@ -221,6 +223,30 @@ export default function ParentsPage() {
             </p>
           </div>
         )}
+
+        {/* بطاقة توجيه لرسالة سرية للأستاذ */}
+        <Link
+          href={`/messages${teacherId ? `?teacher=${teacherId}` : ""}${urlLvl ? `&lvl=${urlLvl}` : ""}`}
+          className="flex items-center justify-between p-3.5 bg-gradient-to-r from-purple-50 via-indigo-50 to-slate-50 border border-purple-200/80 rounded-2xl hover:border-purple-300 hover:shadow-xs transition group cursor-pointer"
+        >
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-purple-600 text-white flex items-center justify-center shadow-xs shrink-0 group-hover:scale-105 transition">
+              <Mail className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="text-xs font-black text-purple-950 flex items-center gap-1.5">
+                <span>توجيه رسالة خاصة وسرية للأستاذ 🔒</span>
+                <span className="text-[10px] font-bold bg-purple-200/70 text-purple-900 px-2 py-0.5 rounded-full">
+                  صندوق الصراحة والشفافية
+                </span>
+              </span>
+              <p className="text-[11px] text-purple-800/80 font-medium">
+                إذا تعذر الحضور لموعد الاستقبال، يمكنكم إرسال أي استفسار أو ملاحظة حول التلميذ مباشرة وبسرية تامة.
+              </p>
+            </div>
+          </div>
+          <ArrowLeft className="w-4 h-4 text-purple-600 group-hover:-translate-x-1 transition shrink-0 mr-2" />
+        </Link>
 
         {/* تنبيه تربوي لطيف */}
         <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 text-[11px] text-slate-700 leading-relaxed font-semibold">

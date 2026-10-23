@@ -58,7 +58,7 @@ export default function WilayaHomePage() {
                     type="text"
                     name="q"
                     required
-                    placeholder="اكتب كود الأستاذ (مثال: MTH-101 أو ARB-205)..."
+                    placeholder="اكتب كود الأستاذ أو كود المستوى (مثال: MTH-101 أو MTH-101-1)..."
                     className="w-full pr-11 pl-4 py-3.5 rounded-2xl border border-[#e8e8e0] text-xs sm:text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57] transition bg-[#fafaf7] font-mono tracking-wider placeholder:font-sans placeholder:tracking-normal text-gray-900 shadow-2xs uppercase"
                   />
                   <Search className="w-4.5 h-4.5 text-gray-400 absolute right-3.5 top-3.5 pointer-events-none" />

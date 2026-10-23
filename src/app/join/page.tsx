@@ -317,7 +317,7 @@ function JoinTeacherForm() {
                 required
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                placeholder="مثال: أ. باهي علي أو أ. عبد الحميد قدوري"
+                placeholder="مثال: أ. محمد بلحاج أو أ. عبد الرحيم"
                 className="w-full pl-3 pr-10 py-2.5 rounded-xl bg-[#fafaf7] border border-[#e8e8e0] text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57] transition"
               />
               <User className="w-4 h-4 text-gray-400 absolute right-3 top-3 pointer-events-none" />
@@ -357,7 +357,7 @@ function JoinTeacherForm() {
                   required
                   value={middleSchoolName}
                   onChange={(e) => setMiddleSchoolName(e.target.value)}
-                  placeholder="مثال: متوسطة باهي علي"
+                  placeholder="مثال: متوسطة الأمير عبد القادر"
                   className="w-full pl-3 pr-10 py-2.5 rounded-xl bg-[#fafaf7] border border-[#e8e8e0] text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57] transition"
                 />
                 <Building2 className="w-4 h-4 text-gray-400 absolute right-3 top-3 pointer-events-none" />

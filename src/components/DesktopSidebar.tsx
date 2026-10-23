@@ -22,6 +22,7 @@ import {
   ClipboardList,
   Sliders,
   X,
+  UserPlus,
 } from "lucide-react";
 import { useLayout } from "@/context/LayoutContext";
 import { TeacherFeatureFlags } from "@/lib/types";
@@ -200,15 +201,15 @@ export function DesktopSidebar() {
     // ─── 3. الوضع العام للزوار والأولياء ───
     return [
       {
-        title: "الميدان التربوي",
+        title: "فضاء التلميذ والولي",
         items: [
           { label: "الرئيسية", href: "/", icon: Sparkles },
-          { label: "البحث بكود الأستاذ", href: "/t/search", icon: Search, badge: "جديد" },
-          { label: "فضاء الأولياء", href: "/my-children", icon: Heart },
+          { label: "البحث بكود الأستاذ أو المستوى", href: "/t/search", icon: Search, badge: "كود" },
+          { label: "مستجدات أبنائي (المحفظة)", href: "/my-children", icon: Heart },
         ],
       },
       {
-        title: "الشفافية والتقويم",
+        title: "الشفافية والتحفيز",
         items: [
           {
             label: "ميثاق التقويم (20/20)",
@@ -221,28 +222,22 @@ export function DesktopSidebar() {
         ],
       },
       {
-        title: "الملتقى والتفتيش",
+        title: "فضاء الطاقم التربوي",
         items: [
           {
-            label: "ملتقى الأساتذة البيداغوجي",
-            href: "/forum",
-            icon: Users,
-            badge: "💬 تفاعلي",
-            badgeColor: "bg-indigo-50 text-indigo-700 border border-indigo-200/80",
+            label: "تسجيل دخول الأستاذ",
+            href: "/login",
+            icon: GraduationCap,
+            badge: "للأساتذة 🔒",
+            badgeColor: "bg-slate-100 text-slate-700 border border-slate-200",
           },
           {
-            label: "فضاء التفتيش والمناشير",
-            href: "/inspector",
-            icon: ShieldCheck,
-            badge: "رسمي",
-            badgeColor: "bg-amber-50 text-amber-700 border border-amber-200/80",
+            label: "انضمام أستاذ جديد",
+            href: "/join",
+            icon: UserPlus,
+            badge: "فوري ✨",
+            badgeColor: "bg-emerald-50 text-emerald-700 border border-emerald-200",
           },
-        ],
-      },
-      {
-        title: "إدارة الفضاء",
-        items: [
-          { label: "تسجيل دخول الأستاذ", href: "/login", icon: GraduationCap },
         ],
       },
     ];

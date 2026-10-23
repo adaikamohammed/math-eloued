@@ -461,11 +461,11 @@ export const COMMON_FIELDS = [
 ] as const;
 
 export const RECEPTION_INFO = {
-  officialDay: "الأربعاء",
-  officialTime: "10:00 إلى 11:00 صباحاً",
-  extraDay: "الأحد",
-  extraTime: "08:00 إلى 09:00 صباحاً",
-  extraNote: "توقيت إضافي (مبادرة من الأستاذ لعدم الانتظار لأسبوع كامل) وليس ساعة استقبال رسمية",
-  location: "متوسطة المجاهد باهي علي",
-  motto: "أود استقبالكم الآن لمتابعة مستوى أبنائكم ومعالجة النقائص، وليس بعد الإعلان عن نتائج الفصل الأول!",
+  officialDay: "",
+  officialTime: "",
+  extraDay: "",
+  extraTime: "",
+  extraNote: "",
+  location: "",
+  motto: "أود استقبالكم لمتابعة مستوى أبنائكم ومعالجة النقائص في الوقت المناسب لصالح التلميذ.",
 } as const;

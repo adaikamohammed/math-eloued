@@ -112,11 +112,6 @@ function AssessmentContent() {
           </p>
         </div>
       </div>
-          <p className="text-[11px] text-slate-500 font-bold truncate">
-            {teacherProfile?.fullName ? `فضاء الأستاذ(ة) ${teacherProfile.fullName} — ${teacherProfile.schoolName || ""}` : "ميثاق التقويم المستمر — مادة الرياضيات (التعليم المتوسط)"}
-          </p>
-        </div>
-      </div>
 
       {/* بنر الميثاق والحديث النبوي الشريف */}
       <div className="relative overflow-hidden bg-gradient-to-br from-emerald-850 via-teal-800 to-emerald-950 rounded-3xl p-5 text-white shadow-md shadow-emerald-900/20 border border-emerald-700/30 space-y-3">
@@ -420,12 +415,22 @@ function AssessmentContent() {
 
       {/* رسالة ختامية وتذكير بمواعيد الاستقبال */}
       <div className="p-4 rounded-3xl bg-slate-900 text-white space-y-2 text-xs">
-        <div className="flex items-center gap-2 text-emerald-400 font-black">
-          <HeartHandshake className="w-4 h-4" />
-          <span>رسالة من الأستاذ لأولياء الأمور الكرام:</span>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-emerald-400 font-black">
+            <HeartHandshake className="w-4 h-4" />
+            <span>رسالة من الأستاذ لأولياء الأمور الكرام:</span>
+          </div>
+          {(teacherId || teacherProfile?.slug) && (
+            <Link
+              href={`/parents?teacher=${teacherId || teacherProfile?.slug}${lvl ? `&lvl=${lvl}` : ""}`}
+              className="text-[10px] text-emerald-400 hover:underline font-bold"
+            >
+              عرض موعد الاستقبال الرسمي ←
+            </Link>
+          )}
         </div>
         <p className="text-slate-300 leading-relaxed text-[11px]">
-          «حرصك كولي أمر يبدأ من اليوم بتفقد كراس ابنك وواجباته في البيت.. أهلاً وسهلاً بكم في ساعات الاستقبال الأسبوعية (الأربعاء 10:00-11:00 صباحاً أو الأحد 08:00-09:00 صباحاً كفترة إضافية)، ويسعدني دائماً التعاون معكم لصالح أبنائكم.»
+          «حرصك كولي أمر يبدأ من اليوم بتفقد كراس ابنك وواجباته في البيت.. أهلاً وسهلاً بكم دائماً للتنسيق والتشاور لصالح التلميذ وتدارك أي صعوبة مبكراً قبل تراكم الدروس.»
         </p>
       </div>
 

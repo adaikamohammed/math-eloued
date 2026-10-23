@@ -81,6 +81,7 @@ import {
   type AnnouncementCategory,
   type AnonymousMessage,
   type MessageCategory,
+  type StudentRosterItem,
 } from "@/lib/types";
 
 export type TeacherSession = {
@@ -168,6 +169,7 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
   const [lessonHomeworkNotes, setLessonHomeworkNotes] = useState("");
   const [filterMissingHw, setFilterMissingHw] = useState(false);
   const [studentsCount, setStudentsCount] = useState<number>(0);
+  const [studentRoster, setStudentRoster] = useState<StudentRosterItem[]>([]);
 
   // حقول إضافة استدعاء ولي أمر
   const [studentName, setStudentName] = useState("");
@@ -277,9 +279,20 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
         setHasDiary(true);
       }
       if (Array.isArray(data.studentRoster)) {
+        setStudentRoster(data.studentRoster);
         setStudentsCount(data.studentRoster.length);
-      } else if (Array.isArray(data.evaluations)) {
-        setStudentsCount(data.evaluations.length);
+      } else if (Array.isArray(data.evaluations) && data.evaluations.length > 0) {
+        const mapped: StudentRosterItem[] = data.evaluations.map((ev: any) => ({
+          id: ev.id,
+          studentName: ev.studentName,
+          className: ev.className,
+          groupName: ev.groupName || "القسم كامل",
+          createdAt: ev.updatedAt || new Date().toISOString(),
+        }));
+        setStudentRoster(mapped);
+        setStudentsCount(mapped.length);
+      } else {
+        setStudentRoster([]);
       }
     } finally {
       setLoading(false);
@@ -1055,6 +1068,42 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
       loadEvaluations();
     } catch (e: any) {
       showToast("error", e.message || "فشل الاستيراد");
+    }
+  };
+
+  const handleSyncClassFromRoster = async (targetCls = evalClass, targetGrp = evalGroup) => {
+    const cleanCls = (targetCls || "").replace(/\s+/g, "");
+    const matching = studentRoster.filter(
+      (s) => (s.className || "").replace(/\s+/g, "") === cleanCls
+    );
+    if (matching.length === 0) {
+      showToast("error", `لا توجد أسماء مسجلة لفوج "${targetCls}" في إدارة الأفواج`);
+      return;
+    }
+    const names = matching.map((s) => s.studentName);
+    try {
+      const res = await fetch("/api/evaluations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          students: names,
+          className: targetCls,
+          groupName: targetGrp,
+          notebookScore: 5,
+          homeworkScore: 5,
+          toolsScore: 5,
+          activityScore: 5,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      showToast(
+        "success",
+        `✓ تمت مزامنة واستيراد (${data.count}) تلميذ من إدارة الأفواج بنجاح إلى ${targetCls}!`
+      );
+      loadEvaluations();
+    } catch (e: any) {
+      showToast("error", e.message || "فشلت المزامنة");
     }
   };
 
@@ -2208,8 +2257,37 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
                     placeholder="اكتب اسم التلميذ، أو عدة أسماء مفصولة بفواصل..."
                     value={studentName}
                     onChange={(e) => setStudentName(e.target.value)}
+                    list="summons-students-datalist"
                     required
                   />
+                  <datalist id="summons-students-datalist">
+                    {studentRoster
+                      .filter((s) => !className || (s.className || "").replace(/\s+/g, "") === className.replace(/\s+/g, ""))
+                      .map((s) => (
+                        <option key={s.id} value={s.studentName} />
+                      ))}
+                  </datalist>
+                  {(() => {
+                    const classStudents = studentRoster.filter(
+                      (s) => !className || (s.className || "").replace(/\s+/g, "") === className.replace(/\s+/g, "")
+                    );
+                    if (classStudents.length === 0) return null;
+                    return (
+                      <div className="flex items-center gap-1 overflow-x-auto pb-1 no-scrollbar pt-1">
+                        <span className="text-[10px] text-slate-400 font-bold shrink-0">اقتراحات سريعة:</span>
+                        {classStudents.slice(0, 6).map((st) => (
+                          <button
+                            key={st.id}
+                            type="button"
+                            onClick={() => setStudentName(st.studentName)}
+                            className="px-2 py-0.5 rounded-md bg-sky-50 text-sky-800 hover:bg-sky-100 border border-sky-200 text-[10px] font-bold shrink-0 cursor-pointer"
+                          >
+                            {st.studentName}
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">
@@ -2419,8 +2497,37 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
                   placeholder="مثال: يونس بلحاج..."
                   value={honorStudentName}
                   onChange={(e) => setHonorStudentName(e.target.value)}
+                  list="honors-students-datalist"
                   required
                 />
+                <datalist id="honors-students-datalist">
+                  {studentRoster
+                    .filter((s) => !honorClass || (s.className || "").replace(/\s+/g, "") === honorClass.replace(/\s+/g, ""))
+                    .map((s) => (
+                      <option key={s.id} value={s.studentName} />
+                    ))}
+                </datalist>
+                {(() => {
+                  const classStudents = studentRoster.filter(
+                    (s) => !honorClass || (s.className || "").replace(/\s+/g, "") === honorClass.replace(/\s+/g, "")
+                  );
+                  if (classStudents.length === 0) return null;
+                  return (
+                    <div className="flex items-center gap-1 overflow-x-auto pb-1 no-scrollbar pt-1">
+                      <span className="text-[10px] text-slate-400 font-bold shrink-0">اقتراحات الفوج:</span>
+                      {classStudents.slice(0, 6).map((st) => (
+                        <button
+                          key={st.id}
+                          type="button"
+                          onClick={() => setHonorStudentName(st.studentName)}
+                          className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-900 hover:bg-amber-100 border border-amber-200 text-[10px] font-bold shrink-0 cursor-pointer"
+                        >
+                          {st.studentName}
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
 
               <div>
@@ -2727,6 +2834,48 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
                     <span>إضافة</span>
                   </button>
                 </div>
+
+                {/* قائمة سريعة للنقر واختيار تلاميذ الفوج */}
+                {(() => {
+                  const classStudents = studentRoster.filter(
+                    (s) => (s.className || "").replace(/\s+/g, "") === (penaltyClass || "").replace(/\s+/g, "")
+                  );
+                  if (classStudents.length === 0) return null;
+                  return (
+                    <div className="space-y-1 pt-1 pb-1">
+                      <div className="flex items-center justify-between text-[11px] font-bold text-slate-600">
+                        <span>انقر على التلميذ لإضافته/إلغائه فوراً:</span>
+                        <span className="text-[10px] text-slate-400 font-mono">({classStudents.length} مسجلين)</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1 max-h-32 overflow-y-auto p-1.5 bg-white/80 rounded-xl border border-red-100">
+                        {classStudents.map((st) => {
+                          const isSelected = penaltyStudents.includes(st.studentName);
+                          return (
+                            <button
+                              key={st.id}
+                              type="button"
+                              onClick={() => {
+                                if (isSelected) {
+                                  setPenaltyStudents((prev) => prev.filter((n) => n !== st.studentName));
+                                } else {
+                                  setPenaltyStudents((prev) => [...prev, st.studentName]);
+                                }
+                              }}
+                              className={`px-2 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer ${
+                                isSelected
+                                  ? "bg-red-600 text-white shadow-xs"
+                                  : "bg-slate-50 text-slate-700 hover:bg-red-50 border border-slate-200"
+                              }`}
+                            >
+                              <span>{st.studentName}</span>
+                              {isSelected ? <span>✓</span> : <span className="text-slate-400 text-[10px]">+</span>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* قائمة شارات التلاميذ المحددين */}
                 {penaltyStudents.length > 0 ? (
@@ -3326,21 +3475,33 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
                         لا يوجد تلاميذ مسجلين في {evalClass} ({evalGroup})
                       </h3>
                       <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-                        اضغط على الزر أدناه لاستيراد قائمة أسماء تلاميذ الفوج دفعة واحدة والبدء في التقييم الميداني فوراً.
+                        يمكنك المزامنة بنقرة واحدة مع قائمة التلاميذ المسجلين في إدارة الأفواج، أو لصق قائمة جديدة.
                       </p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setBatchEvalClass(evalClass);
-                        setBatchEvalGroup(evalGroup === "القسم كامل" ? "فوج 1" : evalGroup);
-                        setIsBatchEvalModalOpen(true);
-                      }}
-                      className="py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs shadow-sm transition active:scale-95 inline-flex items-center gap-1.5"
-                    >
-                      <Plus className="w-4 h-4" />
-                      <span>+ استيراد قائمة تلاميذ {evalClass} ({evalGroup})</span>
-                    </button>
+                    <div className="flex items-center justify-center gap-2 flex-wrap">
+                      {studentRoster.filter((s) => (s.className || "").replace(/\s+/g, "") === (evalClass || "").replace(/\s+/g, "")).length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => handleSyncClassFromRoster(evalClass, evalGroup)}
+                          className="py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-black text-xs shadow-md transition active:scale-95 inline-flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Sparkles className="w-4 h-4 text-emerald-200" />
+                          <span>مزامنة واستيراد قائمة الفوج ({studentRoster.filter((s) => (s.className || "").replace(/\s+/g, "") === (evalClass || "").replace(/\s+/g, "")).length} تلميذ) ⚡</span>
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBatchEvalClass(evalClass);
+                          setBatchEvalGroup(evalGroup === "القسم كامل" ? "فوج 1" : evalGroup);
+                          setIsBatchEvalModalOpen(true);
+                        }}
+                        className="py-2.5 px-4 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs shadow-2xs transition active:scale-95 inline-flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Plus className="w-4 h-4 text-slate-500" />
+                        <span>لصق أو استيراد يدوي</span>
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <div className="space-y-3 lg:space-y-0 lg:grid lg:grid-cols-3 xl:grid-cols-4 lg:gap-3 lg:items-start">
@@ -3704,9 +3865,27 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
             </div>
 
             <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">
-                الصق أسماء التلاميذ هنا (كل اسم في سطر، أو مفصولة بفواصل):
-              </label>
+              <div className="flex items-center justify-between mb-1 flex-wrap gap-1">
+                <label className="text-xs font-bold text-slate-700">
+                  الصق أسماء التلاميذ هنا (كل اسم في سطر):
+                </label>
+                {studentRoster.filter((s) => (s.className || "").replace(/\s+/g, "") === (batchEvalClass || "").replace(/\s+/g, "")).length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const names = studentRoster
+                        .filter((s) => (s.className || "").replace(/\s+/g, "") === (batchEvalClass || "").replace(/\s+/g, ""))
+                        .map((s) => s.studentName)
+                        .join("\n");
+                      setBatchEvalNames(names);
+                    }}
+                    className="text-[11px] font-black text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-0.5 rounded-lg border border-emerald-200 transition cursor-pointer flex items-center gap-1"
+                  >
+                    <Sparkles className="w-3 h-3 text-emerald-600" />
+                    <span>ملء من قائمة الفوج ({studentRoster.filter((s) => (s.className || "").replace(/\s+/g, "") === (batchEvalClass || "").replace(/\s+/g, "")).length} تلميذ)</span>
+                  </button>
+                )}
+              </div>
               <textarea
                 className="input text-xs min-h-[140px] font-mono leading-relaxed"
                 placeholder={"أحمد بوخالفة\nسارة لعريبي\nيونس بلحاج\nمحمد زياني..."}

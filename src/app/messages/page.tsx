@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useTeacherId, withTeacher, useTeacherInfo, teacherLabel } from "@/lib/teacherParam";
 import {
@@ -87,6 +87,18 @@ export default function MessagesPage() {
       }
     }
   }, []);
+
+  const audiencesList = useMemo(() => {
+    if (urlLvl) {
+      return [
+        { id: `ولي أمر (${urlLvl} متوسط)`, label: `👨‍👩‍👦 ولي أمر (${urlLvl} متوسط)` },
+        { id: `تلميذ (${urlLvl} متوسط)`, label: `🎒 تلميذ (${urlLvl} متوسط)` },
+        { id: `${urlLvl} متوسط`, label: `🎯 قسم ${urlLvl} متوسط` },
+        { id: "", label: "🔒 بدون تحديد (سري تماماً)" },
+      ];
+    }
+    return AUDIENCES;
+  }, [urlLvl]);
 
   const backHref = teacherId
     ? `/t/${teacherId}${urlLvl ? `?lvl=${urlLvl}` : ""}`
@@ -261,7 +273,7 @@ export default function MessagesPage() {
                 </span>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-                {AUDIENCES.map((aud) => (
+                {audiencesList.map((aud) => (
                   <button
                     key={aud.id}
                     type="button"
