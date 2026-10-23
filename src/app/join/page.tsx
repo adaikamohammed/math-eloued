@@ -97,13 +97,68 @@ export default function JoinTeacherPage() {
       const prefix = subjectObj?.codePrefix || "MTH";
       const randomCode = `${prefix}-${Math.floor(100 + Math.random() * 900)}`;
       const cleanSlug = `prof-${Math.random().toString(36).substring(2, 8)}`;
+      const cleanEmail = email.trim().toLowerCase();
 
-      // 2. إنشاء حساب الأستاذ مباشرة مع اعتماد فوري وبدون انتظار موافقة
-      const { data, error } = await supabase.auth.signUp({
-        email: email.trim(),
-        password: password,
-        options: {
-          data: {
+      let registeredSuccessfully = false;
+
+      // أ) المحاولة الأولى: دالة التسجيل الفوري register_teacher_instant (لتجاوز Rate Limit ورسائل التأكيد نهائياً)
+      try {
+        const { data: rpcRes, error: rpcErr } = await supabase.rpc("register_teacher_instant", {
+          p_email: cleanEmail,
+          p_password: password,
+          p_full_name: fullName.trim(),
+          p_subject: subject,
+          p_district_id: Number(districtId) || 1,
+          p_school_custom_name: middleSchoolName.trim() || "متوسطة ولاية الوادي",
+          p_teacher_code: randomCode,
+          p_slug: cleanSlug,
+        });
+
+        if (!rpcErr && rpcRes && rpcRes.success === true) {
+          registeredSuccessfully = true;
+          // تسجيل الدخول المباشر
+          await supabase.auth.signInWithPassword({
+            email: cleanEmail,
+            password: password,
+          });
+        } else if (rpcRes && rpcRes.success === false) {
+          throw new Error(rpcRes.error || "فشل تسجيل الحساب");
+        }
+      } catch (rpcCatch: any) {
+        if (rpcCatch?.message?.includes("البريد الإلكتروني مسجل مسبقاً")) {
+          throw rpcCatch;
+        }
+        console.warn("RPC instant registration skipped, attempting signUp fallback:", rpcCatch);
+      }
+
+      // ب) في حال لم يتم استدعاء الدالة بعد، المحاولة عبر supabase.auth.signUp
+      if (!registeredSuccessfully) {
+        const { data, error } = await supabase.auth.signUp({
+          email: cleanEmail,
+          password: password,
+          options: {
+            data: {
+              role: "teacher",
+              full_name: fullName.trim(),
+              subject: subject,
+              district_id: Number(districtId) || 0,
+              school_custom_name: middleSchoolName.trim() || "متوسطة ولاية الوادي",
+              teacher_code: randomCode,
+              slug: cleanSlug,
+              levels_taught: [1, 2, 3, 4],
+              verification_status: "approved",
+              is_verified: true,
+              terms_accepted_at: new Date().toISOString(),
+            },
+          },
+        });
+
+        if (error) throw error;
+        if (!data.user) throw new Error("تعذر إنشاء حساب الأستاذ");
+
+        await supabase
+          .from("profiles")
+          .update({
             role: "teacher",
             full_name: fullName.trim(),
             subject: subject,
@@ -114,30 +169,15 @@ export default function JoinTeacherPage() {
             levels_taught: [1, 2, 3, 4],
             verification_status: "approved",
             is_verified: true,
-            terms_accepted_at: new Date().toISOString(),
-          },
-        },
-      });
+          })
+          .eq("id", data.user.id);
 
-      if (error) throw error;
-      if (!data.user) throw new Error("تعذر إنشاء حساب الأستاذ");
-
-      // 3. تحديث جدول profiles للتأكيد على تفعيل الحساب فورياً
-      await supabase
-        .from("profiles")
-        .update({
-          role: "teacher",
-          full_name: fullName.trim(),
-          subject: subject,
-          district_id: Number(districtId) || 0,
-          school_custom_name: middleSchoolName.trim() || "متوسطة ولاية الوادي",
-          teacher_code: randomCode,
-          slug: cleanSlug,
-          levels_taught: [1, 2, 3, 4],
-          verification_status: "approved",
-          is_verified: true,
-        })
-        .eq("id", data.user.id);
+        // محاولة تسجيل الدخول المباشر
+        await supabase.auth.signInWithPassword({
+          email: cleanEmail,
+          password: password,
+        }).catch(() => {});
+      }
 
       setRegisteredCode(randomCode);
 
