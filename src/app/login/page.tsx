@@ -73,11 +73,24 @@ export default function LoginPage() {
       }
     } catch (err: any) {
       console.error("Login error:", err);
-      setErrorMsg(
-        err.message === "Invalid login credentials"
-          ? "البريد الإلكتروني أو كلمة المرور غير صحيحة"
-          : err.message || "حدث خطأ أثناء تسجيل الدخول"
-      );
+      const rawMsg = String(err?.message || "");
+      const isSchemaError =
+        rawMsg.includes("Database error querying schema") ||
+        rawMsg.includes("AuthRetryableFetchError") ||
+        rawMsg.includes("unexpected_failure") ||
+        err?.status === 500;
+
+      if (isSchemaError) {
+        setErrorMsg(
+          "تعذر تسجيل الدخول بالحساب التجريبي (Database error querying schema): يتطلب تشغيل استعلام الإصلاح في Supabase Dashboard -> SQL Editor، أو يمكنك الضغط أدناه لإنشاء حساب أستاذ جديد فوراً وموثق بنقرة واحدة."
+        );
+      } else {
+        setErrorMsg(
+          rawMsg === "Invalid login credentials"
+            ? "البريد الإلكتروني أو كلمة المرور غير صحيحة"
+            : rawMsg || "حدث خطأ أثناء تسجيل الدخول"
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -114,9 +127,25 @@ export default function LoginPage() {
       <div className="mt-6 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-6 sm:px-10 shadow-xl shadow-slate-200/50 rounded-3xl border border-slate-200/80">
           {errorMsg && (
-            <div className="mb-5 p-3.5 bg-red-50 border border-red-200 rounded-2xl flex items-center gap-3 text-red-700 text-xs font-bold animate-shake">
-              <AlertCircle className="w-5 h-5 shrink-0 text-red-500" />
-              <span>{errorMsg}</span>
+            <div className="mb-5 p-4 bg-red-50 border border-red-200 rounded-2xl text-red-700 text-xs font-bold animate-shake space-y-2.5">
+              <div className="flex items-start gap-2.5">
+                <AlertCircle className="w-5 h-5 shrink-0 text-red-500 mt-0.5" />
+                <div className="space-y-2 leading-relaxed">
+                  <p>{errorMsg}</p>
+                  {(errorMsg.includes("Database error") || errorMsg.includes("استعلام الإصلاح")) && (
+                    <div className="pt-1">
+                      <Link
+                        href="/join?key=asateza-2026"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm transition"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>إنشاء حساب أستاذ جديد فوراً بدعوة خاصة</span>
+                        <ArrowLeft className="w-3 h-3" />
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
@@ -186,8 +215,15 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="mt-5 text-center text-xs text-slate-500">
-            التسجيل مخصص لأساتذة التعليم المتوسط عبر رابط دعوة رسمي من إدارة المؤسسة.
+          <div className="mt-5 text-center text-xs text-slate-500 space-y-2">
+            <p>التسجيل مخصص لأساتذة التعليم المتوسط عبر رابط دعوة رسمي من إدارة المؤسسة.</p>
+            <Link
+              href="/join?key=asateza-2026"
+              className="inline-flex items-center gap-1.5 text-emerald-700 hover:text-emerald-800 font-extrabold hover:underline"
+            >
+              <span>هل أنت أستاذ ولديك رمز دعوة؟ أنشئ حسابك الآن</span>
+              <ArrowLeft className="w-3.5 h-3.5" />
+            </Link>
           </div>
 
           {/* حسابات العرض التجريبي للمقاطعة 1 */}
