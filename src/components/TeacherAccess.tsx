@@ -28,7 +28,7 @@ export function TeacherAccess() {
       {/* زر سري أنيق وغير مزعج في أسفل الصفحة */}
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-3 left-3 z-40 p-2.5 rounded-full bg-white/90 hover:bg-emerald-50 text-slate-400 hover:text-emerald-700 border border-slate-200/80 shadow-xs backdrop-blur-xs transition group"
+        className="fixed bottom-20 lg:bottom-4 left-3 lg:left-4 z-30 p-2.5 rounded-full bg-white/95 hover:bg-[#e6f4ee] text-gray-500 hover:text-[#107a57] border border-[#e8e8e0] shadow-sm backdrop-blur-md transition group"
         title="دخول خاص بالأستاذ"
         aria-label="دخول الأستاذ"
       >

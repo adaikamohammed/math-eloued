@@ -4,32 +4,124 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  GraduationCap,
-  Users,
-  Heart,
+  Menu,
+  Search,
   LogIn,
   LogOut,
+  GraduationCap,
   ShieldCheck,
-  Menu,
-  X,
-  Sparkles,
-  Search,
-  PanelRightClose,
-  PanelRightOpen,
-  Scale,
-  Settings,
-  Trophy,
+  User,
+  ExternalLink,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useLayout } from "@/context/LayoutContext";
 
+// ─── خريطة عناوين الصفحات المستوحاة من منصة فرسان القرآن ─────────
+const PAGE_INFO: Record<string, { title: string; subtitle: string }> = {
+  "/": {
+    title: "منصة جسور التعليمية",
+    subtitle: "المنصة الرقمية الموحدة للتعليم المتوسط • ولاية الوادي",
+  },
+  "/t/search": {
+    title: "دليل الأساتذة",
+    subtitle: "البحث بالرمز التعريفي للأستاذ والولوج للمساحات التعليمية",
+  },
+  "/my-children": {
+    title: "فضاء الأولياء",
+    subtitle: "متابعة وتقويم الأبناء والتواصل التربوي المستمر",
+  },
+  "/parents": {
+    title: "فضاء الأولياء والمتابعة",
+    subtitle: "دفتر المتابعة والنقاط وملاحظات الأساتذة",
+  },
+  "/assessment": {
+    title: "ميثاق التقويم المستمر (20/20)",
+    subtitle: "معايير الشفافية البيداغوجية والتقويم العادل",
+  },
+  "/honor": {
+    title: "لوحة الشرف وتكريم النوابغ",
+    subtitle: "نخبة التلاميذ والتحفيز المستمر على التميز",
+  },
+  "/forum": {
+    title: "ملتقى الأساتذة البيداغوجي",
+    subtitle: "فضاء التبادل والتطوير المهني وتبادل المذكرات",
+  },
+  "/inspector": {
+    title: "فضاء التفتيش والمناشير",
+    subtitle: "المقاطعات التربوية والتعليمات والمذكرات الرسمية",
+  },
+  "/admin": {
+    title: "لوحة تحكم الأستاذ",
+    subtitle: "إدارة الأفواج والدروس وتدوين علامات التقويم",
+  },
+  "/super-admin": {
+    title: "لوحة المشرف العام",
+    subtitle: "إدارة المقاطعات والأساتذة وإحصائيات الولاية",
+  },
+  "/settings": {
+    title: "تخصيص الفضاء والميزات",
+    subtitle: "تخصيص هوية الأستاذ والأقسام المعروضة للأولياء",
+  },
+  "/login": {
+    title: "تسجيل الدخول",
+    subtitle: "الولوج إلى الحساب التربوي المعتمد",
+  },
+  "/register": {
+    title: "إنشاء حساب أستاذ",
+    subtitle: "الانضمام إلى الأسرة التربوية بولاية الوادي",
+  },
+  "/announcement": {
+    title: "الإعلانات والمستجدات",
+    subtitle: "آخر التنبيهات والبلاغات المدرسية والتربوية",
+  },
+  "/pedagogy": {
+    title: "الموارد البيداغوجية",
+    subtitle: "المذكرات النموذجية والتوزيعات السنوية المعتمدة",
+  },
+  "/penalties": {
+    title: "سجل الانضباط والملاحظات",
+    subtitle: "متابعة السلوك والمواظبة داخل المؤسسة",
+  },
+  "/messages": {
+    title: "الرسائل والتواصل",
+    subtitle: "قنوات التواصل المباشر بين الأساتذة والأولياء",
+  },
+};
+
+function getPageInfo(pathname: string): { title: string; subtitle: string } {
+  if (PAGE_INFO[pathname]) return PAGE_INFO[pathname];
+
+  // صفحات فرعية لملفات الأستاذ /t/[slug]
+  if (pathname.startsWith("/t/")) {
+    return {
+      title: "الفضاء التربوي للأستاذ",
+      subtitle: "المستندات والدروس ونقاط التقويم المستمر للأفواج",
+    };
+  }
+
+  // البحث في المسارات الجزئية
+  for (const [key, val] of Object.entries(PAGE_INFO)) {
+    if (key !== "/" && pathname.startsWith(key)) return val;
+  }
+
+  return {
+    title: "منصة جسور التعليمية",
+    subtitle: "المنصة الرقمية الموحدة لولاية الوادي",
+  };
+}
+
 export function GlobalNavbar() {
   const pathname = usePathname() || "/";
   const router = useRouter();
-  const { isSidebarCollapsed, toggleSidebar, isMobileMenuOpen, setIsMobileMenuOpen, user, loadingUser } =
-    useLayout();
+  const {
+    isMobileMenuOpen,
+    setIsMobileMenuOpen,
+    user,
+    loadingUser,
+  } = useLayout();
 
   const [searchCode, setSearchCode] = useState("");
+  const pageInfo = getPageInfo(pathname);
 
   const handleSearchCode = (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,211 +147,109 @@ export function GlobalNavbar() {
   const getWorkspaceLabel = () => {
     if (!user) return "دخول الأستاذ";
     if (user.role === "inspector") return "فضاء التفتيش";
-    if (user.role === "admin") return "لوحة المشرف";
-    return "مساحتي التعليمية";
+    if (user.role === "admin") return "المشرف العام";
+    return "لوحة الأستاذ";
   };
 
   return (
-    <>
-      {/* الشريط العلوي الدقيق لمديرية التربية */}
-      <div className="bg-slate-900 border-b border-slate-800 text-[11px] text-slate-300 py-1 px-4 sm:px-6">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-white tracking-wide">الجمهورية الجزائرية الديمقراطية الشعبية</span>
-            <span className="text-slate-500">•</span>
-            <span className="hidden sm:inline text-slate-300">مديرية التربية لولاية الوادي</span>
-            <span className="hidden md:inline text-slate-500">•</span>
-            <span className="hidden md:inline text-emerald-400 font-medium">المنصة الرقمية الموحدة (التعليم المتوسط)</span>
-          </div>
-          <div className="flex items-center gap-3 text-[10px]">
-            <span className="bg-slate-800 text-emerald-300 px-2 py-0.5 rounded-full font-mono font-bold border border-slate-700">
-              ولاية الوادي (39)
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* الشريط الرئيسي للتنقل بارتفاع ثابت تماماً */}
-      <header className="sticky top-0 z-30 w-full bg-white/95 backdrop-blur-md border-b border-slate-200/90 text-slate-800 shadow-xs transition-all" dir="rtl">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 h-16 flex items-center justify-between gap-3">
-        {/* زر طي/توسيع الشريط الجانبي + الشعار */}
-        <div className="flex items-center gap-2.5">
-          {/* زر تبديل الشريط الجانبي للحاسوب */}
+    <header className="sticky top-0 z-20 bg-white/95 backdrop-blur-md border-b border-[#e8e8e0] px-4 sm:px-6 transition-colors duration-200 shrink-0">
+      <div className="flex items-center justify-between h-16 gap-3 sm:gap-4">
+        {/* الجانب الأيمن: زر القائمة للهاتف + عنوان الصفحة الديناميكي */}
+        <div className="flex items-center gap-3 min-w-0">
+          {/* زر فتح القائمة الجانبية في الهاتف والأجهزة اللوحية */}
           <button
-            onClick={toggleSidebar}
-            className="hidden md:flex p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200/80 transition"
-            title={isSidebarCollapsed ? "فتح الشريط الجانبي" : "إغلاق الشريط الجانبي"}
-            aria-label="تبديل الشريط الجانبي"
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="lg:hidden w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-gray-200 hover:text-gray-900 transition-colors shrink-0"
+            aria-label="القائمة الجانبية"
           >
-            {isSidebarCollapsed ? (
-              <PanelRightOpen className="w-4 h-4 text-emerald-600" />
-            ) : (
-              <PanelRightClose className="w-4 h-4 text-slate-600" />
-            )}
+            <Menu className="w-5 h-5" />
           </button>
 
-          {/* الشعار والهوية الموحدة لكافة المواد والأسرة التربوية */}
-          <Link href="/" className="flex items-center gap-2.5 group shrink-0">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-md shadow-emerald-600/25 group-hover:scale-105 transition-transform">
-              <GraduationCap className="w-5 h-5" />
-            </div>
-            <div className="flex flex-col text-right">
-              <span className="font-black text-sm sm:text-base text-slate-900 tracking-tight leading-none group-hover:text-emerald-700 transition-colors">
-                منصة جسور التعليمية
-              </span>
-              <span className="text-[10px] text-emerald-700 font-bold leading-normal mt-0.5 hidden xs:inline">
-                فضاء الأستاذ • الولي • والتلميذ
-              </span>
-            </div>
-          </Link>
+          {/* عنوان الصفحة ووصفها الدقيق بنمط منصة فرسان القرآن */}
+          <div className="min-w-0">
+            <h1 className="text-sm sm:text-base font-black text-gray-900 leading-tight truncate">
+              {pageInfo.title}
+            </h1>
+            <p className="text-[11px] text-gray-500 font-medium hidden sm:block truncate mt-0.5">
+              {pageInfo.subtitle}
+            </p>
+          </div>
         </div>
 
-        {/* حقل البحث السريع بكود الأستاذ في الحاسوب */}
-        <div className="hidden lg:flex items-center flex-1 max-w-sm mx-4">
-          <form onSubmit={handleSearchCode} className="relative w-full">
+        {/* المنتصف واليسار: البحث بكود الأستاذ + أزرار المستخدم */}
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          {/* البحث السريع بكود الأستاذ */}
+          <form onSubmit={handleSearchCode} className="relative hidden md:block">
             <input
               type="text"
               value={searchCode}
               onChange={(e) => setSearchCode(e.target.value)}
-              placeholder="ابحث بكود الأستاذ (مثلاً: MTH-101)..."
-              className="w-full py-1.5 pl-8 pr-9 rounded-xl bg-slate-100/90 border border-slate-200/90 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition font-mono"
+              placeholder="ابحث بكود الأستاذ..."
+              className="w-40 lg:w-56 py-1.5 pl-7 pr-8 rounded-xl bg-[#fafaf7] border border-[#e8e8e0] text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57] font-mono transition"
             />
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-2.5 pointer-events-none" />
+            <Search className="w-3.5 h-3.5 text-gray-400 absolute right-2.5 top-2.5 pointer-events-none" />
             {searchCode && (
               <button
                 type="submit"
-                className="absolute left-1.5 top-1 px-2 py-0.5 rounded-lg bg-emerald-600 text-white text-[10px] font-bold hover:bg-emerald-700 transition"
+                className="absolute left-1 top-1 px-1.5 py-0.5 rounded-lg bg-[#107a57] text-white text-[10px] font-bold hover:bg-[#0a5c40] transition"
               >
                 بحث
               </button>
             )}
           </form>
-        </div>
 
-        {/* أزرار حساب المستخدم والدخول */}
-        <div className="flex items-center gap-2">
+          {/* حساب المستخدم وأزرار الدخول */}
           {loadingUser ? (
-            <div className="w-24 h-8 bg-slate-100 animate-pulse rounded-xl" />
+            <div className="w-24 h-9 bg-gray-100 animate-pulse rounded-xl" />
           ) : user ? (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2">
               <Link
                 href={getWorkspaceUrl()}
-                className="py-2 px-3.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition flex items-center gap-2"
+                className="flex items-center gap-2 py-1.5 px-3 rounded-xl bg-[#e6f4ee] hover:bg-[#d5eee2] text-[#107a57] border border-[#107a57]/20 text-xs font-bold transition shadow-2xs group"
+                title="الانتقال للمساحة التعليمية"
               >
-                <ShieldCheck className="w-4 h-4 text-emerald-100" />
-                <span className="hidden sm:inline">{getWorkspaceLabel()}</span>
+                <div className="w-6 h-6 rounded-lg bg-[#107a57] text-white flex items-center justify-center text-[11px] font-black shrink-0">
+                  {user.fullName.charAt(0) || "أ"}
+                </div>
+                <span className="hidden sm:inline font-black truncate max-w-[120px]">
+                  {getWorkspaceLabel()}
+                </span>
                 {user.code && (
-                  <span className="bg-black/20 text-white text-[10px] px-1.5 py-0.5 rounded font-mono font-bold">
+                  <span className="hidden md:inline bg-white/80 text-[#107a57] text-[10px] px-1.5 py-0.5 rounded font-mono font-bold border border-[#107a57]/20">
                     {user.code}
                   </span>
                 )}
               </Link>
+
               <button
                 onClick={handleLogout}
-                className="p-2 rounded-xl bg-slate-100 hover:bg-red-50 text-slate-500 hover:text-red-600 border border-slate-200 transition"
+                className="w-9 h-9 rounded-xl bg-gray-100 hover:bg-red-50 text-gray-500 hover:text-red-600 border border-transparent hover:border-red-200 flex items-center justify-center transition-colors"
                 title="تسجيل الخروج"
+                aria-label="تسجيل الخروج"
               >
                 <LogOut className="w-4 h-4" />
               </button>
             </div>
           ) : (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2">
               <Link
                 href="/login"
-                className="py-2 px-3 rounded-xl text-xs font-bold text-slate-700 hover:text-slate-900 hover:bg-slate-100 transition flex items-center gap-1.5"
+                className="py-1.5 px-2.5 sm:px-3 rounded-xl text-xs font-bold text-gray-700 hover:text-gray-900 hover:bg-gray-100 transition flex items-center gap-1.5"
               >
-                <LogIn className="w-3.5 h-3.5 text-emerald-600" />
-                <span className="hidden sm:inline">تسجيل الدخول</span>
+                <LogIn className="w-3.5 h-3.5 text-[#107a57]" />
+                <span className="hidden xs:inline">تسجيل الدخول</span>
               </Link>
               <Link
                 href="/register"
-                className="py-2 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition flex items-center gap-1.5"
+                className="btn-primary text-xs py-1.5 px-3 sm:px-3.5"
               >
                 <GraduationCap className="w-4 h-4" />
                 <span>حساب الأستاذ</span>
               </Link>
             </div>
           )}
-
-          {/* زر القائمة للهاتف (روابط ثانوية) */}
-          <button
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="md:hidden p-2 rounded-xl bg-slate-100 text-slate-700 hover:text-slate-900 border border-slate-200"
-            aria-label="القائمة الجانبية"
-          >
-            {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </button>
         </div>
       </div>
-
-      {/* قائمة الهاتف الإضافية المنسدلة */}
-      {isMobileMenuOpen && (
-        <div className="md:hidden border-t border-slate-200 bg-white/98 px-4 pt-3 pb-6 space-y-3 animate-in fade-in slide-in-from-top-2 duration-150">
-          {/* حقل البحث بكود الأستاذ في الهاتف */}
-          <form onSubmit={handleSearchCode} className="relative">
-            <input
-              type="text"
-              value={searchCode}
-              onChange={(e) => setSearchCode(e.target.value)}
-              placeholder="ابحث بكود الأستاذ (مثال: MTH-101)..."
-              className="w-full py-2.5 pl-8 pr-9 rounded-xl bg-slate-100 border border-slate-200 text-xs text-slate-900 placeholder-slate-400 font-mono"
-            />
-            <Search className="w-4 h-4 text-slate-400 absolute right-3 top-3" />
-          </form>
-
-          <div className="space-y-1 pt-1">
-            <Link
-              href="/"
-              onClick={() => setIsMobileMenuOpen(false)}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-100"
-            >
-              <Sparkles className="w-4 h-4 text-emerald-600" />
-              <span>الرئيسية</span>
-            </Link>
-            <Link
-              href="/assessment"
-              onClick={() => setIsMobileMenuOpen(false)}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-100"
-            >
-              <Scale className="w-4 h-4 text-emerald-600" />
-              <span>ميثاق التقويم المستمر (20/20) ⚖️</span>
-            </Link>
-            <Link
-              href="/forum"
-              onClick={() => setIsMobileMenuOpen(false)}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-100"
-            >
-              <Users className="w-4 h-4 text-indigo-600" />
-              <span>الملتقى البيداغوجي للأساتذة 💬</span>
-            </Link>
-            <Link
-              href="/my-children"
-              onClick={() => setIsMobileMenuOpen(false)}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-100"
-            >
-              <Heart className="w-4 h-4 text-rose-500" />
-              <span>فضاء ومحفظة الأولياء 👨‍👩‍👧‍👦</span>
-            </Link>
-            <Link
-              href="/honor"
-              onClick={() => setIsMobileMenuOpen(false)}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-100"
-            >
-              <Trophy className="w-4 h-4 text-amber-500" />
-              <span>لوحة الشرف والمتفوقين 🏆</span>
-            </Link>
-            <Link
-              href="/settings"
-              onClick={() => setIsMobileMenuOpen(false)}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-100"
-            >
-              <Settings className="w-4 h-4 text-teal-600" />
-              <span>تخصيص الفضاء والميزات ⚙️</span>
-            </Link>
-          </div>
-        </div>
-      )}
     </header>
-    </>
   );
 }

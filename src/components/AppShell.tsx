@@ -22,29 +22,32 @@ function AppShellContent({ children }: { children: React.ReactNode }) {
   const mode = layoutFor(pathname);
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 font-sans" dir="rtl">
-      {/* الهيدر العلوي للمنصة في الحاسوب والهاتف */}
-      <GlobalNavbar />
+    <div
+      className="flex h-screen bg-[#fafaf7] text-[#1a1a2e] overflow-hidden"
+      dir="rtl"
+    >
+      {/* ── الشريط الجانبي (على اليمين، بكامل الارتفاع h-screen) ── */}
+      <DesktopSidebar />
 
-      {/* الحاوية الرئيسية: شريط جانبي يفتح ويغلق على اليمين + المحتوى */}
-      <div className="flex-1 flex w-full">
-        {/* الشريط الجانبي للحاسوب (قابل للطي والتوسيع) */}
-        <DesktopSidebar />
+      {/* ── العمود الرئيسي للمحتوى (على اليسار) ── */}
+      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
+        {/* الهيدر بارتفاع h-16 مطابق لرأس الشريط الجانبي تماماً دون أي انقطاع */}
+        <GlobalNavbar />
 
-        {/* مساحة المحتوى مع padding سفلي كافٍ للهاتف لمنع حجب العناصر */}
-        <div className="flex-1 min-w-0 flex flex-col">
-          <main
-            className={`flex-1 w-full mx-auto px-2 sm:px-4 md:px-6 py-4 pb-24 md:pb-10 transition-all ${
-              mode === "full" ? "max-w-7xl" : mode === "wide" ? "max-w-6xl" : "max-w-2xl"
+        {/* مساحة المحتوى القابلة للتمرير مع الحفاظ على الهيدر والشريط ثابتين */}
+        <main className="flex-1 overflow-y-auto p-3 sm:p-6 pb-24 lg:pb-8 app-main-content">
+          <div
+            className={`w-full mx-auto transition-all ${
+              mode === "full" ? "max-w-7xl" : mode === "wide" ? "max-w-6xl" : "max-w-5xl"
             }`}
           >
             {children}
-          </main>
+          </div>
 
-          <footer className="text-center text-xs text-slate-400 py-4 border-t border-slate-200/60 hidden md:block">
+          <footer className="mt-12 text-center text-xs text-gray-400 py-4 border-t border-[#e8e8e0] hidden md:block">
             منصة جسور التعليمية — المنصة الرقمية الموحدة للتعليم المتوسط • مديرية التربية لولاية الوادي
           </footer>
-        </div>
+        </main>
       </div>
 
       {/* زر الوصول السريع للأستاذ */}
