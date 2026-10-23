@@ -99,106 +99,55 @@ export default function JoinTeacherPage() {
       const cleanSlug = `prof-${Math.random().toString(36).substring(2, 8)}`;
       const cleanEmail = email.trim().toLowerCase();
 
-      let registeredSuccessfully = false;
+      // 2. استدعاء دالة التسجيل الفوري المباشر (تنشئ الحساب مفعل فوراً بدون رسائل وبدون قيود Rate Limit)
+      const { data: rpcRes, error: rpcErr } = await supabase.rpc("register_teacher_instant", {
+        p_email: cleanEmail,
+        p_password: password,
+        p_full_name: fullName.trim(),
+        p_subject: subject,
+        p_district_id: Number(districtId) || 1,
+        p_school_custom_name: middleSchoolName.trim() || "متوسطة ولاية الوادي",
+        p_teacher_code: randomCode,
+        p_slug: cleanSlug,
+      });
 
-      // أ) المحاولة الأولى: دالة التسجيل الفوري register_teacher_instant (لتجاوز Rate Limit ورسائل التأكيد نهائياً)
-      try {
-        const { data: rpcRes, error: rpcErr } = await supabase.rpc("register_teacher_instant", {
-          p_email: cleanEmail,
-          p_password: password,
-          p_full_name: fullName.trim(),
-          p_subject: subject,
-          p_district_id: Number(districtId) || 1,
-          p_school_custom_name: middleSchoolName.trim() || "متوسطة ولاية الوادي",
-          p_teacher_code: randomCode,
-          p_slug: cleanSlug,
-        });
-
-        if (!rpcErr && rpcRes && rpcRes.success === true) {
-          registeredSuccessfully = true;
-          // تسجيل الدخول المباشر
-          await supabase.auth.signInWithPassword({
-            email: cleanEmail,
-            password: password,
-          });
-        } else if (rpcRes && rpcRes.success === false) {
-          throw new Error(rpcRes.error || "فشل تسجيل الحساب");
+      if (rpcErr) {
+        if (rpcErr.message?.includes("does not exist") || rpcErr.code === "42883") {
+          throw new Error("يرجى تشغيل استعلام التسجيل الفوري في Supabase Dashboard -> SQL Editor أولاً لتفعيل إنشاء الحسابات.");
         }
-      } catch (rpcCatch: any) {
-        if (rpcCatch?.message?.includes("البريد الإلكتروني مسجل مسبقاً")) {
-          throw rpcCatch;
-        }
-        console.warn("RPC instant registration skipped, attempting signUp fallback:", rpcCatch);
+        throw new Error(rpcErr.message || "حدث خطأ أثناء إنشاء الحساب");
       }
 
-      // ب) في حال لم يتم استدعاء الدالة بعد، المحاولة عبر supabase.auth.signUp
-      if (!registeredSuccessfully) {
-        const { data, error } = await supabase.auth.signUp({
-          email: cleanEmail,
-          password: password,
-          options: {
-            data: {
-              role: "teacher",
-              full_name: fullName.trim(),
-              subject: subject,
-              district_id: Number(districtId) || 0,
-              school_custom_name: middleSchoolName.trim() || "متوسطة ولاية الوادي",
-              teacher_code: randomCode,
-              slug: cleanSlug,
-              levels_taught: [1, 2, 3, 4],
-              verification_status: "approved",
-              is_verified: true,
-              terms_accepted_at: new Date().toISOString(),
-            },
-          },
-        });
+      if (rpcRes && rpcRes.success === false) {
+        throw new Error(rpcRes.error || "فشل تسجيل الحساب");
+      }
 
-        if (error) throw error;
-        if (!data.user) throw new Error("تعذر إنشاء حساب الأستاذ");
+      // 3. تسجيل الدخول الفوري للحساب
+      const { error: loginErr } = await supabase.auth.signInWithPassword({
+        email: cleanEmail,
+        password: password,
+      });
 
-        await supabase
-          .from("profiles")
-          .update({
-            role: "teacher",
-            full_name: fullName.trim(),
-            subject: subject,
-            district_id: Number(districtId) || 0,
-            school_custom_name: middleSchoolName.trim() || "متوسطة ولاية الوادي",
-            teacher_code: randomCode,
-            slug: cleanSlug,
-            levels_taught: [1, 2, 3, 4],
-            verification_status: "approved",
-            is_verified: true,
-          })
-          .eq("id", data.user.id);
-
-        // محاولة تسجيل الدخول المباشر
-        await supabase.auth.signInWithPassword({
-          email: cleanEmail,
-          password: password,
-        }).catch(() => {});
+      if (loginErr) {
+        console.warn("Auto login warning:", loginErr);
       }
 
       setRegisteredCode(randomCode);
 
-      // توجيه تلقائي بعد ثانيتين إلى لوحة الأستاذ
+      // توجيه تلقائي بعد ثانية ونصف إلى لوحة الأستاذ
       setTimeout(() => {
         router.push("/admin?welcome=1");
         router.refresh();
-      }, 1800);
+      }, 1500);
     } catch (err: any) {
       console.error("Join error:", err);
       const raw = String(err?.message || "");
 
       if (raw.includes("rate limit") || raw.includes("over_email_send_rate_limit")) {
         setErrorMsg(
-          "تم تجاوز الحد التجريبي لإرسال الرسائل في خادم Supabase. للحل الفوري: يرجى فتح Supabase Dashboard -> Authentication -> Providers -> Email وتعطيل خيار 'Confirm email' ليتم التسجيل فورياً بدون انتظار بريد."
+          "تم تجاوز الحد التجريبي لإرسال الرسائل في خادم Supabase. يرجى تشغيل استعلام instant_teacher_registration.sql المحدث في SQL Editor للتسجيل الفوري بدون رسائل."
         );
-      } else if (raw.includes("is invalid") || raw.includes("Email address")) {
-        setErrorMsg(
-          "عنوان البريد الإلكتروني غير صالح (خادم Supabase يحظر العناوين الافتراضية مثل admin@). يرجى استخدام بريد شخصي صالح مثل: اسمك@gmail.com"
-        );
-      } else if (raw.includes("already registered") || raw.includes("User already registered")) {
+      } else if (raw.includes("already registered") || raw.includes("مسجل مسبقاً")) {
         setErrorMsg(
           "هذا البريد مسجل مسبقاً في المنصة. إذا كان هذا حسابك، يمكنك التوجه لصفحة تسجيل الدخول مباشرة."
         );
