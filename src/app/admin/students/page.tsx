@@ -47,7 +47,13 @@ export default function StudentsManagementPage() {
   // نوافذ إضافة وتعديل
   const [isStudentModalOpen, setIsStudentModalOpen] = useState(false);
   const [isClassModalOpen, setIsClassModalOpen] = useState(false);
+  const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<StudentRosterItem | null>(null);
+
+  // استيراد دفعة واحدة
+  const [batchClass, setBatchClass] = useState("");
+  const [batchRawText, setBatchRawText] = useState("");
+  const [isFromOnboarding, setIsFromOnboarding] = useState(false);
 
   // بيانات استمارة التلميذ
   const [formName, setFormName] = useState("");
@@ -60,8 +66,11 @@ export default function StudentsManagementPage() {
   // بيانات إضافة فوج جديد
   const [newClassName, setNewClassName] = useState("");
 
-  // التحقق من الجلسة
+  // التحقق من الجلسة ومصدر الدخول
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      setIsFromOnboarding(window.location.search.includes("from=onboarding"));
+    }
     fetch("/api/auth")
       .then((res) => res.json())
       .then((data) => {
@@ -208,6 +217,54 @@ export default function StudentsManagementPage() {
     await persistChanges(updated, customClasses);
   };
 
+  // استخراج أسماء التلاميذ من النص المنسوخ دفعة واحدة
+  const parsedBatchNames = useMemo(() => {
+    if (!batchRawText.trim()) return [];
+    return batchRawText
+      .split(/\r?\n/)
+      .map((line) => {
+        // إزالة الترقيم (مثال: 1. أو 1- أو 1) أو النقاط)
+        let cleaned = line.replace(/^\s*\d+[\.\-\)\/\t\s]+/, "");
+        // إزالة الأعمدة الإضافية في حال تم نسخ عدة أعمدة من إكسل (الاسم عادة بالعمود الأول)
+        const parts = cleaned.split(/\t/);
+        cleaned = parts[0]?.trim() || "";
+        return cleaned;
+      })
+      .filter((name) => name.length >= 2);
+  }, [batchRawText]);
+
+  // حفظ القائمة المنسوخة دفعة واحدة
+  const handleSaveBatch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const targetClass = batchClass || (selectedClass !== "all" ? selectedClass : customClasses[0]);
+    if (!targetClass) {
+      setMessage({ type: "err", text: "يرجى تحديد الفوج أولاً" });
+      return;
+    }
+    if (parsedBatchNames.length === 0) {
+      setMessage({ type: "err", text: "لم يتم التعرف على أي اسم. يرجى لصق أسماء التلاميذ سطراً بسطر." });
+      return;
+    }
+
+    const newItems: StudentRosterItem[] = parsedBatchNames.map((name, index) => ({
+      id: `st_${Date.now()}_${index}_${Math.random().toString(36).substring(2, 6)}`,
+      studentName: name,
+      className: targetClass,
+      gender: "ذكر",
+      createdAt: new Date().toISOString(),
+    }));
+
+    const updated = [...students, ...newItems];
+    setStudents(updated);
+    setIsBatchModalOpen(false);
+    setBatchRawText("");
+    await persistChanges(updated, customClasses);
+    setMessage({
+      type: "ok",
+      text: `تمت إضافة ${newItems.length} تلميذ بنجاح إلى الفوج ${targetClass} ✨`,
+    });
+  };
+
   // إضافة فوج جديد
   const handleAddClass = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -300,6 +357,16 @@ export default function StudentsManagementPage() {
               <span>طباعة القائمة</span>
             </button>
             <button
+              onClick={() => {
+                setBatchClass(selectedClass !== "all" ? selectedClass : customClasses[0] || "");
+                setIsBatchModalOpen(true);
+              }}
+              className="px-3 py-1.5 rounded-xl border border-emerald-300 bg-emerald-50 text-xs font-black text-emerald-900 hover:bg-emerald-100 transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-700" />
+              <span>لصق قائمة كاملة 📋</span>
+            </button>
+            <button
               onClick={() => setIsClassModalOpen(true)}
               className="px-3 py-1.5 rounded-xl border border-[#e8e8e0] bg-white text-xs font-bold text-gray-700 hover:bg-gray-50 transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
             >
@@ -324,6 +391,45 @@ export default function StudentsManagementPage() {
           parentRoleExplanation="يضمن خصوصية تامة؛ لا يطلع أي ولي على أسماء أو بيانات التلاميذ الآخرين في الفوج."
           inspectorExplanation="يطلع المفتش البيداغوجي على إسناد الأفواج وتعداد التلاميذ لمطابقة التنظيم التربوي الرسمي."
         />
+
+        {/* شريط التوجيه البيداغوجي للخطوة 2 */}
+        {(isFromOnboarding || (students.length === 0 && customClasses.length > 0)) && (
+          <div className="bg-gradient-to-r from-emerald-800 via-teal-800 to-emerald-900 text-white rounded-2xl p-4 sm:p-5 shadow-lg border border-emerald-500/30 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-xs flex items-center justify-center shrink-0 mt-0.5">
+                <Sparkles className="w-5 h-5 text-amber-300" />
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] bg-amber-400 text-emerald-950 font-black px-2 py-0.5 rounded-full">
+                    الخطوة ② من 6 ✨
+                  </span>
+                  <span className="text-xs font-bold text-emerald-200">إضافة وتوثيق التلاميذ</span>
+                </div>
+                <h3 className="text-sm sm:text-base font-black text-white">
+                  أهلاً بك أستاذنا الفاضل في فضاء إدارة التلاميذ والأفواج!
+                </h3>
+                <p className="text-xs text-emerald-100/90 leading-relaxed max-w-2xl">
+                  الأفواج المسندة إليك ({customClasses.join("، ") || "لم تُحدد بعد"}). لتوفير وقتك وجهدك، يمكنك إضافة التلاميذ تلميذاً تلميذاً، أو استخدام زر <strong className="text-white underline">«لصق قائمة كاملة 📋»</strong> لنسخ أسماء القسم دفعة واحدة من ملف إكسل أو الوورد في ثانية واحدة!
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0 w-full md:w-auto">
+              <button
+                type="button"
+                onClick={() => {
+                  setBatchClass(selectedClass !== "all" ? selectedClass : customClasses[0] || "");
+                  setIsBatchModalOpen(true);
+                }}
+                className="w-full md:w-auto px-4 py-2.5 bg-white text-emerald-950 hover:bg-emerald-50 rounded-xl text-xs font-black shadow-md transition flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+              >
+                <FileSpreadsheet className="w-4 h-4 text-emerald-700" />
+                <span>لصق قائمة القسم كاملة دفعة واحدة 📋</span>
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* تنبيهات النجاح أو الخطأ */}
         {message && (
@@ -479,15 +585,29 @@ export default function StudentsManagementPage() {
               </div>
               <p className="font-bold text-gray-700">لا يوجد تلاميذ مسجلين حالياً في هذا العرض</p>
               <p className="text-[11px] text-gray-400 max-w-sm mx-auto">
-                يمكنك البدء بإضافة تلميذ جديد أو استيراد قائمة تلاميذ الفوج.
+                يمكنك البدء بإضافة تلميذ جديد أو استخدام النسخ واللصق لإدراج قائمة القسم كاملة دفعة واحدة.
               </p>
-              <button
-                onClick={handleOpenAddStudent}
-                className="btn-primary text-xs px-4 py-2 inline-flex items-center gap-1.5 cursor-pointer"
-              >
-                <UserPlus className="w-3.5 h-3.5" />
-                <span>إضافة أول تلميذ</span>
-              </button>
+              <div className="flex items-center justify-center gap-2 flex-wrap pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBatchClass(selectedClass !== "all" ? selectedClass : customClasses[0] || "");
+                    setIsBatchModalOpen(true);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-emerald-50 border border-emerald-300 text-xs font-black text-emerald-900 hover:bg-emerald-100 inline-flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-700" />
+                  <span>لصق قائمة الفوج دفعة واحدة 📋</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleOpenAddStudent}
+                  className="btn-primary text-xs px-4 py-2 inline-flex items-center gap-1.5 cursor-pointer"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  <span>إضافة تلميذ فردي</span>
+                </button>
+              </div>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -767,6 +887,133 @@ export default function StudentsManagementPage() {
                   إغلاق
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* ─── Modal لصق قائمة التلاميذ دفعة واحدة ─── */}
+        {isBatchModalOpen && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+            <div className="bg-white rounded-3xl p-5 sm:p-7 max-w-lg w-full border border-emerald-100 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
+              <div className="flex items-center justify-between border-b border-[#e8e8e0] pb-3 shrink-0">
+                <div className="flex items-center gap-2">
+                  <span className="p-1.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <FileSpreadsheet className="w-4 h-4" />
+                  </span>
+                  <div>
+                    <h3 className="text-sm sm:text-base font-black text-gray-900">
+                      لصق قائمة التلاميذ دفعة واحدة (إكسل / وورد)
+                    </h3>
+                    <p className="text-[11px] text-gray-500">انسخ عمود الأسماء والصقه هنا مباشرة دون كتابة يدوية</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsBatchModalOpen(false)}
+                  className="p-1.5 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveBatch} className="space-y-3.5 overflow-y-auto flex-1 pr-1">
+                {/* اختيار الفوج المستهدف */}
+                <div className="space-y-1">
+                  <label className="block text-xs font-black text-gray-800">
+                    حدد الفوج التربوي المستهدف <span className="text-red-500">*</span>:
+                  </label>
+                  <select
+                    value={batchClass}
+                    onChange={(e) => setBatchClass(e.target.value)}
+                    required
+                    className="w-full px-3 py-2 rounded-xl bg-[#fafaf7] border border-[#e8e8e0] text-xs font-bold text-gray-900 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57]"
+                  >
+                    <option value="">-- اختر الفوج المطلوب إلحاق التلاميذ به --</option>
+                    {customClasses.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* حقل لصق النص */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-black text-gray-800">
+                      الصق قائمة الأسماء هنا (تلميذ في كل سطر):
+                    </label>
+                    {parsedBatchNames.length > 0 && (
+                      <span className="text-[11px] font-black text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200">
+                        تم التعرف على {parsedBatchNames.length} تلميذ ✨
+                      </span>
+                    )}
+                  </div>
+                  <textarea
+                    rows={7}
+                    value={batchRawText}
+                    onChange={(e) => setBatchRawText(e.target.value)}
+                    placeholder={`مثال:\n1. محمد بن علي\n2. سارة عمراني\n3. عبد القادر زروقي\nأو الصق عمود كامل تم نسخه من Excel مباشرة...`}
+                    className="w-full p-3 rounded-xl bg-[#fafaf7] border border-[#e8e8e0] text-xs text-gray-900 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57] font-mono leading-relaxed"
+                  />
+                  <p className="text-[10px] text-gray-400">
+                    * يتكفل النظام تلقائياً بإزالة الأرقام (1. 2.) والنقاط والأعمدة والترتيب الأبجدي الآلي.
+                  </p>
+                </div>
+
+                {/* معاينة سريعة لأول 8 أسماء */}
+                {parsedBatchNames.length > 0 && (
+                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+                    <span className="text-[11px] font-bold text-slate-700 block">
+                      معاينة لبعض الأسماء التي تم التعرف عليها:
+                    </span>
+                    <div className="flex flex-wrap gap-1">
+                      {parsedBatchNames.slice(0, 8).map((name, i) => (
+                        <span
+                          key={i}
+                          className="text-[11px] bg-white border border-slate-200 text-slate-800 px-2 py-0.5 rounded-md font-medium"
+                        >
+                          {name}
+                        </span>
+                      ))}
+                      {parsedBatchNames.length > 8 && (
+                        <span className="text-[11px] text-slate-500 font-bold self-center">
+                          +{parsedBatchNames.length - 8} آخرين...
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <div className="pt-2 flex items-center justify-end gap-2 border-t border-[#e8e8e0] shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setIsBatchModalOpen(false)}
+                    className="px-4 py-2 rounded-xl bg-gray-100 text-xs font-bold text-gray-700 hover:bg-gray-200 cursor-pointer"
+                  >
+                    إلغاء
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={saving || !batchClass || parsedBatchNames.length === 0}
+                    className="btn-primary text-xs px-5 py-2 flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-md"
+                  >
+                    {saving ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>جارٍ الحفظ...</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>
+                          إدراج ({parsedBatchNames.length}) تلميذ في الفوج {batchClass || ""} بنقرة واحدة
+                        </span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}

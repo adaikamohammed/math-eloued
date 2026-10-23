@@ -167,6 +167,7 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
   const [notes, setNotes] = useState("");
   const [lessonHomeworkNotes, setLessonHomeworkNotes] = useState("");
   const [filterMissingHw, setFilterMissingHw] = useState(false);
+  const [studentsCount, setStudentsCount] = useState<number>(0);
 
   // حقول إضافة استدعاء ولي أمر
   const [studentName, setStudentName] = useState("");
@@ -274,6 +275,11 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
       }
       if (Array.isArray(data.diaryEntries) && data.diaryEntries.length > 0) {
         setHasDiary(true);
+      }
+      if (Array.isArray(data.studentRoster)) {
+        setStudentsCount(data.studentRoster.length);
+      } else if (Array.isArray(data.evaluations)) {
+        setStudentsCount(data.evaluations.length);
       }
     } finally {
       setLoading(false);
@@ -1213,10 +1219,46 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
           <PedagogyAlerts teacherId={profile.id} />
         </div>
 
+        {/* بطاقة التوجيه الفوري للخطوة 2 عندما يكون الأستاذ قد حدد الأفواج ولكن لم يضف أي تلميذ بعد */}
+        {levelsTaught.length > 0 && teacherClasses.length > 0 && studentsCount === 0 && (
+          <div className="bg-gradient-to-r from-emerald-800 via-teal-800 to-emerald-900 text-white rounded-2xl p-4 sm:p-5 shadow-lg border border-emerald-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-xs flex items-center justify-center shrink-0 mt-0.5">
+                <Users className="w-5 h-5 text-amber-300" />
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] bg-amber-400 text-emerald-950 font-black px-2 py-0.5 rounded-full">
+                    خطوتك الأساسية الحالية ✨
+                  </span>
+                  <span className="text-xs font-bold text-emerald-200">الخطوة ② من 6: إضافة وتوثيق التلاميذ</span>
+                </div>
+                <h3 className="text-sm sm:text-base font-black text-white">
+                  إضافة وتوثيق تلاميذ أفواجك التربوية ({teacherClasses.join("، ")})
+                </h3>
+                <p className="text-xs text-emerald-100/90 leading-relaxed max-w-2xl">
+                  لقد حددت أفواجك بنجاح! الآن حان وقت إضافة أسماء تلاميذك لتتمكن من رصد كراس القسم، تدوين الملاحظات، وطباعة القوائم الأبجدية بنقرة واحدة (يمكنك لصق قائمة القسم كاملة دفعة واحدة من إكسل مباشرة!).
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
+              <Link
+                href="/admin/students?from=dashboard"
+                className="w-full sm:w-auto text-center px-4 py-2.5 rounded-xl bg-white text-emerald-950 hover:bg-emerald-50 font-black text-xs transition shadow-md flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+              >
+                <Users className="w-4 h-4 text-emerald-700" />
+                <span>إضافة التلاميذ الآن 👥</span>
+                <ArrowLeft className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+          </div>
+        )}
+
         {/* شريط خطة التجهيز خطوة بخطوة */}
         <TeacherSetupChecklist
           teacherId={profile.id}
           hasLevelsAndClasses={levelsTaught.length > 0 && teacherClasses.length > 0}
+          hasStudents={studentsCount > 0}
           hasTimetable={hasTimetable}
           hasDiary={hasDiary}
           hasLessons={allLessons.length > 0}

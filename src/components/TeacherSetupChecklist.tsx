@@ -20,6 +20,7 @@ import {
 interface Props {
   teacherId: string;
   hasLevelsAndClasses: boolean;
+  hasStudents: boolean;
   hasTimetable: boolean;
   hasDiary: boolean;
   hasLessons: boolean;
@@ -31,6 +32,7 @@ interface Props {
 export function TeacherSetupChecklist({
   teacherId,
   hasLevelsAndClasses,
+  hasStudents,
   hasTimetable,
   hasDiary,
   hasLessons,
@@ -58,24 +60,49 @@ export function TeacherSetupChecklist({
   const tasks = [
     {
       id: "levels",
-      title: "تحديد المستويات والأفواج التربوية",
+      stepNumber: 1,
+      title: "1. تحديد المستويات والأفواج التربوية",
       desc: "لتخصيص اللوحة وحجب المستويات التي لا تدرسها هذا الموسم.",
       done: hasLevelsAndClasses,
+      isNext: !hasLevelsAndClasses,
       action: (
         <button
           type="button"
           onClick={onOpenOnboarding}
-          className="text-xs font-black text-emerald-800 bg-white hover:bg-emerald-100 border border-emerald-300 px-2.5 py-1 rounded-lg transition cursor-pointer"
+          className="text-xs font-black text-emerald-800 bg-white hover:bg-emerald-100 border border-emerald-300 px-2.5 py-1 rounded-lg transition cursor-pointer shadow-2xs"
         >
           {hasLevelsAndClasses ? "تعديل المستويات" : "تهيئة الآن"}
         </button>
       ),
     },
     {
+      id: "students",
+      stepNumber: 2,
+      title: "2. إضافة وتوثيق تلاميذ كل فوج",
+      desc: "لتفعيل الترتيب الأبجدي الآلي وطباعة القوائم وتدوين الملاحظات.",
+      done: hasStudents,
+      isNext: hasLevelsAndClasses && !hasStudents,
+      action: (
+        <Link
+          href="/admin/students"
+          className={`text-xs font-black px-3 py-1.5 rounded-xl transition inline-flex items-center gap-1 shadow-2xs ${
+            hasLevelsAndClasses && !hasStudents
+              ? "bg-emerald-600 text-white hover:bg-emerald-700 animate-pulse ring-2 ring-emerald-400"
+              : "text-emerald-800 bg-white hover:bg-emerald-100 border border-emerald-300"
+          }`}
+        >
+          <span>{hasStudents ? "قائمة التلاميذ" : "إضافة التلاميذ 👥"}</span>
+          <ArrowLeft className="w-3.5 h-3.5" />
+        </Link>
+      ),
+    },
+    {
       id: "timetable",
-      title: "إعداد جدول التوقيت وساعة الاستقبال",
+      stepNumber: 3,
+      title: "3. إعداد جدول التوقيت وساعة الاستقبال",
       desc: "ليتعرف الأولياء والتلاميذ على أوقات الحصص وموعد الاستقبال المعتمد.",
       done: hasTimetable,
+      isNext: hasLevelsAndClasses && hasStudents && !hasTimetable,
       action: (
         <Link
           href="/admin/timetable"
@@ -88,9 +115,11 @@ export function TeacherSetupChecklist({
     },
     {
       id: "diary",
-      title: "الدفتر اليومي (ماذا سأدرس غداً)",
+      stepNumber: 4,
+      title: "4. الدفتر اليومي (ماذا سأدرس غداً)",
       desc: "لتوثيق المورد المعرفي ومؤشرات الكفاءة وطباعة كراس النصوص بنقرة واحدة.",
       done: hasDiary,
+      isNext: false,
       action: (
         <Link
           href="/admin/diary"
@@ -103,9 +132,11 @@ export function TeacherSetupChecklist({
     },
     {
       id: "lesson",
-      title: "نشر أول درس أو صورة سبورة للقسم",
+      stepNumber: 5,
+      title: "5. نشر أول درس أو صورة سبورة للقسم",
       desc: "ليجد التلميذ المورد المعرفي وصور السبورة عند مراجعته في المنزل.",
       done: hasLessons,
+      isNext: false,
       action: (
         <button
           type="button"
@@ -119,9 +150,11 @@ export function TeacherSetupChecklist({
     },
     {
       id: "share",
-      title: "مشاركة رمز الفوج المخصص مع الأولياء",
+      stepNumber: 6,
+      title: "6. مشاركة رمز الفوج المخصص مع الأولياء",
       desc: "ليدخل كل ولي حصراً لكراس مستوى ابنه دون الاطلاع على المستويات الأخرى.",
       done: false, // مهمة مستمرة
+      isNext: false,
       action: (
         <button
           type="button"
@@ -215,6 +248,8 @@ export function TeacherSetupChecklist({
               className={`p-3 rounded-xl border transition-all flex items-start justify-between gap-3 ${
                 task.done
                   ? "bg-white/90 border-emerald-300/80 shadow-2xs"
+                  : (task as any).isNext
+                  ? "bg-emerald-50/90 border-emerald-400 shadow-sm ring-1 ring-emerald-300"
                   : "bg-white/60 border-slate-200/90 hover:bg-white"
               }`}
             >
@@ -222,18 +257,33 @@ export function TeacherSetupChecklist({
                 <span className="shrink-0 mt-0.5">
                   {task.done ? (
                     <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  ) : (task as any).isNext ? (
+                    <span className="w-4 h-4 rounded-full bg-emerald-600 text-white text-[10px] font-black flex items-center justify-center animate-pulse">
+                      {(task as any).stepNumber || "!"}
+                    </span>
                   ) : (
                     <Circle className="w-4 h-4 text-slate-400" />
                   )}
                 </span>
                 <div>
-                  <h4
-                    className={`text-xs font-black ${
-                      task.done ? "text-emerald-950 line-through decoration-emerald-500/50" : "text-slate-800"
-                    }`}
-                  >
-                    {task.title}
-                  </h4>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <h4
+                      className={`text-xs font-black ${
+                        task.done
+                          ? "text-emerald-950 line-through decoration-emerald-500/50"
+                          : (task as any).isNext
+                          ? "text-emerald-950 font-black"
+                          : "text-slate-800"
+                      }`}
+                    >
+                      {task.title}
+                    </h4>
+                    {(task as any).isNext && (
+                      <span className="text-[9px] bg-emerald-700 text-white px-1.5 py-0.2 rounded font-black">
+                        خطوتك الحالية ✨
+                      </span>
+                    )}
+                  </div>
                   <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">{task.desc}</p>
                 </div>
               </div>
