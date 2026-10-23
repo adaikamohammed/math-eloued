@@ -15,6 +15,7 @@ import {
   Users,
   MessageCircle,
   Scale,
+  Camera,
 } from "lucide-react";
 import { UserProfile, LEVELS, MIDDLE_SCHOOL_SUBJECTS } from "@/lib/types";
 import SaveToWalletButton from "@/components/SaveToWalletButton";
@@ -136,6 +137,42 @@ export default async function TeacherPublicSpace({ params }: TeacherPageProps) {
                 <p className="text-slate-600 mt-1 whitespace-pre-wrap">{a.content}</p>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* كراس الدروس وصور السبورة الرقمية */}
+        {flags.boardLessons !== false && (
+          <div className="bg-gradient-to-r from-emerald-700 via-teal-700 to-emerald-800 text-white rounded-3xl p-5 shadow-md space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-white/15 backdrop-blur-xs flex items-center justify-center text-white border border-white/20 shadow-inner">
+                  <Camera className="w-5 h-5 text-emerald-200" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-sm sm:text-base font-black">
+                      كراس الدروس والسبورة الرقمية
+                    </h2>
+                    <span className="text-[10px] bg-white/20 text-white px-2 py-0.5 rounded-full font-bold">
+                      جديد 📸
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-emerald-100 font-medium mt-0.5">
+                    صور السبورة اليومية، الملخصات، وتوجيهات الأستاذ
+                  </p>
+                </div>
+              </div>
+              <Link
+                href={`/t/${slug}/board`}
+                className="bg-white text-emerald-900 hover:bg-emerald-50 px-3.5 py-2 rounded-xl text-xs font-black transition shadow-sm shrink-0 flex items-center gap-1 active:scale-95"
+              >
+                <span>تصفح السبورة</span>
+                <ChevronLeft className="w-4 h-4" />
+              </Link>
+            </div>
+            <p className="text-[11px] text-emerald-100/90 leading-relaxed bg-black/10 p-2.5 rounded-xl border border-white/10">
+              💡 <strong>خدمة التلميذ الغائب:</strong> إذا غاب ابنك عن الحصة، يستطيع فتح كراس السبورة ونقل عناصر الدرس والأنشطة والواجبات بدقة دون الحاجة لاستعارة كراس زميله.
+            </p>
           </div>
         )}
 

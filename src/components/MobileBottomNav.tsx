@@ -33,7 +33,7 @@ export function MobileBottomNav() {
 
   if (user && user.role === "teacher") {
     items = [
-      { label: "كراس القسم", href: "/admin", icon: BookOpen },
+      { label: "السبورة", href: "/admin/board", icon: BookOpen },
       { label: "التلاميذ", href: "/admin/students", icon: Users },
       { label: "التوقيت", href: "/admin/timetable", icon: Calendar },
       { label: "الدفتر اليومي", href: "/admin/diary", icon: ClipboardList },

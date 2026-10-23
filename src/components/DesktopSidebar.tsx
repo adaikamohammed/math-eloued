@@ -66,7 +66,13 @@ export function DesktopSidebar() {
       const flags = featureFlags || {};
 
       const pedagogyItems: NavItem[] = [
-        { label: "كراس القسم وصور السبورة", href: "/admin", icon: BookOpen },
+        {
+          label: "كراس الدروس والسبورة",
+          href: "/admin/board",
+          icon: BookOpen,
+          badge: "سبورة",
+          badgeColor: "bg-emerald-50 text-emerald-800 border border-emerald-200/80",
+        },
       ];
 
       if (flags.students !== false) {
