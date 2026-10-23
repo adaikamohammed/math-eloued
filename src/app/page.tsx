@@ -55,18 +55,11 @@ export default async function WilayaHomePage() {
           {/* أزرار الإجراءات السريعة */}
           <div className="flex flex-wrap items-center justify-center gap-2.5 pt-1">
             <Link
-              href="/login"
-              className="py-3 px-6 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm shadow-md shadow-emerald-600/20 active:scale-98 transition-all flex items-center gap-2"
-            >
-              <ShieldCheck className="w-4 h-4 text-emerald-100" />
-              <span>تسجيل دخول الأستاذ</span>
-            </Link>
-            <Link
-              href="/register"
+              href="/assessment"
               className="py-3 px-6 rounded-2xl bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 font-bold text-xs sm:text-sm shadow-xs active:scale-98 transition-all flex items-center gap-2"
             >
-              <GraduationCap className="w-4 h-4 text-emerald-700" />
-              <span>إنشاء حساب الأستاذ</span>
+              <Scale className="w-4 h-4 text-emerald-700" />
+              <span>ميثاق التقويم (20/20) ⚖️</span>
             </Link>
             <Link
               href="/forum"
@@ -74,6 +67,13 @@ export default async function WilayaHomePage() {
             >
               <MessageSquare className="w-4 h-4 text-indigo-600" />
               <span>الملتقى البيداغوجي</span>
+            </Link>
+            <Link
+              href="/login"
+              className="py-3 px-5 rounded-2xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 font-bold text-xs sm:text-sm active:scale-98 transition-all flex items-center gap-2"
+            >
+              <ShieldCheck className="w-4 h-4 text-emerald-700" />
+              <span>تسجيل دخول الأساتذة</span>
             </Link>
           </div>
 

@@ -1,16 +1,34 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { BookOpen, Star, X, Plus, ExternalLink, Heart } from "lucide-react";
+import {
+  BookOpen,
+  Heart,
+  X,
+  ExternalLink,
+  Plus,
+  Loader2,
+  CheckCircle2,
+  GraduationCap,
+  Building2,
+  Sparkles,
+} from "lucide-react";
 import Link from "next/link";
+import { supabase } from "@/lib/supabase";
+import { MIDDLE_SCHOOL_SUBJECTS } from "@/lib/types";
 
 export interface SavedTeacher {
   slug: string;
   name: string;
   code: string;
+  subject?: string;
+  subjectName?: string;
+  subjectIcon?: string;
   school?: string;
+  levels?: number[];
+  levelsLabel?: string;
   savedAt: number;
-  childName?: string; // اسم الابن/الابنة لتمييز المعلمين
+  childName?: string;
 }
 
 const STORAGE_KEY = "math_eloued_wallet";
@@ -30,27 +48,97 @@ function saveWallet(items: SavedTeacher[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
 }
 
-/* ─── دالة إضافة معلم (قابلة للاستيراد وتشغيلها خارجياً) ─── */
-export function addTeacherToWallet(teacher: Omit<SavedTeacher, "savedAt">) {
+/* ─── دالة الحفظ التلقائي لأي أستاذ يُزاره الولي ─── */
+export function autoSaveTeacherToWallet(teacher: {
+  slug: string;
+  name: string;
+  code: string;
+  subject?: string;
+  school?: string;
+  levels?: number[];
+}): boolean {
+  if (typeof window === "undefined") return false;
+
   const current = loadWallet();
-  if (current.some((t) => t.slug === teacher.slug)) return false; // موجود مسبقاً
-  const updated = [{ ...teacher, savedAt: Date.now() }, ...current];
-  saveWallet(updated);
+  const cleanCode = (teacher.code || "").trim().toUpperCase();
+
+  // جلب اسم وأيقونة المادة
+  const subjObj = MIDDLE_SCHOOL_SUBJECTS.find((s) => s.id === teacher.subject);
+  const subjectName = subjObj ? subjObj.name : "المادة التعليمية";
+  const subjectIcon = subjObj ? subjObj.icon : "📚";
+
+  // إعداد نص الأقسام/المستويات
+  const levelsLabel =
+    teacher.levels && teacher.levels.length > 0
+      ? teacher.levels.map((l) => `${l}م`).join(" • ")
+      : undefined;
+
+  const existingIndex = current.findIndex(
+    (t) =>
+      t.slug === teacher.slug ||
+      (cleanCode && t.code.toUpperCase() === cleanCode)
+  );
+
+  const updatedItem: SavedTeacher = {
+    slug: teacher.slug,
+    name: teacher.name || "أستاذ المادة",
+    code: cleanCode,
+    subject: teacher.subject,
+    subjectName,
+    subjectIcon,
+    school: teacher.school || "متوسطة ولاية الوادي",
+    levels: teacher.levels,
+    levelsLabel,
+    savedAt: Date.now(),
+    childName: existingIndex >= 0 ? current[existingIndex].childName : undefined,
+  };
+
+  let newWallet: SavedTeacher[];
+  if (existingIndex >= 0) {
+    // تحديث البيانات مع الاحتفاظ بموقعها
+    newWallet = [...current];
+    newWallet[existingIndex] = {
+      ...current[existingIndex],
+      ...updatedItem,
+      savedAt: Date.now(),
+    };
+  } else {
+    // إضافة أستاذ جديد في أعلى القائمة
+    newWallet = [updatedItem, ...current];
+  }
+
+  saveWallet(newWallet);
+  window.dispatchEvent(new CustomEvent("math_wallet_updated"));
   return true;
 }
 
-export function isTeacherInWallet(slug: string): boolean {
-  return loadWallet().some((t) => t.slug === slug);
+export function isTeacherInWallet(slugOrCode: string): boolean {
+  const clean = (slugOrCode || "").trim().toUpperCase();
+  return loadWallet().some(
+    (t) => t.slug === slugOrCode || t.code.toUpperCase() === clean
+  );
 }
 
-/* ─── المكوّن الرئيسي: محفظة معلمي الأبناء ─── */
+/* ─── المكوّن الرئيسي: محفظة أساتذة أبنائي ─── */
 export default function TeacherWallet() {
   const [wallet, setWallet] = useState<SavedTeacher[]>([]);
   const [mounted, setMounted] = useState(false);
 
+  // حقل إضافة أستاذ إضافي بالكود
+  const [newCode, setNewCode] = useState("");
+  const [addingLoading, setAddingLoading] = useState(false);
+  const [addMsg, setAddMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
   useEffect(() => {
     setMounted(true);
     setWallet(loadWallet());
+
+    const handleUpdate = () => {
+      setWallet(loadWallet());
+    };
+
+    window.addEventListener("math_wallet_updated", handleUpdate);
+    return () => window.removeEventListener("math_wallet_updated", handleUpdate);
   }, []);
 
   const removeTeacher = (slug: string) => {
@@ -67,53 +155,187 @@ export default function TeacherWallet() {
     setWallet(updated);
   };
 
-  if (!mounted || wallet.length === 0) return null;
+  const handleAddByCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAddMsg(null);
+    const clean = newCode.trim().toUpperCase();
+    if (!clean) return;
+
+    setAddingLoading(true);
+
+    try {
+      // البحث عن الأستاذ بالكود في Supabase
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, full_name, slug, teacher_code, subject, school_custom_name, levels_taught")
+        .eq("role", "teacher")
+        .ilike("teacher_code", clean)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (!data) {
+        setAddMsg({
+          type: "error",
+          text: `لم يتم العثور على أستاذ يحمل الكود "${clean}". يرجى التأكد من كتابة الكود بشكل صحيح.`,
+        });
+        setAddingLoading(false);
+        return;
+      }
+
+      // حفظ الأستاذ فوراً
+      autoSaveTeacherToWallet({
+        slug: data.slug || data.teacher_code || data.id,
+        name: data.full_name || "الأستاذ",
+        code: data.teacher_code || clean,
+        subject: data.subject,
+        school: data.school_custom_name,
+        levels: data.levels_taught,
+      });
+
+      setAddMsg({
+        type: "success",
+        text: `تمت إضافة ${data.full_name || "الأستاذ"} بنجاح إلى محفظة أبنائك! 🎉`,
+      });
+      setNewCode("");
+      setTimeout(() => setAddMsg(null), 3500);
+    } catch (err: any) {
+      console.error("Error adding teacher by code:", err);
+      setAddMsg({
+        type: "error",
+        text: "تعذر التحقق من الكود حالياً، يرجى المحاولة مرة أخرى.",
+      });
+    } finally {
+      setAddingLoading(false);
+    }
+  };
+
+  if (!mounted) return null;
 
   return (
-    <div className="bg-white rounded-3xl border border-amber-100 shadow-xl shadow-amber-50 p-5 space-y-4">
-      {/* العنوان */}
-      <div className="flex items-center gap-2.5">
-        <div className="w-9 h-9 rounded-xl bg-amber-50 flex items-center justify-center">
-          <Heart className="w-5 h-5 text-amber-500 fill-amber-400" />
+    <div className="bg-white rounded-3xl border border-[#e8e8e0] shadow-sm p-5 sm:p-6 space-y-5">
+      {/* الرأس */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#e8e8e0] pb-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-[#e6f4ee] text-[#107a57] border border-[#107a57]/20 flex items-center justify-center font-black shrink-0">
+            <Heart className="w-5 h-5 fill-[#107a57]" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="font-black text-gray-900 text-sm sm:text-base">
+                محفظة أساتذة أبنائي
+              </h3>
+              {wallet.length > 0 && (
+                <span className="text-[10px] font-black bg-[#e6f4ee] text-[#107a57] px-2 py-0.5 rounded-full border border-[#107a57]/20">
+                  {wallet.length} أستاذ محفوظ
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-gray-500 font-medium">
+              محفوظة تلقائياً على هاتفك للولوج السريع دون الحاجة لإعادة كتابة الأكواد
+            </p>
+          </div>
         </div>
-        <div>
-          <h3 className="font-black text-slate-900 text-sm">
-            محفظة معلمي أبنائي
-          </h3>
-          <p className="text-[11px] text-slate-500">
-            {wallet.length} معلم محفوظ · اضغط للوصول السريع
+
+        {wallet.length > 0 && (
+          <Link
+            href="/my-children"
+            className="inline-flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl bg-[#fafaf7] hover:bg-[#e6f4ee] text-[#107a57] border border-[#e8e8e0] hover:border-[#107a57]/30 text-xs font-bold transition self-start sm:self-auto shrink-0"
+          >
+            <BookOpen className="w-3.5 h-3.5" />
+            <span>عرض المستجدات المجمعة</span>
+          </Link>
+        )}
+      </div>
+
+      {/* رسالة التنبيه إن وجدت */}
+      {addMsg && (
+        <div
+          className={`p-3 rounded-xl text-xs flex items-center gap-2 ${
+            addMsg.type === "success"
+              ? "bg-emerald-50 border border-emerald-200 text-emerald-800"
+              : "bg-red-50 border border-red-200 text-red-700"
+          }`}
+        >
+          {addMsg.type === "success" ? (
+            <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+          ) : (
+            <X className="w-4 h-4 shrink-0 text-red-600" />
+          )}
+          <span>{addMsg.text}</span>
+        </div>
+      )}
+
+      {/* بطاقات الأساتذة المحفوظين */}
+      {wallet.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {wallet.map((teacher) => (
+            <TeacherWalletCard
+              key={teacher.slug || teacher.code}
+              teacher={teacher}
+              onRemove={() => removeTeacher(teacher.slug)}
+              onUpdateChild={(name) => updateChildName(teacher.slug, name)}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-6 px-4 bg-[#fafaf7] rounded-2xl border border-dashed border-[#e8e8e0] space-y-2">
+          <GraduationCap className="w-8 h-8 text-gray-400 mx-auto" />
+          <p className="text-xs font-black text-gray-700">
+            لا يوجد أساتذة محفوظون في محفظتك حتى الآن
+          </p>
+          <p className="text-[11px] text-gray-500 max-w-sm mx-auto">
+            أدخل كود الأستاذ الذي سلمه لابنك في الكراس أدناه ليُحفظ تلقائياً وتتمكن من متابعة دروسه ونقاطه بنقرة واحدة دائماً.
           </p>
         </div>
+      )}
+
+      {/* حقل إضافة أستاذ جديد بالكود */}
+      <div className="pt-2">
+        <form onSubmit={handleAddByCode} className="space-y-2">
+          <label className="block text-xs font-black text-gray-700">
+            + إضافة أستاذ جديد إلى قائمتك عبر الكود:
+          </label>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <input
+              type="text"
+              value={newCode}
+              onChange={(e) => setNewCode(e.target.value)}
+              placeholder="اكتب كود الأستاذ (مثال: MTH-101 أو ARB-205)..."
+              className="flex-1 px-3.5 py-2.5 rounded-xl bg-[#fafaf7] border border-[#e8e8e0] text-xs font-mono text-gray-900 placeholder:font-sans focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57] transition uppercase"
+            />
+            <button
+              type="submit"
+              disabled={addingLoading || !newCode.trim()}
+              className="btn-primary text-xs py-2.5 px-5 justify-center shrink-0 disabled:opacity-50"
+            >
+              {addingLoading ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>جارٍ التحقق...</span>
+                </>
+              ) : (
+                <>
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>إضافة للمحفظة</span>
+                </>
+              )}
+            </button>
+          </div>
+        </form>
       </div>
 
-      <Link
-        href="/my-children"
-        className="flex items-center justify-center gap-2 w-full py-2.5 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-black transition"
-      >
-        <BookOpen className="w-4 h-4" /> كل مستجدات أبنائي في صفحة واحدة
-      </Link>
-
-      {/* بطاقات المعلمين المحفوظين */}
-      <div className="space-y-2">
-        {wallet.map((teacher) => (
-          <WalletCard
-            key={teacher.slug}
-            teacher={teacher}
-            onRemove={() => removeTeacher(teacher.slug)}
-            onUpdateChild={(name) => updateChildName(teacher.slug, name)}
-          />
-        ))}
+      <div className="pt-2 text-center text-[10px] text-gray-400 flex items-center justify-center gap-1.5">
+        <span>🔒 بياناتك محفوظة محلياً في هاتفك فقط</span>
+        <span>•</span>
+        <span>لا يلزم أي تسجيل حساب للولي</span>
       </div>
-
-      <p className="text-[10px] text-slate-400 text-center">
-        📱 محفوظة على هاتفك فقط · لا تسجيل مطلوب
-      </p>
     </div>
   );
 }
 
-/* ─── بطاقة معلم واحد ─── */
-function WalletCard({
+/* ─── بطاقة الأستاذ الفردية في المحفظة ─── */
+function TeacherWalletCard({
   teacher,
   onRemove,
   onUpdateChild,
@@ -126,75 +348,99 @@ function WalletCard({
   const [childInput, setChildInput] = useState(teacher.childName || "");
 
   return (
-    <div className="flex items-center gap-3 bg-amber-50/60 hover:bg-amber-50 rounded-2xl p-3 transition group border border-amber-100">
-      {/* أيقونة */}
-      <div className="w-9 h-9 rounded-xl bg-white border border-amber-100 flex items-center justify-center text-sm font-black text-emerald-700 shrink-0 shadow-xs">
-        {teacher.name.charAt(0)}
-      </div>
-
-      {/* المعلومات */}
-      <div className="flex-1 min-w-0">
-        <p className="font-bold text-slate-900 text-xs truncate">{teacher.name}</p>
-        <div className="flex items-center gap-2 text-[11px] text-slate-500">
-          <span className="font-mono text-emerald-700 font-bold">{teacher.code}</span>
-          {teacher.school && (
-            <span className="truncate">{teacher.school}</span>
-          )}
+    <div className="flex flex-col justify-between bg-white rounded-2xl p-4 border border-[#e8e8e0] hover:border-[#107a57]/40 shadow-xs hover:shadow-sm transition-all group space-y-3">
+      {/* الجزء العلوي: المادة والأستاذ والزر */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-10 h-10 rounded-xl bg-[#e6f4ee] text-[#107a57] border border-[#107a57]/20 flex items-center justify-center text-lg font-black shrink-0">
+            {teacher.subjectIcon || "📚"}
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[10px] font-black text-[#107a57] bg-[#e6f4ee] px-2 py-0.5 rounded-md">
+                {teacher.subjectName || "المادة"}
+              </span>
+              <span className="font-mono text-[10px] font-bold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+                {teacher.code}
+              </span>
+            </div>
+            <h4 className="font-black text-gray-900 text-xs sm:text-sm truncate mt-0.5">
+              {teacher.name}
+            </h4>
+          </div>
         </div>
 
-        {/* اسم الابن */}
-        {editingChild ? (
-          <div className="mt-1.5 flex gap-1.5">
-            <input
-              type="text"
-              value={childInput}
-              onChange={(e) => setChildInput(e.target.value)}
-              placeholder="اسم ابنك/ابنتك..."
-              autoFocus
-              className="flex-1 text-[11px] border border-amber-200 rounded-lg px-2 py-1 focus:ring-1 focus:ring-amber-400 outline-none"
-            />
-            <button
-              onClick={() => {
-                onUpdateChild(childInput.trim());
-                setEditingChild(false);
-              }}
-              className="px-2 py-1 rounded-lg bg-amber-400 text-white text-[10px] font-bold"
-            >
-              حفظ
-            </button>
-            <button
-              onClick={() => setEditingChild(false)}
-              className="px-2 py-1 rounded-lg bg-slate-100 text-slate-600 text-[10px] font-bold"
-            >
-              إلغاء
-            </button>
+        {/* زر الحذف */}
+        <button
+          onClick={onRemove}
+          className="p-1 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition shrink-0"
+          title="إزالة هذا الأستاذ من قائمتي"
+          aria-label="إزالة"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* تفاصيل المتوسطة والمستويات */}
+      <div className="text-[11px] text-gray-500 space-y-0.5 bg-[#fafaf7] p-2.5 rounded-xl border border-[#e8e8e0]/70">
+        <div className="flex items-center gap-1.5 truncate">
+          <Building2 className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+          <span className="truncate">{teacher.school || "المتوسطة"}</span>
+        </div>
+        {teacher.levelsLabel && (
+          <div className="text-[10px] text-[#107a57] font-bold pr-5">
+            الأقسام المعتمدة: {teacher.levelsLabel}
           </div>
-        ) : (
-          <button
-            onClick={() => setEditingChild(true)}
-            className="mt-0.5 text-[11px] text-amber-600 hover:underline"
-          >
-            {teacher.childName ? `👦 ${teacher.childName}` : "+ أضف اسم ابنك"}
-          </button>
         )}
       </div>
 
-      {/* أزرار */}
-      <div className="flex flex-col gap-1.5 shrink-0">
+      {/* الجزء السفلي: اسم الابن وزر الدخول الفوري */}
+      <div className="flex items-center justify-between gap-2 pt-1 border-t border-[#e8e8e0]/60">
+        <div className="min-w-0 flex-1">
+          {editingChild ? (
+            <div className="flex gap-1">
+              <input
+                type="text"
+                value={childInput}
+                onChange={(e) => setChildInput(e.target.value)}
+                placeholder="اسم ابنك/ابنتك..."
+                autoFocus
+                className="w-24 text-[10px] border border-[#107a57] rounded-md px-1.5 py-0.5 outline-none font-bold"
+              />
+              <button
+                onClick={() => {
+                  onUpdateChild(childInput.trim());
+                  setEditingChild(false);
+                }}
+                className="px-1.5 py-0.5 rounded bg-[#107a57] text-white text-[9px] font-bold"
+              >
+                حفظ
+              </button>
+              <button
+                onClick={() => setEditingChild(false)}
+                className="px-1 py-0.5 text-gray-400 text-[9px]"
+              >
+                ✕
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setEditingChild(true)}
+              className="text-[10px] text-gray-500 hover:text-[#107a57] font-bold truncate flex items-center gap-1"
+              title="تخصيص اسم الابن المتابع مع هذا الأستاذ"
+            >
+              <span>{teacher.childName ? `👦 ${teacher.childName}` : "+ اسم الابن"}</span>
+            </button>
+          )}
+        </div>
+
         <Link
           href={`/t/${teacher.slug}`}
-          className="w-8 h-8 rounded-xl bg-white border border-amber-100 flex items-center justify-center text-emerald-600 hover:bg-emerald-50 hover:border-emerald-200 transition shadow-xs"
-          title="فتح فضاء المعلم"
+          className="btn-primary text-xs py-1.5 px-3 font-black shrink-0"
         >
+          <span>دخول فوري</span>
           <ExternalLink className="w-3.5 h-3.5" />
         </Link>
-        <button
-          onClick={onRemove}
-          className="w-8 h-8 rounded-xl bg-white border border-red-100 flex items-center justify-center text-red-400 hover:bg-red-50 hover:border-red-200 transition shadow-xs"
-          title="حذف من المحفظة"
-        >
-          <X className="w-3.5 h-3.5" />
-        </button>
       </div>
     </div>
   );

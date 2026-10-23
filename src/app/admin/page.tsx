@@ -64,6 +64,7 @@ import {
   LEVELS,
   COMMON_FIELDS,
   HONOR_CLASSES,
+  MIDDLE_SCHOOL_SUBJECTS,
   isPdfFile,
   type Lesson,
   type LessonImage,
@@ -85,6 +86,7 @@ export type TeacherSession = {
   teacher_code: string | null;
   school_custom_name: string | null;
   levels_taught: number[] | null;
+  subject?: string | null;
 };
 
 export default function AdminPage() {
@@ -1074,12 +1076,25 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-base font-extrabold text-slate-800">لوحة تحكم {profile.full_name || "الأستاذ"}</h1>
-            <p className="text-[11px] text-emerald-700 font-bold">
-              {profile.school_custom_name || "متوسطة"} — مادة الرياضيات
+            <p className="text-[11px] text-[#107a57] font-bold">
+              {profile.school_custom_name || "متوسطة"} — {profile.subject ? (MIDDLE_SCHOOL_SUBJECTS.find((s) => s.id === profile.subject)?.name || profile.subject) : "مادة الرياضيات"}
               {profile.teacher_code && <span className="font-mono text-slate-500 mr-2">({profile.teacher_code})</span>}
             </p>
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <button
+              type="button"
+              onClick={() => {
+                const inviteUrl = `${window.location.origin}/join?key=asateza-2026`;
+                navigator.clipboard.writeText(inviteUrl);
+                setToastMsg({ type: "success", text: "تم نسخ رابط دعوة الأساتذة السري! شاركه مع زملائك الأساتذة عبر واتساب أو فيبر 📋" });
+              }}
+              className="flex items-center gap-1.5 text-xs text-[#107a57] bg-[#e6f4ee] hover:bg-[#d5eee2] border border-[#107a57]/25 font-bold px-3 py-1.5 rounded-xl transition cursor-pointer"
+              title="نسخ الرابط السري لدعوة وتسجيل أساتذة جدد"
+            >
+              <Copy className="w-3.5 h-3.5" />
+              <span>رابط دعوة أستاذ 🔗</span>
+            </button>
             <button
               type="button"
               onClick={() => setShareModalOpen(true)}

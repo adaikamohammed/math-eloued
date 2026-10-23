@@ -16,8 +16,9 @@ import {
   MessageCircle,
   Scale,
 } from "lucide-react";
-import { UserProfile, LEVELS } from "@/lib/types";
+import { UserProfile, LEVELS, MIDDLE_SCHOOL_SUBJECTS } from "@/lib/types";
 import SaveToWalletButton from "@/components/SaveToWalletButton";
+import { AutoSaveTeacherWallet } from "@/components/AutoSaveTeacherWallet";
 import { normalizeData, readPublicTeacherData } from "@/lib/storage";
 import { findPublicTeacher } from "@/lib/teachers";
 import { TeacherQR } from "@/components/TeacherQR";
@@ -58,9 +59,23 @@ export default async function TeacherPublicSpace({ params }: TeacherPageProps) {
   const showMessages = flags.messages !== false;
 
   const levelsTaught = profile.levels_taught || [1, 2, 3, 4];
+  const codePrefix = (profile.teacher_code || "").split("-")[0]?.toUpperCase() || "MTH";
+  const subjectObj =
+    MIDDLE_SCHOOL_SUBJECTS.find((s) => s.codePrefix === codePrefix || s.id === (profile as any).subject) ||
+    MIDDLE_SCHOOL_SUBJECTS[0];
+  const subjectName = subjectObj.name;
+  const subjectIcon = subjectObj.icon;
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-16" dir="rtl">
+      {/* الحفظ التلقائي في محفظة الولي بمجرد فتح الصفحة */}
+      <AutoSaveTeacherWallet
+        profile={{
+          ...profile,
+          subject: subjectObj.id,
+        }}
+      />
+
       {/* رأس الصفحة والهوية البصرية للأستاذ */}
       <div className="bg-gradient-to-b from-emerald-800 via-emerald-700 to-teal-800 text-white px-4 pt-8 pb-12 rounded-b-3xl shadow-lg">
         <div className="max-w-2xl mx-auto space-y-4">
@@ -87,7 +102,10 @@ export default async function TeacherPublicSpace({ params }: TeacherPageProps) {
 
           <div className="text-center space-y-2 pt-2">
             <div className="w-16 h-16 rounded-2xl bg-white/15 backdrop-blur-md border border-white/20 mx-auto flex items-center justify-center text-2xl font-black shadow-inner">
-              ∑
+              {subjectIcon}
+            </div>
+            <div className="inline-block bg-white/15 px-3 py-0.5 rounded-full text-xs font-bold text-emerald-100 border border-white/20">
+              مادة {subjectName}
             </div>
             <h1 className="text-xl sm:text-2xl font-black tracking-tight">{profile.full_name}</h1>
             <p className="text-xs sm:text-sm text-emerald-100 flex items-center justify-center gap-1.5 font-medium">

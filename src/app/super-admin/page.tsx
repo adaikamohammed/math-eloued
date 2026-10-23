@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
@@ -23,6 +23,7 @@ import {
   MapPin,
   Trash2,
   Lock,
+  Copy,
 } from "lucide-react";
 import { UserProfile } from "@/lib/types";
 import { SchoolsManager } from "./SchoolsManager";
@@ -351,6 +352,18 @@ export default function SuperAdminPage() {
           </div>
           <nav className="flex items-center gap-2 text-xs text-indigo-200">
             <Link href="/" className="px-3 py-1.5 rounded-lg hover:bg-white/10 transition">الصفحة الرئيسية</Link>
+            <button
+              onClick={() => {
+                const inviteUrl = `${window.location.origin}/join?key=asateza-2026`;
+                navigator.clipboard.writeText(inviteUrl);
+                showToast("success", "تم نسخ رابط دعوة الأساتذة السري! شاركه مع مدراء وأساتذة المؤسسات 📋");
+              }}
+              className="px-3 py-1.5 rounded-lg bg-emerald-600/90 hover:bg-emerald-600 text-white font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+              title="نسخ الرابط الخاص لدعوة وتسجيل أساتذة جدد"
+            >
+              <Copy className="w-3.5 h-3.5" />
+              <span>دعوة أستاذ 🔗</span>
+            </button>
             <Link href="/forum" className="px-3 py-1.5 rounded-lg hover:bg-white/10 transition">💬 الملتقى</Link>
             <Link href="/inspector" className="px-3 py-1.5 rounded-lg hover:bg-white/10 transition">🛡️ لوحة المقاطعات</Link>
             <Link href="/settings" className="px-3 py-1.5 rounded-lg hover:bg-white/10 transition">⚙️ حسابي</Link>

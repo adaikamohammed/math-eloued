@@ -177,10 +177,7 @@ export default function LoginPage() {
           </form>
 
           <div className="mt-5 text-center text-xs text-slate-500">
-            أستاذ جديد وتريد الانضمام؟{" "}
-            <Link href="/register" className="text-emerald-700 font-bold hover:underline">
-              تسجيل حساب أستاذ جديد هنا
-            </Link>
+            التسجيل مخصص لأساتذة التعليم المتوسط عبر رابط دعوة رسمي من إدارة المؤسسة.
           </div>
 
           {/* حسابات العرض التجريبي للمقاطعة 1 */}

@@ -4,7 +4,7 @@ import { Lock } from "lucide-react";
 // يظهر في فضاءات الأستاذ عند غياب جلسة دخول (حساب الأستاذ على المنصة)
 export function LoginRequired({ next, title }: { next: string; title: string }) {
   return (
-    <div className="pt-16 max-w-sm mx-auto space-y-4 px-4 text-center fade-up">
+    <div className="pt-16 max-w-sm mx-auto space-y-4 px-4 text-center fade-up" dir="rtl">
       <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-2">
         <Lock className="w-6 h-6" />
       </div>
@@ -18,9 +18,9 @@ export function LoginRequired({ next, title }: { next: string; title: string }) 
       >
         تسجيل الدخول
       </Link>
-      <Link href="/register" className="block text-xs text-emerald-700 font-bold hover:underline">
-        أستاذ جديد؟ أنشئ حسابك
-      </Link>
+      <p className="block text-[11px] text-slate-400">
+        التسجيل متاح للأساتذة عبر رابط الدعوة المعتمد من الإدارة
+      </p>
     </div>
   );
 }
