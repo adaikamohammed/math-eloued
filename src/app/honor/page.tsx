@@ -20,8 +20,13 @@ export default function HonorRollPage() {
   const [selectedClass, setSelectedClass] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [urlLvl, setUrlLvl] = useState<string | null>(null);
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const lvl = new URLSearchParams(window.location.search).get("lvl");
+      if (lvl) setUrlLvl(lvl);
+    }
     fetchHonors();
   }, []);
 
@@ -35,11 +40,22 @@ export default function HonorRollPage() {
       const honorsData: HonorStudent[] = Array.isArray(data.honors) ? data.honors : [];
       setHonors(honorsData);
 
+      const lvlParam = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("lvl") : null;
+      let allCls: string[] = [];
       if (Array.isArray(data.customClasses) && data.customClasses.length > 0) {
-        setClassesList(data.customClasses);
+        allCls = data.customClasses;
       } else {
-        const unique = Array.from(new Set(honorsData.map((h) => h.className).filter(Boolean)));
-        if (unique.length > 0) setClassesList(unique);
+        allCls = Array.from(new Set(honorsData.map((h) => h.className).filter(Boolean)));
+      }
+
+      if (lvlParam) {
+        const scopedCls = allCls.filter((cls) => {
+          const norm = cls.replace(/\s+/g, "").trim();
+          return norm.startsWith(lvlParam) || norm.includes(`${lvlParam}م`) || norm.includes(lvlParam);
+        });
+        setClassesList(scopedCls);
+      } else {
+        setClassesList(allCls);
       }
     } catch (e) {
       console.error("Error fetching honors:", e);
@@ -50,8 +66,13 @@ export default function HonorRollPage() {
 
   const normalizeClass = (c?: string) => (c ? c.replace(/\s+/g, "").trim() : "");
 
-  // تصفية حسب القسم والبحث
+  // تصفية حسب القسم والمستوى والبحث
   const filteredHonors = honors.filter((item) => {
+    if (urlLvl) {
+      const clsNorm = normalizeClass(item.className);
+      const matchesLevel = clsNorm.startsWith(urlLvl) || clsNorm.includes(`${urlLvl}م`) || clsNorm.includes(urlLvl);
+      if (!matchesLevel) return false;
+    }
     const matchesClass =
       selectedClass === "all" ||
       normalizeClass(item.className) === normalizeClass(selectedClass);
@@ -65,9 +86,11 @@ export default function HonorRollPage() {
 
   // حساب عدد المتميزين في كل قسم
   const getClassCount = (cls: string) => {
-    if (cls === "all") return honors.length;
-    return honors.filter((h) => normalizeClass(h.className) === normalizeClass(cls)).length;
+    if (cls === "all") return filteredHonors.length;
+    return filteredHonors.filter((h) => normalizeClass(h.className) === normalizeClass(cls)).length;
   };
+
+  const backHref = teacherHomeHref(teacherId) + (urlLvl ? `?lvl=${urlLvl}` : "");
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans py-6 px-4" dir="rtl">
@@ -75,16 +98,21 @@ export default function HonorRollPage() {
         {/* رأس الصفحة مع زر الرجوع */}
         <div className="flex items-center gap-3 bg-white p-3.5 rounded-2xl border border-slate-100 shadow-2xs">
           <Link
-            href={teacherHomeHref(teacherId)}
+            href={backHref}
             className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-100 active:scale-95 transition shrink-0"
             aria-label="الرجوع"
           >
             <ArrowRight className="w-5 h-5" />
           </Link>
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
               <h1 className="text-base font-black text-slate-900 truncate">لوحة الشرف وتكريم النوابغ</h1>
               <span className="text-amber-500 text-sm">✨</span>
+              {urlLvl && (
+                <span className="text-[10px] bg-amber-100 text-amber-900 font-black px-2 py-0.5 rounded-full border border-amber-300">
+                  السنة {urlLvl} متوسط ⭐
+                </span>
+              )}
             </div>
             <p className="text-[11px] text-slate-500 font-bold truncate">
               {teacherLabel(teacherInfo)}
@@ -172,11 +200,15 @@ export default function HonorRollPage() {
               <div className="text-xs font-black text-slate-800">
                 {search
                   ? "لا توجد نتائج مطابقة لبحثك"
+                  : urlLvl
+                  ? `لم تُنشر لوحة شرف السنة ${urlLvl} متوسط بعد`
                   : "لم يتم نشر لوحة الشرف لهذا الفصل بعد"}
               </div>
               <p className="text-[11px] text-slate-500 max-w-xs mx-auto leading-relaxed">
                 {search
                   ? "تأكد من كتابة الاسم بشكل صحيح."
+                  : urlLvl
+                  ? `يقوم الأستاذ بتكريم التلاميذ النوابغ في السنة ${urlLvl} متوسط فور رصد التقييمات والمشاركات المتميزة.`
                   : "سيقوم الأستاذ بإضافة أسماء النوابغ والمتميزين فور الانتهاء من تقييم الحصص والفروض إن شاء الله."}
               </p>
             </div>

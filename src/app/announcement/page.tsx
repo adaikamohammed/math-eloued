@@ -24,6 +24,14 @@ export default function AnnouncementPage() {
   const [activeTab, setActiveTab] = useState<"all" | "supplies" | "reception">("all");
   const teacherId = useTeacherId();
   const [teacher, setTeacher] = useState<UserProfile | null>(null);
+  const [urlLvl, setUrlLvl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const lvl = new URLSearchParams(window.location.search).get("lvl");
+      if (lvl) setUrlLvl(lvl);
+    }
+  }, []);
 
   // بطاقة استقبال الأستاذ ونبذته من ملفه العام
   useEffect(() => {
@@ -37,6 +45,7 @@ export default function AnnouncementPage() {
   }, [teacherId]);
 
   const reception = teacher?.reception;
+  const backHref = teacherHomeHref(teacherId) + (urlLvl ? `?lvl=${urlLvl}` : "");
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans py-6 px-4" dir="rtl">
@@ -44,16 +53,23 @@ export default function AnnouncementPage() {
         {/* رأس الصفحة وزر الرجوع */}
         <div className="flex items-center gap-3 bg-white p-3.5 rounded-2xl border border-slate-100 shadow-xs">
           <Link
-            href={teacherHomeHref(teacherId)}
+            href={backHref}
             className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-100 active:scale-95 transition shrink-0"
             aria-label="الرجوع للرئيسية"
           >
             <ArrowRight className="w-5 h-5" />
           </Link>
           <div className="min-w-0 flex-1">
-            <span className="inline-flex items-center gap-1 text-[11px] font-black text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200/60 mb-0.5">
-              <Sparkles className="w-3 h-3 text-emerald-600" /> دليل وتوجيهات الأستاذ
-            </span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="inline-flex items-center gap-1 text-[11px] font-black text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200/60 mb-0.5">
+                <Sparkles className="w-3 h-3 text-emerald-600" /> دليل وتوجيهات الأستاذ
+              </span>
+              {urlLvl && (
+                <span className="text-[10px] bg-emerald-600 text-white font-black px-2 py-0.5 rounded-full">
+                  السنة {urlLvl} متوسط 🤝
+                </span>
+              )}
+            </div>
             <h1 className="text-base font-extrabold text-slate-900 truncate">
               ساعة الاستقبال والتوجيهات البيداغوجية
             </h1>
@@ -83,7 +99,7 @@ export default function AnnouncementPage() {
             </button>
           ))}
           <Link
-            href="/assessment"
+            href={`/assessment?teacher=${teacherId || ""}${urlLvl ? `&lvl=${urlLvl}` : ""}`}
             className="px-3.5 py-2 rounded-xl whitespace-nowrap bg-teal-50 text-teal-800 border border-teal-200 hover:bg-teal-100 transition shrink-0 flex items-center gap-1.5 font-bold"
           >
             <span>⚖️ ميثاق التقويم</span>
@@ -239,7 +255,7 @@ export default function AnnouncementPage() {
         {/* زر العودة لفضاء الأستاذ */}
         <div className="text-center pt-2">
           <Link
-            href={teacherHomeHref(teacherId)}
+            href={backHref}
             className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 active:scale-95 transition shadow-sm"
           >
             <span>العودة لفضاء الأستاذ والدروس</span>

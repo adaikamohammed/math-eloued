@@ -33,11 +33,11 @@ export function MobileBottomNav() {
 
   if (user && user.role === "teacher") {
     items = [
-      { label: "السبورة", href: "/admin/board", icon: BookOpen },
+      { label: "لوحتي", href: "/admin", icon: GraduationCap },
       { label: "التلاميذ", href: "/admin/students", icon: Users },
+      { label: "السبورة", href: "/admin/board", icon: BookOpen },
       { label: "التوقيت", href: "/admin/timetable", icon: Calendar },
-      { label: "الدفتر اليومي", href: "/admin/diary", icon: ClipboardList },
-      { label: "تخصيص", href: "/settings/features", icon: Sliders },
+      { label: "الدفتر", href: "/admin/diary", icon: ClipboardList },
     ];
   } else if (user && user.role === "inspector") {
     items = [
@@ -58,8 +58,10 @@ export function MobileBottomNav() {
       {items.map((item) => {
         const Icon = item.icon;
         const isActive =
-          pathname === item.href ||
-          (item.href !== "/" && pathname.startsWith(item.href));
+          item.href === "/admin"
+            ? pathname === "/admin"
+            : pathname === item.href ||
+              (item.href !== "/" && pathname.startsWith(item.href));
 
         return (
           <Link

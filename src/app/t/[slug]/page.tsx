@@ -295,7 +295,7 @@ export default async function TeacherPublicSpace({ params, searchParams }: Teach
               </div>
             </div>
             <Link
-              href={`/assessment?teacher=${profile.id}`}
+              href={`/assessment?teacher=${profile.id}${isValidLevel ? `&lvl=${requestedLevel}` : ""}`}
               className="text-xs font-bold text-emerald-800 bg-white border border-emerald-200 px-3.5 py-2 rounded-xl hover:bg-emerald-100 active:scale-95 transition shadow-2xs shrink-0"
             >
               اطلاع الولي 🔍
@@ -316,7 +316,7 @@ export default async function TeacherPublicSpace({ params, searchParams }: Teach
               </div>
             </div>
             <Link
-              href={`/honor?teacher=${profile.id}`}
+              href={`/honor?teacher=${profile.id}${isValidLevel ? `&lvl=${requestedLevel}` : ""}`}
               className="text-xs font-bold text-amber-700 bg-amber-50 px-3 py-1.5 rounded-lg hover:bg-amber-100 transition"
             >
               مشاهدة 🌟
@@ -328,7 +328,7 @@ export default async function TeacherPublicSpace({ params, searchParams }: Teach
         <div className={`grid grid-cols-1 ${showReception && showMessages ? "sm:grid-cols-2" : ""} gap-2.5`}>
           {showReception && (
             <Link
-              href={`/announcement?teacher=${profile.id}`}
+              href={`/announcement?teacher=${profile.id}${isValidLevel ? `&lvl=${requestedLevel}` : ""}`}
               className="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-sm hover:border-teal-300 transition flex items-center gap-3"
             >
               <span className="w-9 h-9 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center shrink-0">
@@ -364,6 +364,7 @@ export default async function TeacherPublicSpace({ params, searchParams }: Teach
           teacherName={profile.full_name || "الأستاذ"}
           code={isValidLevel ? `${profile.teacher_code || "MTH"}-${requestedLevel}` : profile.teacher_code}
           schoolName={profile.school_custom_name || ""}
+          levelsTaught={isValidLevel ? [requestedLevel] : (profile.levels_taught || [1, 2, 3, 4])}
         />
 
         {/* شريط درع الحماية القانونية وإخلاء المسؤولية */}

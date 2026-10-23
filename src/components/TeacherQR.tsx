@@ -11,11 +11,13 @@ export function TeacherQR({
   teacherName,
   code,
   schoolName,
+  levelsTaught,
 }: {
   path: string;
   teacherName: string;
   code?: string | null;
   schoolName?: string;
+  levelsTaught?: number[];
 }) {
   const [url, setUrl] = useState("");
   const [dataUrl, setDataUrl] = useState("");
@@ -94,6 +96,7 @@ export function TeacherQR({
         teacherCode={code || "MTH"}
         schoolName={schoolName}
         slug={path.replace(/^\/t\//, "")}
+        levelsTaught={levelsTaught}
       />
     </>
   );

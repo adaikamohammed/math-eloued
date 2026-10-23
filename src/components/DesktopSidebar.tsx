@@ -67,6 +67,13 @@ export function DesktopSidebar() {
 
       const pedagogyItems: NavItem[] = [
         {
+          label: "لوحة التحكم والمتابعة",
+          href: "/admin",
+          icon: GraduationCap,
+          badge: "رئيسية",
+          badgeColor: "bg-emerald-600 text-white",
+        },
+        {
           label: "كراس الدروس والسبورة",
           href: "/admin/board",
           icon: BookOpen,
@@ -248,8 +255,12 @@ export function DesktopSidebar() {
     return "/admin";
   };
 
-  const isActive = (href: string) =>
-    href === "/" ? pathname === "/" : pathname.startsWith(href);
+  const isActive = (href: string) => {
+    if (href === "/") return pathname === "/";
+    if (href === "/admin") return pathname === "/admin";
+    if (href === "/inspector") return pathname === "/inspector";
+    return pathname.startsWith(href);
+  };
 
   return (
     <>

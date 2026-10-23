@@ -41,6 +41,7 @@ export default function AssessmentPage() {
 function AssessmentContent() {
   const searchParams = useSearchParams();
   const teacherId = searchParams.get("teacher");
+  const lvl = searchParams.get("lvl");
   const [teacherProfile, setTeacherProfile] = useState<{ fullName?: string; schoolName?: string; slug?: string } | null>(null);
 
   useEffect(() => {
@@ -79,7 +80,7 @@ function AssessmentContent() {
 
   const ratingInfo = getRatingInfo(totalCalc);
 
-  const backUrl = teacherProfile?.slug ? `/t/${teacherProfile.slug}` : teacherId ? `/t/${teacherId}` : "/";
+  const backUrl = (teacherProfile?.slug ? `/t/${teacherProfile.slug}` : teacherId ? `/t/${teacherId}` : "/") + (lvl ? `?lvl=${lvl}` : "");
 
   return (
     <div className="pb-16 pt-3 fade-up space-y-4">
@@ -93,14 +94,24 @@ function AssessmentContent() {
           <ArrowRight className="w-5 h-5" />
         </Link>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-base font-black text-slate-900 truncate">
               ميثاق التقويم المستمر (20 / 20)
             </h1>
             <span className="text-[10px] bg-emerald-100 text-emerald-800 font-black px-2 py-0.5 rounded-md border border-emerald-200">
               شفافية كاملة ⚖️
             </span>
+            {lvl && (
+              <span className="text-[10px] bg-emerald-600 text-white font-black px-2 py-0.5 rounded-full">
+                السنة {lvl} متوسط 📐
+              </span>
+            )}
           </div>
+          <p className="text-[11px] text-slate-500 font-bold truncate">
+            {teacherProfile?.fullName ? `فضاء الأستاذ(ة) ${teacherProfile.fullName} — ${teacherProfile.schoolName || ""}` : "ميثاق التقويم المستمر — مادة الرياضيات (التعليم المتوسط)"}
+          </p>
+        </div>
+      </div>
           <p className="text-[11px] text-slate-500 font-bold truncate">
             {teacherProfile?.fullName ? `فضاء الأستاذ(ة) ${teacherProfile.fullName} — ${teacherProfile.schoolName || ""}` : "ميثاق التقويم المستمر — مادة الرياضيات (التعليم المتوسط)"}
           </p>
