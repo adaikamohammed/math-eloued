@@ -1,15 +1,94 @@
 -- ====================================================================
--- الحل الجذري والنهائي لمشكلة (email rate limit exceeded):
--- دالة التسجيل الفوري للأساتذة بدون رسائل وبدون قيود Rate Limit
+-- الحل الجذري النهائي: السماح بإنشاء حسابات الأساتذة فورياً بدون موافقة
+-- وتجاوز حارس التوثيق guard_profile_privileges ودون إرسال رسائل أو Rate Limit
 -- ====================================================================
--- انسخ هذا الاستعلام بالكامل وألصقه في:
+-- انسخ هذا الملف بالكامل وألصقه في:
 -- Supabase Dashboard -> SQL Editor -> New Query -> Run
 -- ====================================================================
 
--- 1. التأكد من وجود عمود subject في profiles إذا لم يكن موجوداً
+-- 1. التأكد من وجود عمود subject في profiles
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS subject TEXT;
 
--- 2. إنشاء دالة التسجيل الفوري المباشر
+-- 2. تحديث حارس الصلاحيات guard_profile_privileges للسماح بالـ bypass أثناء التسجيل المعتمد
+CREATE OR REPLACE FUNCTION public.guard_profile_privileges()
+RETURNS trigger AS $$
+BEGIN
+  -- السماح إذا كانت المعاملة من داخل دالة نظام موثوقة (app.bypass_guard) أو المشرف العام أو بدون مستخدم
+  IF current_setting('app.bypass_guard', true) = 'on'
+     OR auth.uid() IS NULL 
+     OR public.is_admin() THEN
+    RETURN NEW;
+  END IF;
+
+  IF NEW.role IS DISTINCT FROM OLD.role
+     OR NEW.district_id IS DISTINCT FROM OLD.district_id
+     OR NEW.is_verified IS DISTINCT FROM OLD.is_verified THEN
+    RAISE EXCEPTION 'غير مسموح بتغيير الدور أو المقاطعة أو حالة التوثيق إلا من طرف المشرف العام'
+      USING ERRCODE = '42501';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+-- 3. تحديث دالة إنشاء الحساب التلقائي handle_new_user لتعتمد الحساب فورياً للأستاذ
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger AS $$
+DECLARE
+  meta   JSONB := COALESCE(NEW.raw_user_meta_data, '{}'::jsonb);
+  v_slug TEXT  := COALESCE(NULLIF(meta->>'slug', ''), 'prof-' || SUBSTRING(NEW.id::text, 1, 6));
+  v_code TEXT  := COALESCE(NULLIF(meta->>'teacher_code', ''), 'MTH-' || UPPER(SUBSTRING(NEW.id::text, 1, 4)));
+  v_levels SMALLINT[];
+BEGIN
+  IF EXISTS (SELECT 1 FROM public.profiles WHERE slug = v_slug) THEN
+    v_slug := v_slug || '-' || SUBSTRING(NEW.id::text, 1, 4);
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.profiles WHERE teacher_code = v_code) THEN
+    v_code := v_code || '-' || UPPER(SUBSTRING(NEW.id::text, 1, 3));
+  END IF;
+
+  IF jsonb_typeof(meta->'levels_taught') = 'array' THEN
+    SELECT array_agg(DISTINCT lvl::SMALLINT ORDER BY lvl::SMALLINT)
+    INTO v_levels
+    FROM jsonb_array_elements_text(meta->'levels_taught') AS lvl
+    WHERE lvl IN ('1', '2', '3', '4');
+  END IF;
+
+  INSERT INTO public.profiles (
+    id, role, full_name, district_id, middle_school_id,
+    school_custom_name, teacher_code, slug, levels_taught,
+    is_verified, verification_status, submitted_at, subject
+  )
+  VALUES (
+    NEW.id,
+    COALESCE(NULLIF(meta->>'role', ''), 'teacher'),
+    COALESCE(NULLIF(meta->>'full_name', ''), 'أستاذ جديد'),
+    NULLIF(meta->>'district_id', '')::INTEGER,
+    NULLIF(meta->>'middle_school_id', '')::UUID,
+    meta->>'school_custom_name',
+    v_code,
+    v_slug,
+    COALESCE(v_levels, ARRAY[1, 2, 3, 4]::SMALLINT[]),
+    true, -- تفعيل فوري معتمد بدون انتظار مراجعة وثائق
+    'approved',
+    NOW(),
+    meta->>'subject'
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    role = EXCLUDED.role,
+    full_name = EXCLUDED.full_name,
+    district_id = EXCLUDED.district_id,
+    school_custom_name = EXCLUDED.school_custom_name,
+    teacher_code = EXCLUDED.teacher_code,
+    slug = EXCLUDED.slug,
+    is_verified = true,
+    verification_status = 'approved',
+    subject = EXCLUDED.subject;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+-- 4. دالة التسجيل الفوري register_teacher_instant
 CREATE OR REPLACE FUNCTION public.register_teacher_instant(
   p_email text,
   p_password text,
@@ -31,19 +110,19 @@ DECLARE
   v_code text := p_teacher_code;
   v_slug text := p_slug;
 BEGIN
-  -- تنظيف الإيميل
+  -- تجاوز حارس الصلاحيات أثناء التسجيل المعتمد
+  PERFORM set_config('app.bypass_guard', 'on', true);
+
   p_email := lower(trim(p_email));
   
   IF p_email = '' OR p_password = '' OR p_full_name = '' THEN
     RETURN json_build_object('success', false, 'error', 'يرجى ملء جميع الحقول الإلزامية');
   END IF;
 
-  -- فحص إذا كان البريد مسجلاً مسبقاً
   IF EXISTS (SELECT 1 FROM auth.users WHERE lower(email) = p_email) THEN
     RETURN json_build_object('success', false, 'error', 'البريد الإلكتروني مسجل مسبقاً في المنصة');
   END IF;
 
-  -- توليد الكود والـ slug إذا كانا فارغين
   IF v_code = '' THEN
     v_code := 'MTH-' || floor(100 + random() * 900)::text;
   END IF;
@@ -54,7 +133,7 @@ BEGIN
   v_user_id := gen_random_uuid();
   v_encrypted_pw := extensions.crypt(p_password, extensions.gen_salt('bf'));
 
-  -- إدراج المستخدم في auth.users مفعل ومؤكد فوراً بدون إرسال أي إيميل
+  -- إدراج المستخدم في auth.users
   INSERT INTO auth.users (
     id, instance_id, email, encrypted_password, email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data, aud, role, created_at, updated_at,
@@ -73,8 +152,11 @@ BEGIN
       'role', 'teacher',
       'subject', p_subject,
       'district_id', p_district_id,
+      'school_custom_name', p_school_custom_name,
       'teacher_code', v_code,
-      'slug', v_slug
+      'slug', v_slug,
+      'is_verified', true,
+      'verification_status', 'approved'
     )::jsonb,
     'authenticated',
     'authenticated',
@@ -83,10 +165,10 @@ BEGIN
     '', '', '', '', '', ''
   );
 
-  -- إدراج الملف الشخصي في profiles
+  -- تحديث أو إدراج الملف الشخصي للتأكيد
   INSERT INTO public.profiles (
     id, role, full_name, district_id, school_custom_name,
-    teacher_code, slug, levels_taught, is_verified, subject
+    teacher_code, slug, levels_taught, is_verified, verification_status, subject
   )
   VALUES (
     v_user_id,
@@ -98,6 +180,7 @@ BEGIN
     v_slug,
     ARRAY[1, 2, 3, 4],
     true,
+    'approved',
     p_subject
   )
   ON CONFLICT (id) DO UPDATE SET
@@ -108,6 +191,7 @@ BEGIN
     teacher_code = EXCLUDED.teacher_code,
     slug = EXCLUDED.slug,
     is_verified = true,
+    verification_status = 'approved',
     subject = EXCLUDED.subject;
 
   RETURN json_build_object(
@@ -122,5 +206,4 @@ EXCEPTION WHEN OTHERS THEN
 END;
 $$;
 
--- 3. منح الصلاحية للاستخدام المباشر
 GRANT EXECUTE ON FUNCTION public.register_teacher_instant TO anon, authenticated;
