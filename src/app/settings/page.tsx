@@ -96,7 +96,7 @@ export default function TeacherSettingsPage() {
     setBio(profile.bio || "");
     setSchoolId(profile.middle_school_id || "");
     setSchoolName(profile.school_custom_name || "");
-    setLevels((profile.levels_taught as number[]) || [1, 2, 3, 4]);
+    setLevels(Array.isArray(profile.levels_taught) ? (profile.levels_taught as number[]) : []);
     setReception(profile.reception || {});
     if (profile.district_id) {
       supabase

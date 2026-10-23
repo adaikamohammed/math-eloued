@@ -26,6 +26,7 @@ import {
   Compass,
 } from "lucide-react";
 import { LoginRequired } from "@/components/LoginRequired";
+import { PageExplainer } from "@/components/PageExplainer";
 import {
   DailyDiaryEntry,
   LessonsData,
@@ -303,6 +304,17 @@ export default function TeacherDiaryPage() {
               <span>تحضير حصة جديدة (ماذا سأدرس غداً)</span>
             </button>
           </div>
+        </div>
+
+        {/* دليل الصفحة البيداغوجي */}
+        <div className="print:hidden">
+          <PageExplainer
+            pageId="diary"
+            title="الدفتر اليومي ودفتر النصوص (ماذا سأدرس غداً)"
+            teacherRoleExplanation="هنا تسجل وتوثق ما ستدرسه غداً لكل فوج، وتحدد المورد المعرفي ومؤشرات الكفاءة والواجب المنزلي، مع إمكانية طباعة دفتر نصوص ورقي جاهز للإدارة والمفتشية بنقرة واحدة."
+            parentRoleExplanation="يطلع الولي على عنوان الحصة المحضرة والواجب المنزلي المطلوب من ابنه لمواكبته في البيت (إذا قمت بتفعيل ظهورها للأولياء)."
+            inspectorExplanation="يطلع المفتش التربوي على وتيرة إنجاز البرنامج السنوي ومطابقة الموارد المعرفية لمخططات التعلم الرسمية."
+          />
         </div>
 
         {/* تنبيهات النجاح أو الخطأ */}

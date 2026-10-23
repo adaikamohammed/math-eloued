@@ -24,6 +24,7 @@ import {
   Eye,
 } from "lucide-react";
 import { LoginRequired } from "@/components/LoginRequired";
+import { PageExplainer } from "@/components/PageExplainer";
 import {
   SCHOOL_DAYS,
   TimetableSlot,
@@ -239,6 +240,17 @@ export default function TeacherTimetablePage() {
               <span>إدارة الأفواج والتلاميذ</span>
             </Link>
           </div>
+        </div>
+
+        {/* دليل الصفحة البيداغوجي */}
+        <div className="print:hidden">
+          <PageExplainer
+            pageId="timetable"
+            title="التوقيت الأسبوعي وساعة الاستقبال"
+            teacherRoleExplanation="اضغط على أي خانة فارغة في الشبكة لتعيين حصة الفوج والقاعة وساعة الاستقبال الرسمية، مع إمكانية طباعة جدول ورقي مطابق للمقاييس التربوية الرسمية."
+            parentRoleExplanation="يظهر للولي توقيت حصص ابنه مع توضيح ساعة استقبالك المعتمدة لتجنب إحراج الزيارات المفاجئة."
+            inspectorExplanation="يمكّن المفتشية من مطابقة النصاب الساعي الأسبوعي للأستاذ ومعاينة توزيع الحصص والقاعات."
+          />
         </div>
 
         {/* تنبيهات النجاح أو الخطأ */}

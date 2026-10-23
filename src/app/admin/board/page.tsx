@@ -30,6 +30,7 @@ import {
   ChevronUp,
 } from "lucide-react";
 import { LoginRequired } from "@/components/LoginRequired";
+import { PageExplainer } from "@/components/PageExplainer";
 import {
   Lesson,
   LessonImage,
@@ -52,6 +53,13 @@ export default function AdminBoardPage() {
   // حالة النافذة المنبثقة لإضافة/تعديل درس سبورة
   const [showModal, setShowModal] = useState(false);
   const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
+
+  const teacherLevels = useMemo(() => {
+    if (Array.isArray(profile?.levels_taught) && profile.levels_taught.length > 0) {
+      return (profile.levels_taught as number[]).filter((l) => [1, 2, 3, 4].includes(l));
+    }
+    return [1, 2, 3, 4];
+  }, [profile]);
 
   // حقول النموذج
   const [formLevel, setFormLevel] = useState<number>(1);
@@ -416,6 +424,15 @@ export default function AdminBoardPage() {
             </div>
           </div>
 
+          {/* دليل الصفحة البيداغوجي */}
+          <PageExplainer
+            pageId="board"
+            title="كراس الدروس والسبورة الرقمية"
+            teacherRoleExplanation="هنا تلتقط وترفع صور السبورة في نهاية كل حصة، مع ملخص الدرس والواجب المنزلي، حتى يتمكن التلميذ الغائب من نقل درسه ويواكب ولي أمره ما تم تقديمه في القسم."
+            parentRoleExplanation="يستطيع الولي فتح سبورة القسم والتأكد من نقل ابنه للدرس كاملاً ومساعدته في حل الواجبات."
+            inspectorExplanation="يمكّن المفتش من متابعة جودة التوثيق والمنتوج التعليمي المكتوب على السبورة لتقويم الأثر البيداغوجي."
+          />
+
           {/* ── شريط الفلاتر والبحث ── */}
           <div className="bg-white rounded-2xl border border-[#e8e8e0] p-4 shadow-xs space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -433,7 +450,7 @@ export default function AdminBoardPage() {
                 >
                   الكل ({lessons.length})
                 </button>
-                {[1, 2, 3, 4].map((lvl) => {
+                {teacherLevels.map((lvl) => {
                   const count = lessons.filter((l) => l.level === lvl).length;
                   return (
                     <button
@@ -728,10 +745,11 @@ export default function AdminBoardPage() {
                       onChange={(e) => setFormLevel(Number(e.target.value))}
                       className="w-full py-2 px-3 rounded-xl border border-[#e8e8e0] text-xs bg-[#fafaf7] focus:bg-white focus:outline-none focus:border-[#107a57]"
                     >
-                      <option value={1}>السنة الأولى متوسط (1م)</option>
-                      <option value={2}>السنة الثانية متوسط (2م)</option>
-                      <option value={3}>السنة الثالثة متوسط (3م)</option>
-                      <option value={4}>السنة الرابعة متوسط (4م - BEM)</option>
+                      {teacherLevels.map((lv) => (
+                        <option key={lv} value={lv}>
+                          {LEVELS[lv as 1 | 2 | 3 | 4].label} ({lv}م)
+                        </option>
+                      ))}
                     </select>
                   </div>
 

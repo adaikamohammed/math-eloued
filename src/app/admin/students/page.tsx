@@ -26,6 +26,7 @@ import {
   GraduationCap,
 } from "lucide-react";
 import { LoginRequired } from "@/components/LoginRequired";
+import { PageExplainer } from "@/components/PageExplainer";
 import { StudentRosterItem, LessonsData } from "@/lib/types";
 
 export default function StudentsManagementPage() {
@@ -314,6 +315,15 @@ export default function StudentsManagementPage() {
             </button>
           </div>
         </div>
+
+        {/* دليل الصفحة البيداغوجي */}
+        <PageExplainer
+          pageId="students"
+          title="إدارة الأفواج والتلاميذ"
+          teacherRoleExplanation="هنا تضيف أقسامك التربوية الفعلية (مثل 1م3، 2م5) وتدون أسماء تلاميذك مع الترتيب الأبجدي الآلي وطباعة القوائم بضغطة زر واحدة."
+          parentRoleExplanation="يضمن خصوصية تامة؛ لا يطلع أي ولي على أسماء أو بيانات التلاميذ الآخرين في الفوج."
+          inspectorExplanation="يطلع المفتش البيداغوجي على إسناد الأفواج وتعداد التلاميذ لمطابقة التنظيم التربوي الرسمي."
+        />
 
         {/* تنبيهات النجاح أو الخطأ */}
         {message && (

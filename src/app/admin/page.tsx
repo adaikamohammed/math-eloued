@@ -7,6 +7,8 @@ import { LoginRequired } from "@/components/LoginRequired";
 import { withTeacher } from "@/lib/teacherParam";
 import { PedagogyAlerts } from "@/components/PedagogyAlerts";
 import { ParentShareModal } from "@/components/ParentShareModal";
+import { TeacherOnboardingModal } from "@/components/TeacherOnboardingModal";
+import { TeacherSetupChecklist } from "@/components/TeacherSetupChecklist";
 import { BOARD_IMAGE_OPTIONS } from "@/lib/compress";
 import {
   Plus,
@@ -128,13 +130,17 @@ export default function AdminPage() {
 /* ---------------- 2. لوحة التحكم الرئيسية ---------------- */
 function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: () => void }) {
   const [shareModalOpen, setShareModalOpen] = useState(false);
-  const levelsTaught = (
-    profile.levels_taught && profile.levels_taught.length > 0 ? profile.levels_taught : [1, 2, 3, 4]
-  ).filter((lv): lv is 1 | 2 | 3 | 4 => [1, 2, 3, 4].includes(lv));
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
+  const [levelsTaughtState, setLevelsTaughtState] = useState<number[]>(
+    Array.isArray(profile.levels_taught) ? profile.levels_taught : []
+  );
+  const levelsTaught = levelsTaughtState.filter((lv): lv is 1 | 2 | 3 | 4 => [1, 2, 3, 4].includes(lv));
   const [mainTab, setMainTab] = useState<
     "lessons" | "summons" | "honors" | "evaluations" | "penalties" | "announcements" | "messages"
   >("lessons");
   const [level, setLevel] = useState<1 | 2 | 3 | 4>(levelsTaught[0] ?? 1);
+  const [hasTimetable, setHasTimetable] = useState(false);
+  const [hasDiary, setHasDiary] = useState(false);
   const [notebookTab, setNotebookTab] = useState<NotebookType>("lessons");
   const [allLessons, setAllLessons] = useState<Lesson[]>([]);
   const [summonsList, setSummonsList] = useState<ParentSummons[]>([]);
@@ -263,10 +269,40 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
           setPenaltyClass((prev) => prev || data.customClasses[0]);
         }
       }
+      if (data.timetable) {
+        setHasTimetable(true);
+      }
+      if (Array.isArray(data.diaryEntries) && data.diaryEntries.length > 0) {
+        setHasDiary(true);
+      }
     } finally {
       setLoading(false);
     }
   }, [level]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const isWelcome = window.location.search.includes("welcome=1");
+      const hasSeenOnboarding = localStorage.getItem(`onboarding_seen_${profile.id}`) === "true";
+      if (isWelcome || (levelsTaught.length === 0 && !hasSeenOnboarding)) {
+        setOnboardingOpen(true);
+        localStorage.setItem(`onboarding_seen_${profile.id}`, "true");
+      }
+    }
+  }, [profile.id, levelsTaught.length]);
+
+  const handleOnboardingComplete = (newLevels: number[], newClasses: string[]) => {
+    setLevelsTaughtState(newLevels);
+    setTeacherClasses(newClasses);
+    if (newLevels.length > 0 && !newLevels.includes(level)) {
+      setLevel(newLevels[0] as 1 | 2 | 3 | 4);
+    }
+    if (newClasses.length > 0) {
+      setEvalClass(newClasses[0]);
+      setClassName(newClasses[0]);
+    }
+    setToastMsg({ type: "success", text: "تم حفظ وتحديث المستويات والأفواج بنجاح! ✨" });
+  };
 
   const loadSummons = useCallback(async () => {
     try {
@@ -1086,15 +1122,25 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
       )}
 
       {profile && (
-        <ParentShareModal
-          isOpen={shareModalOpen}
-          onClose={() => setShareModalOpen(false)}
-          teacherName={profile.full_name || "الأستاذ"}
-          teacherCode={profile.teacher_code || "MTH"}
-          schoolName={profile.school_custom_name || ""}
-          slug={profile.slug || profile.teacher_code || ""}
-          levelsTaught={profile.levels_taught || [1, 2, 3, 4]}
-        />
+        <>
+          <ParentShareModal
+            isOpen={shareModalOpen}
+            onClose={() => setShareModalOpen(false)}
+            teacherName={profile.full_name || "الأستاذ"}
+            teacherCode={profile.teacher_code || "MTH"}
+            schoolName={profile.school_custom_name || ""}
+            slug={profile.slug || profile.teacher_code || ""}
+            levelsTaught={levelsTaught.length > 0 ? levelsTaught : [1, 2, 3, 4]}
+          />
+          <TeacherOnboardingModal
+            isOpen={onboardingOpen}
+            onClose={() => setOnboardingOpen(false)}
+            profile={profile}
+            currentClasses={teacherClasses}
+            initialLevels={levelsTaught}
+            onComplete={handleOnboardingComplete}
+          />
+        </>
       )}
 
       {/* الشريط العلوي */}
@@ -1167,6 +1213,18 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
           <PedagogyAlerts teacherId={profile.id} />
         </div>
 
+        {/* شريط خطة التجهيز خطوة بخطوة */}
+        <TeacherSetupChecklist
+          teacherId={profile.id}
+          hasLevelsAndClasses={levelsTaught.length > 0 && teacherClasses.length > 0}
+          hasTimetable={hasTimetable}
+          hasDiary={hasDiary}
+          hasLessons={allLessons.length > 0}
+          onOpenOnboarding={() => setOnboardingOpen(true)}
+          onOpenShareModal={() => setShareModalOpen(true)}
+          onOpenAddLesson={() => setMainTab("lessons")}
+        />
+
         {/* بطاقة رموز فضاء الأولياء المباشرة لكل مستوى */}
         <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50/70 rounded-2xl p-3 sm:p-4 border border-emerald-200/90 shadow-2xs space-y-2.5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -1181,59 +1239,95 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
                 زوّد أولياء كل سنة برمزهم المخصص، ليدخل كل ولي حصراً لكراس وسبورة مستوى ابنه مع إخفاء باقي المستويات:
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => setShareModalOpen(true)}
-              className="text-xs font-black text-emerald-800 bg-white hover:bg-emerald-100 border border-emerald-300 px-3 py-1.5 rounded-xl transition flex items-center gap-1 self-start sm:self-auto cursor-pointer shadow-2xs"
-            >
-              <Share2 className="w-3.5 h-3.5 text-emerald-600" />
-              <span>مشاركة سريعة عبر واتساب</span>
-            </button>
+            <div className="flex items-center gap-1.5 flex-wrap self-start sm:self-auto">
+              <button
+                type="button"
+                onClick={() => setOnboardingOpen(true)}
+                className="text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 px-2.5 py-1.5 rounded-xl transition flex items-center gap-1 cursor-pointer shadow-2xs"
+              >
+                <Sliders className="w-3.5 h-3.5 text-slate-500" />
+                <span>تعديل المستويات والأفواج</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShareModalOpen(true)}
+                className="text-xs font-black text-emerald-800 bg-white hover:bg-emerald-100 border border-emerald-300 px-3 py-1.5 rounded-xl transition flex items-center gap-1 cursor-pointer shadow-2xs"
+              >
+                <Share2 className="w-3.5 h-3.5 text-emerald-600" />
+                <span>مشاركة سريعة عبر واتساب</span>
+              </button>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-            {(profile.levels_taught || [1, 2, 3, 4]).map((lvl: number) => {
-              const lvlCode = `${profile.teacher_code || "MTH"}-${lvl}`;
-              const lvlUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/t/${profile.slug || profile.teacher_code}?lvl=${lvl}`;
-              return (
-                <div
-                  key={lvl}
-                  className="bg-white rounded-xl p-2.5 border border-emerald-200/70 flex items-center justify-between gap-2 shadow-2xs"
-                >
-                  <div className="min-w-0">
-                    <span className="text-[11px] font-black text-slate-800 block">السنة {lvl} متوسط:</span>
-                    <code className="text-xs font-mono font-black text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded">
-                      {lvlCode}
-                    </code>
+          {levelsTaught.length === 0 ? (
+            <div className="bg-white rounded-xl p-4 border border-amber-200 text-center space-y-2">
+              <p className="text-xs text-amber-800 font-bold">
+                لم تقم بتحديد المستويات المسندة إليك بعد. حدد سنواتك لتوليد الرموز المخصصة وإخفاء باقي المستويات.
+              </p>
+              <button
+                type="button"
+                onClick={() => setOnboardingOpen(true)}
+                className="btn-primary py-2 px-4 text-xs font-black inline-flex items-center gap-1 shadow-sm cursor-pointer"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>تحديد المستويات والأفواج الآن</span>
+              </button>
+            </div>
+          ) : (
+            <div
+              className={`grid grid-cols-1 ${
+                levelsTaught.length === 1
+                  ? "max-w-xs"
+                  : levelsTaught.length === 2
+                  ? "sm:grid-cols-2 max-w-xl"
+                  : levelsTaught.length === 3
+                  ? "sm:grid-cols-3"
+                  : "sm:grid-cols-2 lg:grid-cols-4"
+              } gap-2`}
+            >
+              {levelsTaught.map((lvl: number) => {
+                const lvlCode = `${profile.teacher_code || "MTH"}-${lvl}`;
+                const lvlUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/t/${profile.slug || profile.teacher_code}?lvl=${lvl}`;
+                return (
+                  <div
+                    key={lvl}
+                    className="bg-white rounded-xl p-2.5 border border-emerald-200/70 flex items-center justify-between gap-2 shadow-2xs"
+                  >
+                    <div className="min-w-0">
+                      <span className="text-[11px] font-black text-slate-800 block">السنة {lvl} متوسط:</span>
+                      <code className="text-xs font-mono font-black text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded">
+                        {lvlCode}
+                      </code>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(lvlCode);
+                          setToastMsg({ type: "success", text: `تم نسخ رمز السنة ${lvl}م (${lvlCode})!` });
+                        }}
+                        className="p-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 text-[11px] font-bold transition cursor-pointer"
+                        title="نسخ الرمز"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(lvlUrl);
+                          setToastMsg({ type: "success", text: `تم نسخ رابط أولياء السنة ${lvl}م!` });
+                        }}
+                        className="p-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-[11px] font-bold transition cursor-pointer"
+                        title="نسخ الرابط المباشر"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        navigator.clipboard.writeText(lvlCode);
-                        setToastMsg({ type: "success", text: `تم نسخ رمز السنة ${lvl}م (${lvlCode})!` });
-                      }}
-                      className="p-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 text-[11px] font-bold transition cursor-pointer"
-                      title="نسخ الرمز"
-                    >
-                      <Copy className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        navigator.clipboard.writeText(lvlUrl);
-                        setToastMsg({ type: "success", text: `تم نسخ رابط أولياء السنة ${lvl}م!` });
-                      }}
-                      className="p-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-[11px] font-bold transition cursor-pointer"
-                      title="نسخ الرابط المباشر"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* أزرار سريعة للمعاينة */}
@@ -1528,32 +1622,45 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
           </div>
 
           {/* اختيار المستوى */}
-          <div
-            className="grid gap-2 bg-white p-1.5 rounded-2xl border border-slate-100 shadow-2xs"
-            style={{ gridTemplateColumns: `repeat(${Math.min(levelsTaught.length, 4)}, minmax(0, 1fr))` }}
-          >
-            {levelsTaught.map((lv) => (
+          {levelsTaught.length === 0 ? (
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 flex items-center justify-between gap-2 shadow-2xs">
+              <span className="text-xs text-amber-900 font-bold">لم تقم بتحديد المستويات المسندة بعد.</span>
               <button
-                key={lv}
-                onClick={() => {
-                  setLevel(lv);
-                  setOpenId(null);
-                }}
-                className={`py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 ${
-                  level === lv ? "bg-slate-800 text-white shadow-sm" : "text-slate-600 hover:bg-slate-50"
-                }`}
+                type="button"
+                onClick={() => setOnboardingOpen(true)}
+                className="text-xs font-black text-emerald-800 bg-white hover:bg-emerald-50 border border-emerald-300 px-3 py-1.5 rounded-xl shadow-2xs transition cursor-pointer"
               >
-                <span>{LEVELS[lv].label}</span>
-                <span
-                  className={`text-[10px] px-2 py-0.5 rounded-md font-extrabold ${
-                    level === lv ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
+                ✨ تحديد المستويات والأفواج
+              </button>
+            </div>
+          ) : (
+            <div
+              className="grid gap-2 bg-white p-1.5 rounded-2xl border border-slate-100 shadow-2xs"
+              style={{ gridTemplateColumns: `repeat(${Math.min(levelsTaught.length, 4)}, minmax(0, 1fr))` }}
+            >
+              {levelsTaught.map((lv) => (
+                <button
+                  key={lv}
+                  onClick={() => {
+                    setLevel(lv);
+                    setOpenId(null);
+                  }}
+                  className={`py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
+                    level === lv ? "bg-slate-800 text-white shadow-sm" : "text-slate-600 hover:bg-slate-50"
                   }`}
                 >
-                  {LEVELS[lv].short}
-                </span>
-              </button>
-            ))}
-          </div>
+                  <span>{LEVELS[lv].label}</span>
+                  <span
+                    className={`text-[10px] px-2 py-0.5 rounded-md font-extrabold ${
+                      level === lv ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
+                    }`}
+                  >
+                    {LEVELS[lv].short}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* اختيار القسم (كراس الدروس، الأعمال الموجهة، سلاسل التمارين، الملخصات) */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-white p-1.5 rounded-2xl border border-slate-100 shadow-2xs">

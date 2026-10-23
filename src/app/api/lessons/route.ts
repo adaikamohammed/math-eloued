@@ -45,7 +45,15 @@ export async function GET(
   }
 
   return NextResponse.json(
-    { lessons },
+    {
+      lessons,
+      customClasses: data.customClasses || [],
+      timetable: data.timetable || null,
+      diaryEntries: data.diaryEntries || [],
+      studentRoster: data.studentRoster || [],
+      featureFlags: data.featureFlags || null,
+      subject: data.subject || null,
+    },
     {
       headers: {
         "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
