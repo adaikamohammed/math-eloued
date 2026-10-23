@@ -13,7 +13,7 @@ import {
   Sparkles,
   HeartHandshake,
 } from "lucide-react";
-import { HONOR_CLASSES, type ParentSummons } from "@/lib/types";
+import type { ParentSummons } from "@/lib/types";
 import { Loading } from "@/components/ui";
 
 export default function ParentsPage() {
@@ -168,7 +168,7 @@ export default function ParentsPage() {
           >
             الكل ({getClassCount("all")})
           </button>
-          {HONOR_CLASSES.map((cls) => {
+          {classesList.map((cls) => {
             const count = getClassCount(cls);
             return (
               <button

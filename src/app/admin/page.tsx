@@ -66,7 +66,6 @@ import {
 import {
   LEVELS,
   COMMON_FIELDS,
-  HONOR_CLASSES,
   MIDDLE_SCHOOL_SUBJECTS,
   isPdfFile,
   type Lesson,
@@ -142,13 +141,14 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
   const [honorsList, setHonorsList] = useState<HonorStudent[]>([]);
   const [penaltiesList, setPenaltiesList] = useState<Penalty[]>([]);
   const [evaluationsList, setEvaluationsList] = useState<StudentEvaluation[]>([]);
-  const [evalClass, setEvalClass] = useState<string>("1 م 1");
+  const [teacherClasses, setTeacherClasses] = useState<string[]>([]);
+  const [evalClass, setEvalClass] = useState<string>("");
   const [evalGroup, setEvalGroup] = useState<"فوج 1" | "فوج 2" | "القسم كامل">("فوج 1");
   const [evalSearch, setEvalSearch] = useState<string>("");
   const [singleEvalName, setSingleEvalName] = useState<string>("");
   const [isBatchEvalModalOpen, setIsBatchEvalModalOpen] = useState(false);
   const [batchEvalNames, setBatchEvalNames] = useState("");
-  const [batchEvalClass, setBatchEvalClass] = useState("1 م 1");
+  const [batchEvalClass, setBatchEvalClass] = useState("");
   const [batchEvalGroup, setBatchEvalGroup] = useState<"فوج 1" | "فوج 2" | "القسم كامل">("فوج 1");
   const [batchDefaultFullScore, setBatchDefaultFullScore] = useState(true);
   const [loading, setLoading] = useState(true);
@@ -164,13 +164,13 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
 
   // حقول إضافة استدعاء ولي أمر
   const [studentName, setStudentName] = useState("");
-  const [className, setClassName] = useState("1م3");
+  const [className, setClassName] = useState("");
   const [summonsNotes, setSummonsNotes] = useState("");
   const [isExtraSunday, setIsExtraSunday] = useState(false);
 
   // حقول إضافة تلميذ في لوحة الشرف
   const [honorStudentName, setHonorStudentName] = useState("");
-  const [honorClass, setHonorClass] = useState<string>("1 م 1");
+  const [honorClass, setHonorClass] = useState<string>("");
   const [honorNotes, setHonorNotes] = useState("");
   const [honorBadge, setHonorBadge] = useState("");
   const [selectedHonorFilter, setSelectedHonorFilter] = useState<string>("all");
@@ -178,7 +178,7 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
   // حقول إضافة عقوبة أو خصم (تلميذ أو مجموعة تلاميذ)
   const [penaltyStudents, setPenaltyStudents] = useState<string[]>([]);
   const [currentStudentName, setCurrentStudentName] = useState("");
-  const [penaltyClass, setPenaltyClass] = useState<string>("1 م 1");
+  const [penaltyClass, setPenaltyClass] = useState<string>("");
   const [penaltyDeduction, setPenaltyDeduction] = useState("ناقص 3 في التقويم المستمر (-3)");
   const [penaltyReason, setPenaltyReason] = useState("");
   const [penaltyDate, setPenaltyDate] = useState("");
@@ -238,12 +238,31 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
   const [messageReadFilter, setMessageReadFilter] = useState<"all" | "unread" | "read">("all");
   const [deletingMessage, setDeletingMessage] = useState<AnonymousMessage | null>(null);
 
+  const allAdminClasses = useMemo(() => {
+    if (teacherClasses.length > 0) return teacherClasses;
+    const set = new Set<string>();
+    honorsList.forEach((h) => h.className && set.add(h.className));
+    penaltiesList.forEach((p) => p.className && set.add(p.className));
+    evaluationsList.forEach((e) => e.className && set.add(e.className));
+    return Array.from(set);
+  }, [teacherClasses, honorsList, penaltiesList, evaluationsList]);
+
   const loadLessons = useCallback(async () => {
     try {
       setLoading(true);
       const res = await fetch(`/api/lessons?level=${level}&_t=${Date.now()}`, { cache: "no-store" });
       const data = await res.json();
       setAllLessons(data.lessons || []);
+      if (Array.isArray(data.customClasses)) {
+        setTeacherClasses(data.customClasses);
+        if (data.customClasses.length > 0) {
+          setEvalClass((prev) => prev || data.customClasses[0]);
+          setBatchEvalClass((prev) => prev || data.customClasses[0]);
+          setClassName((prev) => prev || data.customClasses[0]);
+          setHonorClass((prev) => prev || data.customClasses[0]);
+          setPenaltyClass((prev) => prev || data.customClasses[0]);
+        }
+      }
     } finally {
       setLoading(false);
     }
@@ -267,6 +286,9 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
       });
       const data = await res.json();
       setHonorsList(data.honors || []);
+      if (Array.isArray(data.customClasses) && data.customClasses.length > 0) {
+        setTeacherClasses((prev) => (prev.length > 0 ? prev : data.customClasses));
+      }
     } catch {
       setHonorsList([]);
     }
@@ -1071,6 +1093,7 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
           teacherCode={profile.teacher_code || "MTH"}
           schoolName={profile.school_custom_name || ""}
           slug={profile.slug || profile.teacher_code || ""}
+          levelsTaught={profile.levels_taught || [1, 2, 3, 4]}
         />
       )}
 
@@ -1142,6 +1165,75 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
 
         <div className="hidden lg:block">
           <PedagogyAlerts teacherId={profile.id} />
+        </div>
+
+        {/* بطاقة رموز فضاء الأولياء المباشرة لكل مستوى */}
+        <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50/70 rounded-2xl p-3 sm:p-4 border border-emerald-200/90 shadow-2xs space-y-2.5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black text-emerald-950">رموز فضاء الأولياء المخصصة لكل مستوى:</span>
+                <span className="text-[10px] bg-emerald-600 text-white px-2 py-0.5 rounded-full font-bold">
+                  مستوى محمي 🔒
+                </span>
+              </div>
+              <p className="text-[11px] text-emerald-800 mt-0.5">
+                زوّد أولياء كل سنة برمزهم المخصص، ليدخل كل ولي حصراً لكراس وسبورة مستوى ابنه مع إخفاء باقي المستويات:
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShareModalOpen(true)}
+              className="text-xs font-black text-emerald-800 bg-white hover:bg-emerald-100 border border-emerald-300 px-3 py-1.5 rounded-xl transition flex items-center gap-1 self-start sm:self-auto cursor-pointer shadow-2xs"
+            >
+              <Share2 className="w-3.5 h-3.5 text-emerald-600" />
+              <span>مشاركة سريعة عبر واتساب</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+            {(profile.levels_taught || [1, 2, 3, 4]).map((lvl: number) => {
+              const lvlCode = `${profile.teacher_code || "MTH"}-${lvl}`;
+              const lvlUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/t/${profile.slug || profile.teacher_code}?lvl=${lvl}`;
+              return (
+                <div
+                  key={lvl}
+                  className="bg-white rounded-xl p-2.5 border border-emerald-200/70 flex items-center justify-between gap-2 shadow-2xs"
+                >
+                  <div className="min-w-0">
+                    <span className="text-[11px] font-black text-slate-800 block">السنة {lvl} متوسط:</span>
+                    <code className="text-xs font-mono font-black text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded">
+                      {lvlCode}
+                    </code>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(lvlCode);
+                        setToastMsg({ type: "success", text: `تم نسخ رمز السنة ${lvl}م (${lvlCode})!` });
+                      }}
+                      className="p-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 text-[11px] font-bold transition cursor-pointer"
+                      title="نسخ الرمز"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(lvlUrl);
+                        setToastMsg({ type: "success", text: `تم نسخ رابط أولياء السنة ${lvl}م!` });
+                      }}
+                      className="p-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-[11px] font-bold transition cursor-pointer"
+                      title="نسخ الرابط المباشر"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         {/* أزرار سريعة للمعاينة */}
@@ -1985,27 +2077,29 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
               </div>
 
               {/* أزرار سريعة لأقسام الأستاذ */}
-              <div>
-                <label className="text-[11px] font-bold text-slate-500 block mb-1">
-                  اختيار سريع للقسم:
-                </label>
-                <div className="grid grid-cols-4 gap-1.5 text-xs font-bold">
-                  {HONOR_CLASSES.map((cls) => (
-                    <button
-                      key={cls}
-                      type="button"
-                      onClick={() => setClassName(cls)}
-                      className={`py-1.5 rounded-xl border transition ${
-                        className.replace(/\s+/g, "") === cls.replace(/\s+/g, "")
-                          ? "bg-sky-600 text-white border-sky-600 shadow-xs"
-                          : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
-                      }`}
-                    >
-                      {cls}
-                    </button>
-                  ))}
+              {allAdminClasses.length > 0 && (
+                <div>
+                  <label className="text-[11px] font-bold text-slate-500 block mb-1">
+                    اختيار سريع للقسم:
+                  </label>
+                  <div className="flex flex-wrap gap-1.5 text-xs font-bold">
+                    {allAdminClasses.map((cls) => (
+                      <button
+                        key={cls}
+                        type="button"
+                        onClick={() => setClassName(cls)}
+                        className={`py-1.5 px-3 rounded-xl border transition ${
+                          className.replace(/\s+/g, "") === cls.replace(/\s+/g, "")
+                            ? "bg-sky-600 text-white border-sky-600 shadow-xs"
+                            : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+                        }`}
+                      >
+                        {cls}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* سبب المقابلة وملاحظة الأستاذ لولي الأمر */}
               <div className="space-y-1.5">
@@ -2190,11 +2284,15 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
                   onChange={(e) => setHonorClass(e.target.value)}
                   required
                 >
-                  {HONOR_CLASSES.map((cls) => (
-                    <option key={cls} value={cls}>
-                      {cls} {cls.startsWith("1") ? "(الأولى متوسط)" : "(الثانية متوسط)"}
-                    </option>
-                  ))}
+                  {allAdminClasses.length === 0 ? (
+                    <option value="">-- يرجى إضافة أفواج في إدارة الأفواج --</option>
+                  ) : (
+                    allAdminClasses.map((cls) => (
+                      <option key={cls} value={cls}>
+                        فوج {cls}
+                      </option>
+                    ))
+                  )}
                 </select>
               </div>
             </div>
@@ -2274,11 +2372,11 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
             </div>
 
             {/* فلتر الأقسام الأربعة */}
-            <div className="grid grid-cols-5 gap-1 bg-white p-1 rounded-xl border border-slate-100 text-center">
+            <div className="flex items-center gap-1 overflow-x-auto pb-1 no-scrollbar bg-white p-1 rounded-xl border border-slate-100 text-center">
               <button
                 type="button"
                 onClick={() => setSelectedHonorFilter("all")}
-                className={`py-1.5 rounded-lg text-xs font-bold transition ${
+                className={`py-1.5 px-3 rounded-lg text-xs font-bold transition shrink-0 ${
                   selectedHonorFilter === "all"
                     ? "bg-slate-900 text-white"
                     : "text-slate-600 hover:bg-slate-50"
@@ -2286,7 +2384,7 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
               >
                 الكل ({honorsList.length})
               </button>
-              {HONOR_CLASSES.map((cls) => {
+              {allAdminClasses.map((cls) => {
                 const count = honorsList.filter(
                   (h) => (h.className || "").replace(/\s+/g, "") === cls.replace(/\s+/g, "")
                 ).length;
@@ -2295,7 +2393,7 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
                     key={cls}
                     type="button"
                     onClick={() => setSelectedHonorFilter(cls)}
-                    className={`py-1.5 rounded-lg text-xs font-bold transition ${
+                    className={`py-1.5 px-2.5 rounded-lg text-xs font-bold transition shrink-0 ${
                       selectedHonorFilter === cls
                         ? "bg-amber-500 text-white"
                         : "text-slate-600 hover:bg-slate-50"
@@ -2415,21 +2513,30 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
                 <label className="text-xs font-bold text-slate-700 block mb-1">
                   القسم المعني: <span className="text-red-600">*</span>
                 </label>
-                <div className="grid grid-cols-4 gap-1.5">
-                  {HONOR_CLASSES.map((cls) => (
-                    <button
-                      key={cls}
-                      type="button"
-                      onClick={() => setPenaltyClass(cls)}
-                      className={`py-2 px-1 rounded-xl text-xs font-black transition border ${
-                        penaltyClass === cls
-                          ? "bg-red-600 text-white border-red-600 shadow-xs"
-                          : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
-                      }`}
-                    >
-                      {cls}
-                    </button>
-                  ))}
+                <div className="flex flex-wrap gap-1.5">
+                  {allAdminClasses.length === 0 ? (
+                    <input
+                      className="input text-xs font-bold"
+                      placeholder="اكتب القسم (مثال: 1م3)..."
+                      value={penaltyClass}
+                      onChange={(e) => setPenaltyClass(e.target.value)}
+                    />
+                  ) : (
+                    allAdminClasses.map((cls) => (
+                      <button
+                        key={cls}
+                        type="button"
+                        onClick={() => setPenaltyClass(cls)}
+                        className={`py-2 px-3 rounded-xl text-xs font-black transition border ${
+                          penaltyClass === cls
+                            ? "bg-red-600 text-white border-red-600 shadow-xs"
+                            : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+                        }`}
+                      >
+                        {cls}
+                      </button>
+                    ))
+                  )}
                 </div>
               </div>
 
@@ -2732,12 +2839,12 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
               )}
             </div>
 
-            {/* فلتر الأقسام الأربعة */}
-            <div className="grid grid-cols-5 gap-1 bg-white p-1 rounded-xl border border-slate-100 text-center">
+            {/* فلتر الأقسام */}
+            <div className="flex items-center gap-1 overflow-x-auto pb-1 no-scrollbar bg-white p-1 rounded-xl border border-slate-100 text-center">
               <button
                 type="button"
                 onClick={() => setSelectedPenaltyFilter("all")}
-                className={`py-1.5 rounded-lg text-xs font-bold transition ${
+                className={`py-1.5 px-3 rounded-lg text-xs font-bold transition shrink-0 ${
                   selectedPenaltyFilter === "all"
                     ? "bg-slate-900 text-white"
                     : "text-slate-600 hover:bg-slate-50"
@@ -2745,7 +2852,7 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
               >
                 الكل ({penaltiesList.length})
               </button>
-              {HONOR_CLASSES.map((cls) => {
+              {allAdminClasses.map((cls) => {
                 const count = penaltiesList.filter(
                   (p) => (p.className || "").replace(/\s+/g, "") === cls.replace(/\s+/g, "")
                 ).length;
@@ -2754,7 +2861,7 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
                     key={cls}
                     type="button"
                     onClick={() => setSelectedPenaltyFilter(cls)}
-                    className={`py-1.5 rounded-lg text-xs font-bold transition ${
+                    className={`py-1.5 px-2.5 rounded-lg text-xs font-bold transition shrink-0 ${
                       selectedPenaltyFilter === cls
                         ? "bg-red-600 text-white"
                         : "text-slate-600 hover:bg-slate-50"
@@ -2904,21 +3011,25 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
             {/* أزرار اختيار القسم */}
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700 block">اختر القسم:</label>
-              <div className="grid grid-cols-4 gap-1.5">
-                {HONOR_CLASSES.map((cls) => (
-                  <button
-                    key={cls}
-                    type="button"
-                    onClick={() => setEvalClass(cls)}
-                    className={`py-2 px-2 rounded-xl text-xs font-black transition ${
-                      evalClass === cls
-                        ? "bg-emerald-700 text-white shadow-sm"
-                        : "bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200"
-                    }`}
-                  >
-                    <span>{cls}</span>
-                  </button>
-                ))}
+              <div className="flex flex-wrap gap-1.5">
+                {allAdminClasses.length === 0 ? (
+                  <p className="text-[11px] text-slate-400">أضف أفواجك من صفحة إدارة الأفواج لتقييمها هنا</p>
+                ) : (
+                  allAdminClasses.map((cls) => (
+                    <button
+                      key={cls}
+                      type="button"
+                      onClick={() => setEvalClass(cls)}
+                      className={`py-2 px-3 rounded-xl text-xs font-black transition ${
+                        evalClass === cls
+                          ? "bg-emerald-700 text-white shadow-sm"
+                          : "bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200"
+                      }`}
+                    >
+                      <span>{cls}</span>
+                    </button>
+                  ))
+                )}
               </div>
             </div>
 
@@ -3415,11 +3526,15 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
                   value={batchEvalClass}
                   onChange={(e) => setBatchEvalClass(e.target.value)}
                 >
-                  {HONOR_CLASSES.map((cls) => (
-                    <option key={cls} value={cls}>
-                      {cls}
-                    </option>
-                  ))}
+                  {allAdminClasses.length === 0 ? (
+                    <option value="">-- يرجى إضافة أفواج --</option>
+                  ) : (
+                    allAdminClasses.map((cls) => (
+                      <option key={cls} value={cls}>
+                        {cls}
+                      </option>
+                    ))
+                  )}
                 </select>
               </div>
 
@@ -5836,18 +5951,13 @@ function EditHonorModal({
 
             <div className="col-span-1">
               <label className="text-xs font-bold text-slate-700 block mb-1">القسم:</label>
-              <select
+              <input
                 className="input text-xs font-black text-amber-900 bg-amber-50/40 border-amber-200"
                 value={className}
                 onChange={(e) => setClassName(e.target.value)}
+                placeholder="مثال: 1م3"
                 required
-              >
-                {HONOR_CLASSES.map((cls) => (
-                  <option key={cls} value={cls}>
-                    {cls}
-                  </option>
-                ))}
-              </select>
+              />
             </div>
           </div>
 
@@ -6058,18 +6168,13 @@ function EditPenaltyModal({
 
             <div className="col-span-1">
               <label className="text-xs font-bold text-slate-700 block mb-1">القسم:</label>
-              <select
+              <input
                 className="input text-xs font-black text-red-900 bg-red-50/40 border-red-200"
                 value={className}
                 onChange={(e) => setClassName(e.target.value)}
+                placeholder="مثال: 1م3"
                 required
-              >
-                {HONOR_CLASSES.map((cls) => (
-                  <option key={cls} value={cls}>
-                    {cls}
-                  </option>
-                ))}
-              </select>
+              />
             </div>
           </div>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -15,7 +15,7 @@ import {
   MinusCircle,
   FileWarning,
 } from "lucide-react";
-import { Penalty, HONOR_CLASSES } from "@/lib/types";
+import { Penalty } from "@/lib/types";
 
 export default function PenaltiesPage() {
   const [penalties, setPenalties] = useState<Penalty[]>([]);
@@ -52,6 +52,14 @@ export default function PenaltiesPage() {
       setLoading(false);
     }
   };
+
+  const classesList = useMemo(() => {
+    const set = new Set<string>();
+    penalties.forEach((p) => {
+      if (p.className) set.add(p.className);
+    });
+    return Array.from(set).sort();
+  }, [penalties]);
 
   const normalizeClass = (c?: string) => (c ? c.replace(/\s+/g, "").trim() : "");
 
@@ -173,7 +181,7 @@ export default function PenaltiesPage() {
             </span>
           </button>
 
-          {HONOR_CLASSES.map((cls) => {
+          {classesList.map((cls) => {
             const count = getClassCount(cls);
             const isSelected = selectedClass === cls;
             return (

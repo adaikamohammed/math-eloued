@@ -16,6 +16,8 @@ import {
   MessageCircle,
   Scale,
   Camera,
+  Check,
+  Eye,
 } from "lucide-react";
 import { UserProfile, LEVELS, MIDDLE_SCHOOL_SUBJECTS } from "@/lib/types";
 import SaveToWalletButton from "@/components/SaveToWalletButton";
@@ -29,43 +31,67 @@ interface TeacherPageProps {
   params: Promise<{
     slug: string;
   }>;
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export default async function TeacherPublicSpace({ params }: TeacherPageProps) {
+export default async function TeacherPublicSpace({ params, searchParams }: TeacherPageProps) {
   const { slug } = await params;
+  const sParams = searchParams ? await searchParams : {};
+  const requestedLvlStr = typeof sParams.lvl === "string" ? sParams.lvl : undefined;
+  const requestedLevel = requestedLvlStr ? parseInt(requestedLvlStr, 10) : null;
+  const isValidLevel = requestedLevel !== null && requestedLevel >= 1 && requestedLevel <= 4;
 
   const profile = await findPublicTeacher(slug);
   if (!profile) {
     notFound();
   }
 
-  // 2. بيانات الأستاذ العامة: الدروس والإعلانات (من فضائه المستقل)
+  // بيانات الأستاذ العامة: الدروس والإعلانات ولوحة الشرف
   const publicData = await readPublicTeacherData(supabase, profile.id).catch(() => normalizeData({}));
 
   const announcements = (publicData.announcements ?? [])
     .filter((a) => a.active !== false)
     .sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)) || b.createdAt.localeCompare(a.createdAt))
     .slice(0, 3);
-  const teacherLessons = publicData.lessons;
+  const teacherLessons = publicData.lessons || [];
 
   // إعدادات وتخصيصات الفضاء البيداغوجي للأستاذ
   const flags = publicData.featureFlags || (profile as any).feature_flags || {};
   const showAnnouncements = flags.announcements !== false;
-  const showHonors = flags.honors !== false;
   const showContinuousAssessment = flags.continuousAssessment !== false;
-  const showReception = flags.reception !== false;
   const showMessages = flags.messages !== false;
 
-  const levelsTaught = profile.levels_taught || [1, 2, 3, 4];
+  // التحقق من تعيين ساعة الاستقبال ولوحة الشرف: إذا لم يحددهما الأستاذ فلا يتم إظهارهما
+  const hasConfiguredReception = Boolean(profile.reception?.officialDay || profile.reception?.guidance);
+  const showReception = flags.reception !== false && hasConfiguredReception;
+
+  const hasConfiguredHonors = Array.isArray(publicData.honors) && publicData.honors.length > 0;
+  const showHonors = flags.honors !== false && hasConfiguredHonors;
+
+  // المستويات التي يدرسها الأستاذ فعلياً
+  const teacherDeclaredLevels: number[] = Array.isArray(profile.levels_taught) && profile.levels_taught.length > 0
+    ? profile.levels_taught
+    : [1, 2, 3, 4];
+
+  // إذا حدد الولي رمز مستوى معين (مثلاً ?lvl=1)، نظهر له حصراً هذا المستوى ونخفي الباقي
+  const activeLevels = isValidLevel ? [requestedLevel] : teacherDeclaredLevels;
+
   const codePrefix = (profile.teacher_code || "").split("-")[0]?.toUpperCase() || "MTH";
   const subjectObj =
     MIDDLE_SCHOOL_SUBJECTS.find((s) => s.codePrefix === codePrefix || s.id === (profile as any).subject) ||
     MIDDLE_SCHOOL_SUBJECTS[0];
   const subjectName = subjectObj.name;
   const subjectIcon = subjectObj.icon;
+
+  const levelTitles: Record<number, { title: string; tag: string }> = {
+    1: { title: "السنة الأولى متوسط", tag: "1م" },
+    2: { title: "السنة الثانية متوسط", tag: "2م" },
+    3: { title: "السنة الثالثة متوسط", tag: "3م" },
+    4: { title: "السنة الرابعة متوسط (BEM)", tag: "4م" },
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-16" dir="rtl">
@@ -90,12 +116,12 @@ export default async function TeacherPublicSpace({ params }: TeacherPageProps) {
             </Link>
             <div className="flex items-center gap-2">
               <span className="font-mono bg-white/15 px-2.5 py-0.5 rounded-md font-bold text-[11px]">
-                {profile.teacher_code || "MTH"}
+                {isValidLevel ? `${profile.teacher_code || "MTH"}-${requestedLevel}` : profile.teacher_code || "MTH"}
               </span>
               <SaveToWalletButton
                 slug={slug}
                 name={profile.full_name || ""}
-                code={profile.teacher_code || ""}
+                code={isValidLevel ? `${profile.teacher_code || ""}-${requestedLevel}` : profile.teacher_code || ""}
                 school={profile.school_custom_name || ""}
               />
             </div>
@@ -105,9 +131,18 @@ export default async function TeacherPublicSpace({ params }: TeacherPageProps) {
             <div className="w-16 h-16 rounded-2xl bg-white/15 backdrop-blur-md border border-white/20 mx-auto flex items-center justify-center text-2xl font-black shadow-inner">
               {subjectIcon}
             </div>
-            <div className="inline-block bg-white/15 px-3 py-0.5 rounded-full text-xs font-bold text-emerald-100 border border-white/20">
-              مادة {subjectName}
-            </div>
+
+            {isValidLevel ? (
+              <div className="inline-flex items-center gap-1.5 bg-amber-400/25 px-3 py-1 rounded-full text-xs font-black text-amber-200 border border-amber-300/40 shadow-xs">
+                <span>⭐</span>
+                <span>فضاء أولياء وتلاميذ {levelTitles[requestedLevel]?.title || `السنة ${requestedLevel}م`}</span>
+              </div>
+            ) : (
+              <div className="inline-block bg-white/15 px-3 py-0.5 rounded-full text-xs font-bold text-emerald-100 border border-white/20">
+                مادة {subjectName}
+              </div>
+            )}
+
             <h1 className="text-xl sm:text-2xl font-black tracking-tight">{profile.full_name}</h1>
             <p className="text-xs sm:text-sm text-emerald-100 flex items-center justify-center gap-1.5 font-medium">
               <Building2 className="w-4 h-4 text-emerald-300" />
@@ -124,6 +159,30 @@ export default async function TeacherPublicSpace({ params }: TeacherPageProps) {
       </div>
 
       <div className="max-w-2xl mx-auto px-4 -mt-6 space-y-5">
+        {/* تنبيه المستوى المخصص إذا دخل الولي برمز مستوى */}
+        {isValidLevel && (
+          <div className="bg-white rounded-2xl p-3.5 border border-emerald-200 shadow-sm flex items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2 text-emerald-800">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+              <span>
+                أنت تتصفح حصراً محتوى <strong>{levelTitles[requestedLevel]?.title}</strong> (الرمز:{" "}
+                <code className="font-mono font-bold text-emerald-700 bg-emerald-50 px-1 py-0.5 rounded">
+                  {profile.teacher_code}-{requestedLevel}
+                </code>
+                )
+              </span>
+            </div>
+            {teacherDeclaredLevels.length > 1 && (
+              <Link
+                href={`/t/${slug}`}
+                className="text-[11px] text-slate-500 hover:text-emerald-700 underline font-medium shrink-0"
+              >
+                عرض باقي المستويات
+              </Link>
+            )}
+          </div>
+        )}
+
         {/* شريط الإعلانات للأستاذ */}
         {showAnnouncements && announcements && announcements.length > 0 && (
           <div className="bg-white rounded-2xl p-4 border border-emerald-100 shadow-md space-y-2">
@@ -154,16 +213,18 @@ export default async function TeacherPublicSpace({ params }: TeacherPageProps) {
                       كراس الدروس والسبورة الرقمية
                     </h2>
                     <span className="text-[10px] bg-white/20 text-white px-2 py-0.5 rounded-full font-bold">
-                      جديد 📸
+                      {isValidLevel ? `${requestedLevel}م 📸` : "جديد 📸"}
                     </span>
                   </div>
                   <p className="text-[11px] text-emerald-100 font-medium mt-0.5">
-                    صور السبورة اليومية، الملخصات، وتوجيهات الأستاذ
+                    {isValidLevel
+                      ? `صور السبورة اليومية والواجبات الخاصة بالسنة ${requestedLevel} متوسط`
+                      : "صور السبورة اليومية، الملخصات، وتوجيهات الأستاذ"}
                   </p>
                 </div>
               </div>
               <Link
-                href={`/t/${slug}/board`}
+                href={isValidLevel ? `/t/${slug}/board?lvl=${requestedLevel}` : `/t/${slug}/board`}
                 className="bg-white text-emerald-900 hover:bg-emerald-50 px-3.5 py-2 rounded-xl text-xs font-black transition shadow-sm shrink-0 flex items-center gap-1 active:scale-95"
               >
                 <span>تصفح السبورة</span>
@@ -176,22 +237,18 @@ export default async function TeacherPublicSpace({ params }: TeacherPageProps) {
           </div>
         )}
 
-        {/* السنوات الدراسية للأستاذ */}
+        {/* السنوات الدراسية للأستاذ: تعرض فقط المستويات المحددة */}
         <div className="space-y-3">
           <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2 px-1">
             <BookOpen className="w-4 h-4 text-emerald-600" />
-            اختر سنتك الدراسية لمشاهدة الدروس والواجبات:
+            {isValidLevel
+              ? `الدروس والمذكرات المقررة للسنة ${requestedLevel} متوسط:`
+              : "اختر السنة الدراسية لمشاهدة الدروس والواجبات:"}
           </h2>
 
           <div className="space-y-2.5">
-            {levelsTaught.map((lvl: number) => {
+            {activeLevels.map((lvl: number) => {
               const levelCount = teacherLessons.filter((l) => l.level === lvl).length;
-              const levelTitles: Record<number, { title: string; tag: string }> = {
-                1: { title: "السنة الأولى متوسط", tag: "1م" },
-                2: { title: "السنة الثانية متوسط", tag: "2م" },
-                3: { title: "السنة الثالثة متوسط", tag: "3م" },
-                4: { title: "السنة الرابعة متوسط (BEM)", tag: "4م" },
-              };
               const item = levelTitles[lvl] || { title: `السنة ${lvl} متوسط`, tag: `${lvl}م` };
 
               return (
@@ -233,7 +290,7 @@ export default async function TeacherPublicSpace({ params }: TeacherPageProps) {
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-500 mt-0.5 font-medium">
-                  شبكة التقييم: كراس (04) • سلوك (04) • واجبات (04) • استجوابات (08)
+                  شبكة التقييم: كراس • سلوك وانضباط • واجبات • استجوابات
                 </p>
               </div>
             </div>
@@ -246,7 +303,7 @@ export default async function TeacherPublicSpace({ params }: TeacherPageProps) {
           </div>
         )}
 
-        {/* لوحة الشرف للأستاذ */}
+        {/* لوحة الشرف للأستاذ: تظهر فقط إذا أضاف الأستاذ تلاميذ متميزين */}
         {showHonors && (
           <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-2xs flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -254,21 +311,21 @@ export default async function TeacherPublicSpace({ params }: TeacherPageProps) {
                 <Trophy className="w-5 h-5" />
               </div>
               <div>
-                <p className="text-xs font-bold text-slate-800">لوحة الشرف والمتفوقين</p>
-                <p className="text-[11px] text-slate-400">التلاميذ المتميزون في مادة الرياضيات</p>
+                <p className="text-xs font-bold text-slate-800">لوحة الشرف وتكريم النوابغ</p>
+                <p className="text-[11px] text-slate-400">التلاميذ المتميزون في مادة {subjectName}</p>
               </div>
             </div>
             <Link
               href={`/honor?teacher=${profile.id}`}
               className="text-xs font-bold text-amber-700 bg-amber-50 px-3 py-1.5 rounded-lg hover:bg-amber-100 transition"
             >
-              مشاهدة
+              مشاهدة 🌟
             </Link>
           </div>
         )}
 
-        {/* خدمات الولي: الاستقبال، الاستدعاءات، الرسائل المجهولة */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+        {/* قنوات التواصل الخاصة بالولي: ساعة الاستقبال المعتمدة والرسالة السرية */}
+        <div className={`grid grid-cols-1 ${showReception && showMessages ? "sm:grid-cols-2" : ""} gap-2.5`}>
           {showReception && (
             <Link
               href={`/announcement?teacher=${profile.id}`}
@@ -278,49 +335,34 @@ export default async function TeacherPublicSpace({ params }: TeacherPageProps) {
                 <CalendarClock className="w-4 h-4" />
               </span>
               <span className="text-xs">
-                <strong className="block text-slate-800">ساعة الاستقبال</strong>
+                <strong className="block text-slate-800">ساعة استقبال الأولياء</strong>
                 <span className="text-slate-500">
-                  {profile.reception?.officialDay ? `كل ${profile.reception.officialDay}` : "التوجيهات والمواعيد"}
+                  {profile.reception?.officialDay ? `كل ${profile.reception.officialDay}` : "المواعيد والتوجيهات"}
                 </span>
-              </span>
-            </Link>
-          )}
-
-          {showReception && (
-            <Link
-              href={`/parents?teacher=${profile.id}`}
-              className="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-sm hover:border-sky-300 transition flex items-center gap-3"
-            >
-              <span className="w-9 h-9 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
-                <Users className="w-4 h-4" />
-              </span>
-              <span className="text-xs">
-                <strong className="block text-slate-800">أولياء أود استقبالهم</strong>
-                <span className="text-slate-500">هل ابنك معني بلقاء؟</span>
               </span>
             </Link>
           )}
 
           {showMessages && (
             <Link
-              href={`/messages?teacher=${profile.id}`}
-              className="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-sm hover:border-violet-300 transition flex items-center gap-3"
+              href={`/messages?teacher=${profile.id}${isValidLevel ? `&lvl=${requestedLevel}` : ""}`}
+              className="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-sm hover:border-emerald-300 transition flex items-center gap-3"
             >
-              <span className="w-9 h-9 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center shrink-0">
+              <span className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
                 <MessageCircle className="w-4 h-4" />
               </span>
               <span className="text-xs">
                 <strong className="block text-slate-800">رسالة سرية للأستاذ</strong>
-                <span className="text-slate-500">سؤال أو اقتراح دون ذكر الاسم</span>
+                <span className="text-slate-500">ملاحظة أو استفسار سري ومجهول الهوية 🔒</span>
               </span>
             </Link>
           )}
         </div>
 
         <TeacherQR
-          path={`/t/${profile.slug || profile.id}`}
+          path={`/t/${profile.slug || profile.id}${isValidLevel ? `?lvl=${requestedLevel}` : ""}`}
           teacherName={profile.full_name || "الأستاذ"}
-          code={profile.teacher_code}
+          code={isValidLevel ? `${profile.teacher_code || "MTH"}-${requestedLevel}` : profile.teacher_code}
           schoolName={profile.school_custom_name || ""}
         />
 

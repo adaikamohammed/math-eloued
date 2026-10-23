@@ -48,7 +48,7 @@ export default function TeacherTimetablePage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
-  const [customClasses, setCustomClasses] = useState<string[]>(["1م1", "1م2", "1م3", "2م3"]);
+  const [customClasses, setCustomClasses] = useState<string[]>([]);
   const [slots, setSlots] = useState<TimetableSlot[]>([]);
   const [officialImagePath, setOfficialImagePath] = useState<string | null>(null);
 
@@ -57,7 +57,7 @@ export default function TeacherTimetablePage() {
   const [selectedDay, setSelectedDay] = useState<(typeof SCHOOL_DAYS)[number]>("الأحد");
   const [selectedStart, setSelectedStart] = useState("08:00");
   const [selectedEnd, setSelectedEnd] = useState("09:00");
-  const [selectedClass, setSelectedClass] = useState("1م1");
+  const [selectedClass, setSelectedClass] = useState("");
   const [selectedRoom, setSelectedRoom] = useState("قاعة 01");
   const [editingSlotIndex, setEditingSlotIndex] = useState<number | null>(null);
 
@@ -81,7 +81,7 @@ export default function TeacherTimetablePage() {
 
       const teacherClasses = Array.isArray(data.customClasses) && data.customClasses.length > 0
         ? data.customClasses
-        : ["1م1", "1م2", "1م3", "2م3"];
+        : [];
       setCustomClasses(teacherClasses);
 
       if (data.timetable && Array.isArray(data.timetable.slots)) {
@@ -145,7 +145,7 @@ export default function TeacherTimetablePage() {
       setSelectedRoom(existing.room || "قاعة 01");
       setEditingSlotIndex(existingIndex);
     } else {
-      setSelectedClass(customClasses[0] || "1م1");
+      setSelectedClass(customClasses[0] || "");
       setSelectedRoom("قاعة 01");
       setEditingSlotIndex(null);
     }
@@ -435,11 +435,15 @@ export default function TeacherTimetablePage() {
                     onChange={(e) => setSelectedClass(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl bg-[#fafaf7] border border-[#e8e8e0] text-xs font-bold text-gray-900 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57]"
                   >
-                    {customClasses.map((c) => (
-                      <option key={c} value={c}>
-                        فوج {c}
-                      </option>
-                    ))}
+                    {customClasses.length === 0 ? (
+                      <option value="">-- يرجى إضافة فوج في إدارة الأفواج --</option>
+                    ) : (
+                      customClasses.map((c) => (
+                        <option key={c} value={c}>
+                          فوج {c}
+                        </option>
+                      ))
+                    )}
                     <option value="استقبال الأولياء">استقبال الأولياء 🤝</option>
                     <option value="أعمال موجهة (ف1)">أعمال موجهة (فوج 1)</option>
                     <option value="أعمال موجهة (ف2)">أعمال موجهة (فوج 2)</option>

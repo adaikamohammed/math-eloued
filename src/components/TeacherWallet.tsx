@@ -158,8 +158,16 @@ export default function TeacherWallet() {
   const handleAddByCode = async (e: React.FormEvent) => {
     e.preventDefault();
     setAddMsg(null);
-    const clean = newCode.trim().toUpperCase();
-    if (!clean) return;
+    const rawClean = newCode.trim().toUpperCase();
+    if (!rawClean) return;
+
+    let baseCode = rawClean;
+    let targetLevel: number | null = null;
+    const match = rawClean.match(/^([A-Za-z]{2,5}[-_]?\d{2,5})[-_/\s]?([1-4])(?:[mMم])?$/i);
+    if (match) {
+      baseCode = match[1];
+      targetLevel = parseInt(match[2], 10);
+    }
 
     setAddingLoading(true);
 
@@ -169,7 +177,7 @@ export default function TeacherWallet() {
         .from("profiles")
         .select("id, full_name, slug, teacher_code, subject, school_custom_name, levels_taught")
         .eq("role", "teacher")
-        .ilike("teacher_code", clean)
+        .ilike("teacher_code", baseCode)
         .maybeSingle();
 
       if (error) throw error;
@@ -177,7 +185,7 @@ export default function TeacherWallet() {
       if (!data) {
         setAddMsg({
           type: "error",
-          text: `لم يتم العثور على أستاذ يحمل الكود "${clean}". يرجى التأكد من كتابة الكود بشكل صحيح.`,
+          text: `لم يتم العثور على أستاذ يحمل الرمز "${rawClean}". يرجى التأكد من كتابة الرمز بشكل صحيح.`,
         });
         setAddingLoading(false);
         return;
@@ -187,10 +195,10 @@ export default function TeacherWallet() {
       autoSaveTeacherToWallet({
         slug: data.slug || data.teacher_code || data.id,
         name: data.full_name || "الأستاذ",
-        code: data.teacher_code || clean,
+        code: targetLevel ? `${data.teacher_code || baseCode}-${targetLevel}` : data.teacher_code || baseCode,
         subject: data.subject,
         school: data.school_custom_name,
-        levels: data.levels_taught,
+        levels: targetLevel ? [targetLevel] : data.levels_taught,
       });
 
       setAddMsg({
@@ -434,13 +442,19 @@ function TeacherWalletCard({
           )}
         </div>
 
-        <Link
-          href={`/t/${teacher.slug}`}
-          className="btn-primary text-xs py-1.5 px-3 font-black shrink-0"
-        >
-          <span>دخول فوري</span>
-          <ExternalLink className="w-3.5 h-3.5" />
-        </Link>
+        {(() => {
+          const lvlParam = (teacher.code || "").match(/-([1-4])$/)?.[1];
+          const targetUrl = `/t/${teacher.slug}${lvlParam ? `?lvl=${lvlParam}` : ""}`;
+          return (
+            <Link
+              href={targetUrl}
+              className="btn-primary text-xs py-1.5 px-3 font-black shrink-0"
+            >
+              <span>{lvlParam ? `دخول (${lvlParam}م)` : "دخول فوري"}</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </Link>
+          );
+        })()}
       </div>
     </div>
   );

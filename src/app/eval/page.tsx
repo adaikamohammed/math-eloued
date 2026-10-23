@@ -36,7 +36,7 @@ import {
   ArrowLeftRight,
 } from "lucide-react";
 import {
-  HONOR_CLASSES,
+  // dynamic classes
   type InspectionSession,
   type InspectionRecord,
   type StudentRosterItem,
@@ -77,13 +77,35 @@ export default function FastEvaluationPage() {
 /* ---------------- 2. لوحة التقييم الميداني المتكاملة ---------------- */
 function EvaluationDashboard({ onLogout }: { onLogout: () => void }) {
   const [activeTab, setActiveTab] = useState<"sessions" | "averages" | "roster">("sessions");
-  const [selectedClass, setSelectedClass] = useState<string>("1 م 1");
+  const [selectedClass, setSelectedClass] = useState<string>("");
+  const [teacherClasses, setTeacherClasses] = useState<string[]>([]);
+
+  useEffect(() => {
+    fetch("/api/lessons")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.customClasses && Array.isArray(data.customClasses) && data.customClasses.length > 0) {
+          setTeacherClasses(data.customClasses);
+          setSelectedClass((prev) => (prev ? prev : data.customClasses[0]));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+
+
   const [selectedGroup, setSelectedGroup] = useState<"فوج 1" | "فوج 2" | "القسم كامل">("فوج 1");
   const [searchStudent, setSearchStudent] = useState("");
   const [rosterGroupFilter, setRosterGroupFilter] = useState<"all" | "فوج 1" | "فوج 2">("all");
 
   const [sessions, setSessions] = useState<InspectionSession[]>([]);
   const [roster, setRoster] = useState<StudentRosterItem[]>([]);
+
+  const classesList = useMemo(() => {
+    if (teacherClasses.length > 0) return teacherClasses;
+    const fromRoster = Array.from(new Set(roster.map((r) => r.className))).filter(Boolean);
+    return fromRoster;
+  }, [teacherClasses, roster]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -822,7 +844,7 @@ function EvaluationDashboard({ onLogout }: { onLogout: () => void }) {
         <div>
           <div className="text-[11px] font-black text-slate-700 mb-1">القسم المعني:</div>
           <div className="grid grid-cols-4 gap-1.5">
-            {HONOR_CLASSES.map((cls) => (
+            {classesList.map((cls) => (
               <button
                 key={cls}
                 type="button"

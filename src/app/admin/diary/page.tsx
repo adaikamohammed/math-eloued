@@ -39,7 +39,7 @@ export default function TeacherDiaryPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
-  const [customClasses, setCustomClasses] = useState<string[]>(["1م1", "1م2", "1م3", "2م3"]);
+  const [customClasses, setCustomClasses] = useState<string[]>([]);
   const [entries, setEntries] = useState<DailyDiaryEntry[]>([]);
 
   // الفلاتر
@@ -57,7 +57,7 @@ export default function TeacherDiaryPage() {
     d.setDate(d.getDate() + 1);
     return d.toISOString().split("T")[0];
   });
-  const [formClass, setFormClass] = useState("1م1");
+  const [formClass, setFormClass] = useState("");
   const [formPeriodTime, setFormPeriodTime] = useState("08:00 - 09:00");
   const [formField, setFormField] = useState<string>("أنشطة عددية");
   const [formSection, setFormSection] = useState("");
@@ -88,7 +88,7 @@ export default function TeacherDiaryPage() {
 
       const teacherClasses = Array.isArray(data.customClasses) && data.customClasses.length > 0
         ? data.customClasses
-        : ["1م1", "1م2", "1م3", "2م3"];
+        : [];
       setCustomClasses(teacherClasses);
 
       if (Array.isArray(data.diaryEntries)) {
@@ -136,7 +136,7 @@ export default function TeacherDiaryPage() {
 
     setEditingEntry(null);
     setFormDate(dateStr);
-    setFormClass(selectedClassFilter !== "all" ? selectedClassFilter : customClasses[0] || "1م1");
+    setFormClass(selectedClassFilter !== "all" ? selectedClassFilter : customClasses[0] || "");
     setFormPeriodTime("08:00 - 09:00");
     setFormField("أنشطة عددية");
     setFormSection("");

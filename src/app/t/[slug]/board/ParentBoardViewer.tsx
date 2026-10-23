@@ -21,10 +21,18 @@ interface Props {
   lessons: Lesson[];
   teacherName: string;
   subjectName: string;
+  initialLevel?: number | "all";
+  lockedLevel?: boolean;
 }
 
-export function ParentBoardViewer({ lessons, teacherName, subjectName }: Props) {
-  const [selectedLevel, setSelectedLevel] = useState<number | "all">("all");
+export function ParentBoardViewer({
+  lessons,
+  teacherName,
+  subjectName,
+  initialLevel = "all",
+  lockedLevel = false,
+}: Props) {
+  const [selectedLevel, setSelectedLevel] = useState<number | "all">(initialLevel);
   const [selectedType, setSelectedType] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [lightboxImg, setLightboxImg] = useState<string | null>(null);
@@ -70,38 +78,47 @@ export function ParentBoardViewer({ lessons, teacherName, subjectName }: Props) 
       {/* شريط الفلاتر */}
       <div className="bg-white rounded-2xl border border-[#e8e8e0] p-4 shadow-xs space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
-            <span className="text-xs font-bold text-gray-500 ml-1 shrink-0">المستوى:</span>
-            <button
-              type="button"
-              onClick={() => setSelectedLevel("all")}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition shrink-0 cursor-pointer ${
-                selectedLevel === "all"
-                  ? "bg-[#107a57] text-white shadow-2xs"
-                  : "bg-[#fafaf7] hover:bg-gray-100 text-gray-700 border border-[#e8e8e0]"
-              }`}
-            >
-              الكل ({lessons.length})
-            </button>
-            {[1, 2, 3, 4].map((lvl) => {
-              const count = lessons.filter((l) => l.level === lvl).length;
-              if (count === 0 && selectedLevel !== lvl) return null;
-              return (
-                <button
-                  key={lvl}
-                  type="button"
-                  onClick={() => setSelectedLevel(lvl)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition shrink-0 cursor-pointer ${
-                    selectedLevel === lvl
-                      ? "bg-[#107a57] text-white shadow-2xs"
-                      : "bg-[#fafaf7] hover:bg-gray-100 text-gray-700 border border-[#e8e8e0]"
-                  }`}
-                >
-                  {lvl} متوسط ({count})
-                </button>
-              );
-            })}
-          </div>
+          {lockedLevel ? (
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-gray-500">المستوى:</span>
+              <span className="bg-[#107a57] text-white px-3 py-1.5 rounded-xl text-xs font-black shadow-2xs">
+                السنة {selectedLevel} متوسط
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+              <span className="text-xs font-bold text-gray-500 ml-1 shrink-0">المستوى:</span>
+              <button
+                type="button"
+                onClick={() => setSelectedLevel("all")}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition shrink-0 cursor-pointer ${
+                  selectedLevel === "all"
+                    ? "bg-[#107a57] text-white shadow-2xs"
+                    : "bg-[#fafaf7] hover:bg-gray-100 text-gray-700 border border-[#e8e8e0]"
+                }`}
+              >
+                الكل ({lessons.length})
+              </button>
+              {[1, 2, 3, 4].map((lvl) => {
+                const count = lessons.filter((l) => l.level === lvl).length;
+                if (count === 0 && selectedLevel !== lvl) return null;
+                return (
+                  <button
+                    key={lvl}
+                    type="button"
+                    onClick={() => setSelectedLevel(lvl)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition shrink-0 cursor-pointer ${
+                      selectedLevel === lvl
+                        ? "bg-[#107a57] text-white shadow-2xs"
+                        : "bg-[#fafaf7] hover:bg-gray-100 text-gray-700 border border-[#e8e8e0]"
+                    }`}
+                  >
+                    {lvl} متوسط ({count})
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           <div className="relative w-full sm:w-64">
             <input

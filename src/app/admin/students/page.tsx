@@ -35,7 +35,7 @@ export default function StudentsManagementPage() {
   const [message, setMessage] = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
   // بيانات الأستاذ والتلاميذ
-  const [customClasses, setCustomClasses] = useState<string[]>(["1م1", "1م2", "1م3", "2م3"]);
+  const [customClasses, setCustomClasses] = useState<string[]>([]);
   const [students, setStudents] = useState<StudentRosterItem[]>([]);
 
   // الفلاتر والبحث
@@ -79,7 +79,7 @@ export default function StudentsManagementPage() {
       
       const teacherClasses = Array.isArray(data.customClasses) && data.customClasses.length > 0
         ? data.customClasses
-        : ["1م1", "1م2", "1م3", "2م3"];
+        : [];
       setCustomClasses(teacherClasses);
 
       if (Array.isArray(data.studentRoster)) {
@@ -136,7 +136,7 @@ export default function StudentsManagementPage() {
   const handleOpenAddStudent = () => {
     setEditingStudent(null);
     setFormName("");
-    setFormClass(selectedClass !== "all" ? selectedClass : customClasses[0] || "1م1");
+    setFormClass(selectedClass !== "all" ? selectedClass : customClasses[0] || "");
     setFormRegNum("");
     setFormPhone("");
     setFormGender("ذكر");
@@ -608,11 +608,15 @@ export default function StudentsManagementPage() {
                       onChange={(e) => setFormClass(e.target.value)}
                       className="w-full px-3 py-2 rounded-xl bg-[#fafaf7] border border-[#e8e8e0] text-xs font-bold text-gray-900 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57]"
                     >
-                      {customClasses.map((c) => (
-                        <option key={c} value={c}>
-                          {c}
-                        </option>
-                      ))}
+                      {customClasses.length === 0 ? (
+                        <option value="">-- يرجى إضافة فوج أولاً --</option>
+                      ) : (
+                        customClasses.map((c) => (
+                          <option key={c} value={c}>
+                            {c}
+                          </option>
+                        ))
+                      )}
                     </select>
                   </div>
 

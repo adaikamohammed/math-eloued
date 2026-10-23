@@ -14,6 +14,7 @@ import {
   ExternalLink,
   MessageCircle,
   Key,
+  Layers,
 } from "lucide-react";
 
 interface ParentShareModalProps {
@@ -23,6 +24,7 @@ interface ParentShareModalProps {
   teacherCode: string;
   schoolName?: string;
   slug?: string;
+  levelsTaught?: number[];
 }
 
 export function ParentShareModal({
@@ -32,12 +34,16 @@ export function ParentShareModal({
   teacherCode,
   schoolName = "متوسطة ولاية الوادي",
   slug,
+  levelsTaught,
 }: ParentShareModalProps) {
   const [dataUrl, setDataUrl] = useState("");
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedMsg, setCopiedMsg] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
-  const printAreaRef = useRef<HTMLDivElement>(null);
+  const [copiedLvlCode, setCopiedLvlCode] = useState<number | null>(null);
+  const [copiedLvlLink, setCopiedLvlLink] = useState<number | null>(null);
+
+  const levels = Array.isArray(levelsTaught) && levelsTaught.length > 0 ? levelsTaught : [1, 2, 3, 4];
 
   const publicUrl = typeof window !== "undefined"
     ? `${window.location.origin}/t/${slug || teacherCode}`
@@ -61,12 +67,12 @@ export function ParentShareModal({
 
   if (!isOpen) return null;
 
-  // نص الرسالة الموجهة للأولياء
+  // نص الرسالة العامة الموجهة للأولياء
   const whatsappMessage = `السلام عليكم ورحمة الله وبركاته،
 أولياء التلاميذ المحترمين:
-لمتابعة دروس، سبورة مادة الرياضيات، والواجبات المنزلية لأبنائكم، يرجى الدخول إلى المنصة الرسمية:
+لمتابعة دروس، سبورة القسم، والواجبات المنزلية لأبنائكم، يرجى الدخول إلى المنصة الرسمية:
 🔗 الرابط المباشر: ${publicUrl}
-🔑 أو ادخل إلى المنصة: ${homeUrl} واكتب كود الأستاذ: *${teacherCode}*
+🔑 أو ادخل إلى المنصة: ${homeUrl} واكتب رمز الأستاذ: *${teacherCode}*
 
 الأستاذ(ة): ${teacherName}
 ${schoolName}`;
@@ -100,6 +106,37 @@ ${schoolName}`;
     window.open(url, "_blank");
   };
 
+  const handleCopyLevelCode = async (lvl: number) => {
+    const code = `${teacherCode}-${lvl}`;
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopiedLvlCode(lvl);
+      setTimeout(() => setCopiedLvlCode(null), 2000);
+    } catch {}
+  };
+
+  const handleCopyLevelLink = async (lvl: number) => {
+    const link = `${publicUrl}?lvl=${lvl}`;
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopiedLvlLink(lvl);
+      setTimeout(() => setCopiedLvlLink(null), 2000);
+    } catch {}
+  };
+
+  const handleShareLevelWhatsApp = (lvl: number) => {
+    const lvlText = `السلام عليكم ورحمة الله وبركاته،
+أولياء وتلاميذ السنة ${lvl} متوسط المحترمين:
+لمتابعة كراس الدروس وصور السبورة اليومية والواجبات لمستوى ابنكم حصراً، يرجى الدخول عبر الرابط المباشر:
+🔗 ${publicUrl}?lvl=${lvl}
+🔑 أو ادخل للمنصة (${homeUrl}) واكتب رمز المستوى: *${teacherCode}-${lvl}*
+
+الأستاذ(ة): ${teacherName}
+${schoolName}`;
+    const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(lvlText)}`;
+    window.open(url, "_blank");
+  };
+
   const handlePrintSlip = () => {
     window.print();
   };
@@ -115,9 +152,9 @@ ${schoolName}`;
               <Share2 className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base sm:text-lg font-bold">بطاقة مشاركة الكود مع الأولياء</h2>
+              <h2 className="text-base sm:text-lg font-bold">رموز ومشاركة الفضاء مع الأولياء</h2>
               <p className="text-xs text-emerald-200">
-                كيف يتابع ولي التلميذ دروس وسبورة {teacherName}
+                شارك الرابط العام أو رمز كل مستوى لمتابعة الدروس والسبورة
               </p>
             </div>
           </div>
@@ -132,26 +169,101 @@ ${schoolName}`;
 
         {/* محتوى المودال القابل للتمرير */}
         <div className="p-5 sm:p-6 space-y-6 overflow-y-auto flex-1">
-          {/* 1. بطاقة الكود البارزة */}
-          <div className="bg-gradient-to-br from-emerald-50 via-teal-50 to-slate-50 border-2 border-emerald-500/30 rounded-3xl p-5 text-center space-y-3 shadow-inner">
-            <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-widest bg-emerald-100/80 px-3 py-1 rounded-full">
-              كود الأستاذ المخصص للأولياء
+          {/* قسم الرموز الخاصة بكل مستوى */}
+          <div className="bg-emerald-50/70 border-2 border-emerald-500/30 rounded-3xl p-5 space-y-4">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-emerald-700 text-white flex items-center justify-center">
+                <Layers className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-emerald-950">
+                  رموز المستويات المباشرة (كل مستوى يرى حصراً دروسه)
+                </h3>
+                <p className="text-[11px] text-emerald-700">
+                  أعط أولياء كل مستوى رمزهم الخاص، ليفتح لهم فضاء وسبورة قسمهم فقط مع إخفاء باقي المستويات!
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-2.5">
+              {levels.map((lvl) => {
+                const lvlCode = `${teacherCode}-${lvl}`;
+                const isCodeCopied = copiedLvlCode === lvl;
+                const isLinkCopied = copiedLvlLink === lvl;
+
+                return (
+                  <div
+                    key={lvl}
+                    className="bg-white rounded-2xl p-3 border border-emerald-200/80 shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-3"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-600 text-white flex items-center justify-center text-xs font-black shadow-xs">
+                        {lvl}م
+                      </span>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-black text-slate-900">السنة {lvl} متوسط:</span>
+                          <code className="text-sm font-mono font-black text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60">
+                            {lvlCode}
+                          </code>
+                        </div>
+                        <p className="text-[10px] text-slate-500 mt-0.5">
+                          رابط مباشر يفتح دروس وسبورة السنة {lvl}م فقط
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 w-full sm:w-auto justify-end flex-wrap">
+                      <button
+                        onClick={() => handleCopyLevelCode(lvl)}
+                        className="py-1.5 px-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1 transition cursor-pointer"
+                        title="نسخ الرمز"
+                      >
+                        {isCodeCopied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span>{isCodeCopied ? "تم نسخ الرمز" : "نسخ الرمز"}</span>
+                      </button>
+
+                      <button
+                        onClick={() => handleCopyLevelLink(lvl)}
+                        className="py-1.5 px-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 font-bold text-xs flex items-center gap-1 transition cursor-pointer"
+                        title="نسخ الرابط المباشر"
+                      >
+                        {isLinkCopied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Key className="w-3.5 h-3.5" />}
+                        <span>{isLinkCopied ? "تم نسخ الرابط" : "نسخ الرابط"}</span>
+                      </button>
+
+                      <button
+                        onClick={() => handleShareLevelWhatsApp(lvl)}
+                        className="py-1.5 px-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1 transition cursor-pointer shadow-2xs"
+                        title="إرسال إلى مجموعة أولياء هذا المستوى في واتساب"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5" />
+                        <span>مشاركة واتساب</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 1. الرمز العام للأستاذ */}
+          <div className="bg-slate-50 border border-slate-200 rounded-3xl p-5 text-center space-y-3">
+            <span className="text-[11px] font-bold text-slate-600 uppercase tracking-widest bg-slate-200/70 px-3 py-1 rounded-full">
+              الرمز العام للأستاذ (يعرض جميع مستوياتك)
             </span>
             <div className="flex items-center justify-center gap-3">
-              <span className="text-3xl sm:text-4xl font-mono font-black text-emerald-950 tracking-wider">
+              <span className="text-3xl font-mono font-black text-slate-900 tracking-wider">
                 {teacherCode}
               </span>
               <button
                 onClick={handleCopyCode}
-                className="py-2 px-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs flex items-center gap-1.5 shadow-md transition cursor-pointer"
+                className="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs flex items-center gap-1.5 shadow-md transition cursor-pointer"
               >
-                {copiedCode ? <Check className="w-4 h-4 text-emerald-200" /> : <Copy className="w-4 h-4" />}
-                <span>{copiedCode ? "تم النسخ" : "نسخ الكود"}</span>
+                {copiedCode ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                <span>{copiedCode ? "تم النسخ" : "نسخ الرمز العام"}</span>
               </button>
             </div>
-            <p className="text-xs text-slate-600 max-w-md mx-auto leading-relaxed">
-              يدخل الولي إلى الصفحة الرئيسية ويكتب هذا الكود فقط في خانة <strong>«فضاء الولي والتلميذ»</strong> ليفتح له كراس القسم والسبورة والواجبات فوراً.
-            </p>
           </div>
 
           {/* 2. الإرسال عبر واتساب / وسائل التواصل */}
@@ -159,7 +271,7 @@ ${schoolName}`;
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-slate-800 font-bold text-sm">
                 <MessageCircle className="w-4 h-4 text-emerald-600" />
-                <span>رسالة جاهزة لمجموعات الأولياء (WhatsApp / Telegram)</span>
+                <span>رسالة عامة جاهزة لمجموعات الأولياء</span>
               </div>
               <button
                 onClick={handleOpenWhatsApp}
@@ -178,21 +290,21 @@ ${schoolName}`;
                 className="py-2 px-3.5 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
               >
                 {copiedMsg ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
-                <span>{copiedMsg ? "تم نسخ نص الرسالة ✓" : "نسخ الرسالة كاملة"}</span>
+                <span>{copiedMsg ? "تم نسخ الرسالة ✓" : "نسخ الرسالة"}</span>
               </button>
               <button
                 onClick={handleCopyLink}
                 className="py-2 px-3.5 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
               >
                 {copiedLink ? <Check className="w-4 h-4 text-emerald-600" /> : <Key className="w-4 h-4" />}
-                <span>{copiedLink ? "تم نسخ الرابط ✓" : "نسخ الرابط المباشر"}</span>
+                <span>{copiedLink ? "تم نسخ الرابط ✓" : "نسخ الرابط العام"}</span>
               </button>
             </div>
           </div>
 
-          {/* 3. رمز QR ووصل مطبوع للأولياء */}
+          {/* 3. رمز QR */}
           <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-center gap-5">
-            <div className="w-36 h-36 rounded-2xl border-2 border-emerald-100 bg-emerald-50/50 flex items-center justify-center shrink-0 p-2">
+            <div className="w-32 h-32 rounded-2xl border-2 border-emerald-100 bg-emerald-50/50 flex items-center justify-center shrink-0 p-2">
               {dataUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={dataUrl} alt="QR Code" className="w-full h-full object-contain rounded-xl" />
@@ -206,63 +318,27 @@ ${schoolName}`;
                 رمز الاستجابة السريعة (QR Code)
               </h3>
               <p className="text-xs text-slate-500 leading-relaxed">
-                يمكن للولي فتح الكاميرا في هاتفه ومسح الرمز ليدخل مباشرة لدروس ابنه دون كتابة أي رابط.
+                يمكن طباعة هذا الرمز أو إلصاقه في القسم أو في كراس التلميذ لمسحه بكاميرا الهاتف والوصول فوراً للفضاء.
               </p>
-
-              <div className="pt-2 flex flex-wrap items-center justify-center sm:justify-start gap-2">
-                {dataUrl && (
-                  <a
-                    href={dataUrl}
-                    download={`qr-code-${teacherCode}.png`}
-                    className="py-2 px-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center gap-1.5 transition"
-                  >
-                    <Download className="w-4 h-4" />
-                    <span>تحميل صورة الرمز</span>
-                  </a>
-                )}
-                <button
-                  onClick={handlePrintSlip}
-                  className="py-2 px-3.5 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-xs flex items-center gap-1.5 shadow-md transition cursor-pointer"
+              {dataUrl && (
+                <a
+                  href={dataUrl}
+                  download={`QR-${teacherCode}.png`}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition"
                 >
-                  <Printer className="w-4 h-4" />
-                  <span>طباعة وصل إشعار الأولياء 🖨️</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* 4. قسم الوصل الورقي المطبوع (المخصص للطباعة) */}
-          <div className="border-t border-slate-200 pt-4" ref={printAreaRef}>
-            <div className="bg-slate-50 border-2 border-dashed border-slate-300 rounded-2xl p-4 sm:p-5 space-y-3">
-              <div className="flex items-center justify-between text-[11px] text-slate-500 border-b border-slate-200 pb-2">
-                <span>الجمهورية الجزائرية الديمقراطية الشعبية — مديرية التربية لولاية الوادي</span>
-                <span className="font-bold text-emerald-800">وصل متابعة مادة الرياضيات</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="font-black text-sm text-slate-900">{teacherName}</h4>
-                  <p className="text-xs text-slate-600">{schoolName}</p>
-                </div>
-                <div className="text-left">
-                  <span className="text-[10px] text-slate-400 block">كود الأستاذ للمنصة:</span>
-                  <span className="font-mono font-black text-base text-emerald-800 bg-white px-2.5 py-1 rounded-lg border border-emerald-300">
-                    {teacherCode}
-                  </span>
-                </div>
-              </div>
-              <p className="text-[11px] text-slate-600 leading-relaxed">
-                عزيزي ولي التلميذ: لمتابعة دروس مادة الرياضيات، صورة السبورة اليومية، كراس القسم، والواجبات المنزلية، تفضل بمسح رمز الاستجابة السريعة أعلاه أو ادخل إلى المنصة واكتب كود الأستاذ.
-              </p>
+                  <Download className="w-3.5 h-3.5" />
+                  <span>تحميل صورة الرمز (PNG)</span>
+                </a>
+              )}
             </div>
           </div>
         </div>
 
         {/* التذييل */}
-        <div className="bg-slate-50 px-6 py-3.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-          <span>منصة رياضيات ولاية الوادي — الرقمنة في خدمة التلميذ والولي</span>
+        <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-end">
           <button
             onClick={onClose}
-            className="font-bold text-slate-700 hover:text-slate-900 cursor-pointer"
+            className="py-2 px-5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs transition cursor-pointer"
           >
             إغلاق
           </button>

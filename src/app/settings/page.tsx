@@ -56,7 +56,7 @@ export default function TeacherSettingsPage() {
   const [schoolName, setSchoolName] = useState("");
   const [levels, setLevels] = useState<number[]>([]);
   const [reception, setReception] = useState<ReceptionInfo>({});
-  const [customClasses, setCustomClasses] = useState<string[]>(["1 م 1", "1 م 2", "1 م 3", "2 م 3"]);
+  const [customClasses, setCustomClasses] = useState<string[]>([]);
   const [newClassInput, setNewClassInput] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "ok" | "err"; text: string } | null>(null);

@@ -63,16 +63,16 @@ export type HonorStudent = {
   createdAt: string;
 };
 
-export const HONOR_CLASSES = ["1 م 1", "1 م 2", "1 م 3", "2 م 3"] as const;
-export type HonorClass = (typeof HONOR_CLASSES)[number];
+export const HONOR_CLASSES: readonly string[] = [];
+export type HonorClass = string;
 
-export const DEFAULT_CLASSES = ["1 م 1", "1 م 2", "1 م 3", "2 م 3"];
+export const DEFAULT_CLASSES: readonly string[] = [];
 
 export function getTeacherClasses(data?: LessonsData | null): string[] {
   if (data?.customClasses && Array.isArray(data.customClasses) && data.customClasses.length > 0) {
     return data.customClasses;
   }
-  return [...DEFAULT_CLASSES];
+  return [];
 }
 
 export type Penalty = {

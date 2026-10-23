@@ -19,9 +19,6 @@ const DASHBOARD_ROUTES = [
   "/pedagogy",
   "/penalties",
   "/eval",
-  "/messages",
-  "/year",
-  "/lesson",
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {

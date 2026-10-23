@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { Suspense, useEffect, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
@@ -35,7 +35,7 @@ const DISTRICTS = [
   { id: 0, name: "غير محدد" },
 ];
 
-export default function JoinTeacherPage() {
+function JoinTeacherForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -450,5 +450,19 @@ export default function JoinTeacherPage() {
       </div>
     </div>
   </div>
+  );
+}
+
+export default function JoinTeacherPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+          <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
+        </div>
+      }
+    >
+      <JoinTeacherForm />
+    </Suspense>
   );
 }
