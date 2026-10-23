@@ -147,7 +147,31 @@ export type StudentRosterItem = {
   id: string;
   studentName: string;
   className: string;
-  groupName: "فوج 1" | "فوج 2" | "القسم كامل";
+  groupName?: "فوج 1" | "فوج 2" | "القسم كامل" | string;
+  registrationNumber?: string;
+  parentPhone?: string;
+  birthDate?: string;
+  gender?: "ذكر" | "أنثى";
+  notes?: string;
+  createdAt?: string;
+};
+
+export type DailyDiaryEntry = {
+  id: string;
+  date: string;               // تاريخ الحصة: YYYY-MM-DD
+  day: string;                // يوم الحصة: الأحد، الإثنين...
+  periodTime?: string;        // التوقيت: 08:00 - 09:00
+  className: string;          // الفوج: 1م3
+  subject?: string;           // المادة: رياضيات، فيزياء...
+  field?: string;             // الميدان (أنشطة عددية...)
+  section?: string;           // المقطع التعلمي
+  lessonTitle: string;        // عنوان المورد / الحصة
+  objectives?: string;        // مؤشرات الكفاءة والأهداف التعلمية
+  activities?: string;        // سير الأنشطة ومراحل الدرس
+  homework?: string;          // الواجب المنزلي
+  notes?: string;             // ملاحظات التقويم والمعالجة البيداغوجية
+  isPublicForParents?: boolean; // هل يظهر عنوان الدرس للولي في صفحته
+  createdAt: string;
 };
 
 export type AnnouncementCategory = "absence" | "lesson" | "update" | "general" | "urgent";
@@ -184,6 +208,10 @@ export type TeacherFeatureFlags = {
   messages?: boolean;              // صندوق الرسائل المجهولة
   penalties?: boolean;             // سجل الملاحظات والخصومات
   inspectorSync?: boolean;         // الربط مع المفتشية البيداغوجية
+  students?: boolean;              // إدارة الأفواج والتلاميذ
+  timetable?: boolean;             // التوقيت الأسبوعي
+  diary?: boolean;                 // الدفتر اليومي (ماذا سأدرس غداً)
+  forum?: boolean;                 // ملتقى الأساتذة البيداغوجي
 };
 
 export const DEFAULT_FEATURE_FLAGS: TeacherFeatureFlags = {
@@ -196,10 +224,14 @@ export const DEFAULT_FEATURE_FLAGS: TeacherFeatureFlags = {
   messages: true,
   penalties: true,
   inspectorSync: true,
+  students: true,
+  timetable: true,
+  diary: true,
+  forum: true,
 };
 
 export const MIDDLE_SCHOOL_SUBJECTS = [
-  { id: "mathematics", name: "الرياضيات", icon: "∑", codePrefix: "MTH" },
+  { id: "mathematics", name: "الرياضيات", icon: "📐", codePrefix: "MTH" },
   { id: "physics", name: "العلوم الفيزيائية والتكنولوجيا", icon: "⚛️", codePrefix: "PHY" },
   { id: "science", name: "علوم الطبيعة والحياة", icon: "🔬", codePrefix: "SCI" },
   { id: "arabic", name: "اللغة العربية وآدابها", icon: "📖", codePrefix: "ARA" },
@@ -226,6 +258,8 @@ export type LessonsData = {
   featureFlags?: TeacherFeatureFlags;
   subject?: SubjectId | string;
   customClasses?: string[];
+  timetable?: TeacherTimetable;
+  diaryEntries?: DailyDiaryEntry[];
 };
 
 export const LEVELS = {

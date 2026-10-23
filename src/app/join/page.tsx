@@ -27,11 +27,12 @@ import { MIDDLE_SCHOOL_SUBJECTS } from "@/lib/types";
 const VALID_INVITE_KEYS = ["asateza-2026", "eloued-teachers", "bahi-ali-2026"];
 
 const DISTRICTS = [
-  { id: 1, name: "المقاطعة 1 (الوادي شرق)" },
-  { id: 2, name: "المقاطعة 2 (الوادي غرب)" },
-  { id: 3, name: "المقاطعة 3 (قمار والرقيبة)" },
-  { id: 4, name: "المقاطعة 4 (جامعة والمغير)" },
-  { id: 5, name: "المقاطعة 5 (الدبيلة والمقرن)" },
+  { id: 1, name: "المقاطعة 1" },
+  { id: 2, name: "المقاطعة 2" },
+  { id: 3, name: "المقاطعة 3" },
+  { id: 4, name: "المقاطعة 4" },
+  { id: 5, name: "المقاطعة 5" },
+  { id: 0, name: "غير محدد" },
 ];
 
 export default function JoinTeacherPage() {
@@ -50,7 +51,6 @@ export default function JoinTeacherPage() {
   const [password, setPassword] = useState("");
   const [districtId, setDistrictId] = useState("1");
   const [middleSchoolName, setMiddleSchoolName] = useState("");
-  const [selectedLevels, setSelectedLevels] = useState<number[]>([1, 2]);
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
@@ -75,12 +75,6 @@ export default function JoinTeacherPage() {
     }
   };
 
-  const toggleLevel = (lvl: number) => {
-    setSelectedLevels((prev) =>
-      prev.includes(lvl) ? prev.filter((l) => l !== lvl) : [...prev, lvl].sort()
-    );
-  };
-
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg("");
@@ -92,11 +86,6 @@ export default function JoinTeacherPage() {
 
     if (password.length < 6) {
       setErrorMsg("كلمة المرور يجب أن لا تقل عن 6 أحرف أو أرقام");
-      return;
-    }
-
-    if (selectedLevels.length === 0) {
-      setErrorMsg("يرجى تحديد مستوى دراسي واحد على الأقل تدرسه هذا العام");
       return;
     }
 
@@ -118,11 +107,11 @@ export default function JoinTeacherPage() {
             role: "teacher",
             full_name: fullName.trim(),
             subject: subject,
-            district_id: Number(districtId),
+            district_id: Number(districtId) || 0,
             school_custom_name: middleSchoolName.trim() || "متوسطة ولاية الوادي",
             teacher_code: randomCode,
             slug: cleanSlug,
-            levels_taught: selectedLevels,
+            levels_taught: [1, 2, 3, 4],
             verification_status: "approved",
             is_verified: true,
             terms_accepted_at: new Date().toISOString(),
@@ -140,11 +129,11 @@ export default function JoinTeacherPage() {
           role: "teacher",
           full_name: fullName.trim(),
           subject: subject,
-          district_id: Number(districtId),
+          district_id: Number(districtId) || 0,
           school_custom_name: middleSchoolName.trim() || "متوسطة ولاية الوادي",
           teacher_code: randomCode,
           slug: cleanSlug,
-          levels_taught: selectedLevels,
+          levels_taught: [1, 2, 3, 4],
           verification_status: "approved",
           is_verified: true,
         })
@@ -343,7 +332,7 @@ export default function JoinTeacherPage() {
               >
                 {MIDDLE_SCHOOL_SUBJECTS.map((s) => (
                   <option key={s.id} value={s.id}>
-                    {s.icon} {s.name} (كود: {s.codePrefix}-xxx)
+                    {s.icon} {s.name}
                   </option>
                 ))}
               </select>
@@ -378,7 +367,7 @@ export default function JoinTeacherPage() {
                 <select
                   value={districtId}
                   onChange={(e) => setDistrictId(e.target.value)}
-                  className="w-full pl-3 pr-10 py-2.5 rounded-xl bg-[#fafaf7] border border-[#e8e8e0] text-xs text-gray-900 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57] transition appearance-none"
+                  className="w-full pl-3 pr-10 py-2.5 rounded-xl bg-[#fafaf7] border border-[#e8e8e0] text-xs text-gray-900 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57] transition appearance-none font-bold"
                 >
                   {DISTRICTS.map((d) => (
                     <option key={d.id} value={d.id}>
@@ -388,38 +377,6 @@ export default function JoinTeacherPage() {
                 </select>
                 <MapPin className="w-4 h-4 text-gray-400 absolute right-3 top-3 pointer-events-none" />
               </div>
-            </div>
-          </div>
-
-          {/* المستويات الدراسية المسندة */}
-          <div className="space-y-2 pt-1">
-            <label className="block text-xs font-black text-gray-800">
-              المستويات والأطوار التي تدرسها هذا العام: <span className="text-red-500">*</span>
-            </label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-              {[
-                { lvl: 1, label: "أولى متوسط (1م)" },
-                { lvl: 2, label: "ثانية متوسط (2م)" },
-                { lvl: 3, label: "ثالثة متوسط (3م)" },
-                { lvl: 4, label: "رابعة متوسط (4م - BEM)" },
-              ].map(({ lvl, label }) => {
-                const checked = selectedLevels.includes(lvl);
-                return (
-                  <button
-                    key={lvl}
-                    type="button"
-                    onClick={() => toggleLevel(lvl)}
-                    className={`py-2 px-3 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
-                      checked
-                        ? "bg-[#e6f4ee] border-[#107a57] text-[#107a57] shadow-xs"
-                        : "bg-[#fafaf7] border-[#e8e8e0] text-gray-600 hover:bg-gray-100"
-                    }`}
-                  >
-                    <span>{checked ? "✓" : "+"}</span>
-                    <span>{label}</span>
-                  </button>
-                );
-              })}
             </div>
           </div>
 

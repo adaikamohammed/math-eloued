@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -18,9 +18,13 @@ import {
   LogIn,
   LogOut,
   BookOpen,
+  Calendar,
+  ClipboardList,
+  Sliders,
   X,
 } from "lucide-react";
 import { useLayout } from "@/context/LayoutContext";
+import { TeacherFeatureFlags } from "@/lib/types";
 
 interface NavItem {
   label: string;
@@ -39,60 +43,197 @@ export function DesktopSidebar() {
   const pathname = usePathname() || "/";
   const { isSidebarCollapsed, toggleSidebar, isMobileMenuOpen, setIsMobileMenuOpen, user } = useLayout();
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
+  const [featureFlags, setFeatureFlags] = useState<TeacherFeatureFlags | null>(null);
 
-  const categories: NavCategory[] = [
-    {
-      title: "الميدان التربوي",
-      items: [
-        { label: "الرئيسية", href: "/", icon: Sparkles },
-        { label: "البحث بكود الأستاذ", href: "/t/search", icon: Search, badge: "جديد" },
-        { label: "فضاء الأولياء", href: "/my-children", icon: Heart },
-      ],
-    },
-    {
-      title: "الشفافية والتقويم",
-      items: [
-        {
+  // جلب تفضيلات الأستاذ لإظهار وإخفاء الصفحات ديناميكياً
+  useEffect(() => {
+    if (user && user.role !== "inspector") {
+      fetch("/api/lessons")
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data?.featureFlags) {
+            setFeatureFlags(data.featureFlags);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [user]);
+
+  // بناء القوائم وفق رتبة المستخدم وإعداداته
+  const categories: NavCategory[] = React.useMemo(() => {
+    // ─── 1. إذا كان المستخدم أستاذاً مسجلاً ───
+    if (user && user.role === "teacher") {
+      const flags = featureFlags || {};
+
+      const pedagogyItems: NavItem[] = [
+        { label: "كراس القسم وصور السبورة", href: "/admin", icon: BookOpen },
+      ];
+
+      if (flags.students !== false) {
+        pedagogyItems.push({
+          label: "إدارة الأفواج والتلاميذ",
+          href: "/admin/students",
+          icon: Users,
+          badge: "أبجدي",
+          badgeColor: "bg-emerald-50 text-emerald-800 border border-emerald-200/80",
+        });
+      }
+
+      if (flags.timetable !== false) {
+        pedagogyItems.push({
+          label: "التوقيت الأسبوعي",
+          href: "/admin/timetable",
+          icon: Calendar,
+          badge: "جدول",
+          badgeColor: "bg-blue-50 text-blue-800 border border-blue-200/80",
+        });
+      }
+
+      if (flags.diary !== false) {
+        pedagogyItems.push({
+          label: "الدفتر اليومي (ماذا سأدرس غداً)",
+          href: "/admin/diary",
+          icon: ClipboardList,
+          badge: "يومي",
+          badgeColor: "bg-amber-50 text-amber-800 border border-amber-200/80",
+        });
+      }
+
+      const followupItems: NavItem[] = [];
+      if (flags.continuousAssessment !== false) {
+        followupItems.push({
           label: "ميثاق التقويم (20/20)",
           href: "/assessment",
           icon: Scale,
           badge: "شفافية ⚖️",
           badgeColor: "bg-emerald-50 text-emerald-700 border border-emerald-200/80",
-        },
-        { label: "لوحة الشرف وتكريم النوابغ", href: "/honor", icon: Trophy },
-      ],
-    },
-    {
-      title: "الملتقى والتفتيش",
-      items: [
-        {
+        });
+      }
+      if (flags.honors !== false) {
+        followupItems.push({
+          label: "لوحة الشرف وتكريم النوابغ",
+          href: "/honor",
+          icon: Trophy,
+        });
+      }
+
+      const inspectionItems: NavItem[] = [];
+      if (flags.forum !== false) {
+        inspectionItems.push({
           label: "ملتقى الأساتذة البيداغوجي",
           href: "/forum",
-          icon: Users,
+          icon: Sparkles,
           badge: "💬 تفاعلي",
           badgeColor: "bg-indigo-50 text-indigo-700 border border-indigo-200/80",
-        },
-        {
+        });
+      }
+      if (flags.inspectorSync !== false) {
+        inspectionItems.push({
           label: "فضاء التفتيش والمناشير",
           href: "/inspector",
           icon: ShieldCheck,
           badge: "رسمي",
           badgeColor: "bg-amber-50 text-amber-700 border border-amber-200/80",
-        },
-      ],
-    },
-    {
-      title: "إدارة الفضاء",
-      items: [
+        });
+      }
+
+      const cats: NavCategory[] = [
+        { title: "الميدان التربوي", items: pedagogyItems },
+      ];
+
+      if (followupItems.length > 0) {
+        cats.push({ title: "الشفافية والتقويم", items: followupItems });
+      }
+
+      if (inspectionItems.length > 0) {
+        cats.push({ title: "الملتقى والتفتيش", items: inspectionItems });
+      }
+
+      cats.push({
+        title: "إدارة الفضاء والتخصيص",
+        items: [
+          {
+            label: "تخصيص الواجهة والصفحات",
+            href: "/settings/features",
+            icon: Sliders,
+            badge: "تحكم ⚙️",
+            badgeColor: "bg-[#e6f4ee] text-[#107a57] border border-[#107a57]/20",
+          },
+          { label: "إعدادات الحساب وكلمة المرور", href: "/settings", icon: Settings },
+        ],
+      });
+
+      return cats;
+    }
+
+    // ─── 2. إذا كان المستخدم مفتشاً ───
+    if (user && user.role === "inspector") {
+      return [
         {
-          label: user?.role === "inspector" ? "لوحة المفتش" : "لوحة تحكم الأستاذ",
-          href: user?.role === "inspector" ? "/inspector" : "/admin",
-          icon: GraduationCap,
+          title: "فضاء التفتيش",
+          items: [
+            { label: "لوحة المفتشية والمناشير", href: "/inspector", icon: ShieldCheck, badge: "رسمي" },
+            { label: "الملتقى البيداغوجي", href: "/forum", icon: Users, badge: "نقاش" },
+            { label: "ميثاق التقويم (20/20)", href: "/assessment", icon: Scale },
+          ],
         },
-        { label: "تخصيص الفضاء والميزات", href: "/settings", icon: Settings },
-      ],
-    },
-  ];
+        {
+          title: "إدارة الحساب",
+          items: [{ label: "الإعدادات", href: "/settings", icon: Settings }],
+        },
+      ];
+    }
+
+    // ─── 3. الوضع العام للزوار والأولياء ───
+    return [
+      {
+        title: "الميدان التربوي",
+        items: [
+          { label: "الرئيسية", href: "/", icon: Sparkles },
+          { label: "البحث بكود الأستاذ", href: "/t/search", icon: Search, badge: "جديد" },
+          { label: "فضاء الأولياء", href: "/my-children", icon: Heart },
+        ],
+      },
+      {
+        title: "الشفافية والتقويم",
+        items: [
+          {
+            label: "ميثاق التقويم (20/20)",
+            href: "/assessment",
+            icon: Scale,
+            badge: "شفافية ⚖️",
+            badgeColor: "bg-emerald-50 text-emerald-700 border border-emerald-200/80",
+          },
+          { label: "لوحة الشرف وتكريم النوابغ", href: "/honor", icon: Trophy },
+        ],
+      },
+      {
+        title: "الملتقى والتفتيش",
+        items: [
+          {
+            label: "ملتقى الأساتذة البيداغوجي",
+            href: "/forum",
+            icon: Users,
+            badge: "💬 تفاعلي",
+            badgeColor: "bg-indigo-50 text-indigo-700 border border-indigo-200/80",
+          },
+          {
+            label: "فضاء التفتيش والمناشير",
+            href: "/inspector",
+            icon: ShieldCheck,
+            badge: "رسمي",
+            badgeColor: "bg-amber-50 text-amber-700 border border-amber-200/80",
+          },
+        ],
+      },
+      {
+        title: "إدارة الفضاء",
+        items: [
+          { label: "تسجيل دخول الأستاذ", href: "/login", icon: GraduationCap },
+        ],
+      },
+    ];
+  }, [user, featureFlags]);
 
   const getWorkspaceUrl = () => {
     if (!user) return "/login";

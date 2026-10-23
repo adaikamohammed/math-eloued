@@ -23,6 +23,7 @@ import {
   Eye,
   Layers,
   GraduationCap,
+  Users,
   Sparkles,
   CheckCircle,
 } from "lucide-react";
@@ -228,6 +229,57 @@ export default function TeacherSettingsPage() {
             الكود: <span className="font-mono">{profile.teacher_code}</span> • المقاطعة {profile.district_id ?? "—"}
           </p>
         </div>
+      </div>
+
+      {/* روابط سريعة للوحدات المتقدمة وتخصيص الواجهة */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+        <Link
+          href="/settings/features"
+          className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200/80 hover:border-emerald-300 transition shadow-2xs flex items-center justify-between group"
+        >
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-white text-[#107a57] border border-emerald-200 flex items-center justify-center shrink-0">
+              <Sliders className="w-4 h-4" />
+            </div>
+            <div className="text-right">
+              <span className="block text-xs font-black text-gray-900 group-hover:text-[#107a57]">تخصيص الواجهة</span>
+              <span className="text-[10px] text-gray-500 font-medium">إظهار وإخفاء الصفحات</span>
+            </div>
+          </div>
+          <ArrowRight className="w-3.5 h-3.5 text-gray-400 group-hover:text-[#107a57] rotate-180" />
+        </Link>
+
+        <Link
+          href="/admin/students"
+          className="p-3.5 rounded-2xl bg-white border border-slate-200 hover:border-emerald-300 transition shadow-2xs flex items-center justify-between group"
+        >
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-[#fafaf7] text-gray-700 border border-slate-200 flex items-center justify-center shrink-0">
+              <Users className="w-4 h-4" />
+            </div>
+            <div className="text-right">
+              <span className="block text-xs font-black text-gray-900 group-hover:text-[#107a57]">إدارة الأفواج والتلاميذ</span>
+              <span className="text-[10px] text-gray-500 font-medium">ترتيب أبجدي + 1م3، 2م5</span>
+            </div>
+          </div>
+          <ArrowRight className="w-3.5 h-3.5 text-gray-400 group-hover:text-[#107a57] rotate-180" />
+        </Link>
+
+        <Link
+          href="/admin/timetable"
+          className="p-3.5 rounded-2xl bg-white border border-slate-200 hover:border-emerald-300 transition shadow-2xs flex items-center justify-between group"
+        >
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-[#fafaf7] text-gray-700 border border-slate-200 flex items-center justify-center shrink-0">
+              <CalendarClock className="w-4 h-4" />
+            </div>
+            <div className="text-right">
+              <span className="block text-xs font-black text-gray-900 group-hover:text-[#107a57]">التوقيت الأسبوعي</span>
+              <span className="text-[10px] text-gray-500 font-medium">جدول الحصص والطباعة</span>
+            </div>
+          </div>
+          <ArrowRight className="w-3.5 h-3.5 text-gray-400 group-hover:text-[#107a57] rotate-180" />
+        </Link>
       </div>
 
       <TeacherQR path={`/t/${profile.slug || profile.id}`} teacherName={profile.full_name || "الأستاذ"} code={profile.teacher_code} schoolName={profile.school_custom_name || ""} />

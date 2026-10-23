@@ -11,6 +11,11 @@ import {
   GraduationCap,
   ShieldCheck,
   User,
+  BookOpen,
+  Calendar,
+  ClipboardList,
+  Sliders,
+  Heart,
 } from "lucide-react";
 import { useLayout } from "@/context/LayoutContext";
 
@@ -18,32 +23,31 @@ export function MobileBottomNav() {
   const pathname = usePathname() || "/";
   const { user } = useLayout();
 
-  const getAccountHref = () => {
-    if (!user) return "/login";
-    if (user.role === "inspector") return "/inspector";
-    if (user.role === "admin") return "/super-admin";
-    return "/admin";
-  };
-
-  const getAccountLabel = () => {
-    if (!user) return "دخولي";
-    if (user.role === "inspector") return "التفتيش";
-    return "مساحتي";
-  };
-
-  const AccountIcon = user
-    ? user.role === "inspector"
-      ? ShieldCheck
-      : GraduationCap
-    : User;
-
-  const items = [
+  let items = [
     { label: "الرئيسية", href: "/", icon: Sparkles },
     { label: "بحث بكود", href: "/t/search", icon: Search },
+    { label: "محفظتي", href: "/my-children", icon: Heart },
     { label: "التقويم (20)", href: "/assessment", icon: Scale },
-    { label: "الملتقى", href: "/forum", icon: Users },
-    { label: getAccountLabel(), href: getAccountHref(), icon: AccountIcon },
+    { label: "دخول الأستاذ", href: "/login", icon: GraduationCap },
   ];
+
+  if (user && user.role === "teacher") {
+    items = [
+      { label: "كراس القسم", href: "/admin", icon: BookOpen },
+      { label: "التلاميذ", href: "/admin/students", icon: Users },
+      { label: "التوقيت", href: "/admin/timetable", icon: Calendar },
+      { label: "الدفتر اليومي", href: "/admin/diary", icon: ClipboardList },
+      { label: "تخصيص", href: "/settings/features", icon: Sliders },
+    ];
+  } else if (user && user.role === "inspector") {
+    items = [
+      { label: "التفتيش", href: "/inspector", icon: ShieldCheck },
+      { label: "الندوات", href: "/inspector/circulars", icon: Calendar },
+      { label: "الملتقى", href: "/forum", icon: Users },
+      { label: "التقويم", href: "/assessment", icon: Scale },
+      { label: "الإعدادات", href: "/settings", icon: Sliders },
+    ];
+  }
 
   return (
     <nav

@@ -23,6 +23,9 @@ import {
   Settings,
   Lock,
   ArrowRight,
+  Calendar,
+  ClipboardList,
+  Sliders,
   ArrowLeft,
   ArrowUp,
   ArrowDown,
@@ -1251,6 +1254,77 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
             </Link>
           </div>
         </div>
+      </div>
+
+      {/* ── لوحة الوحدات التعليمية والتنظيمية المتقدمة (مستوحاة من فرسان القرآن) ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+        <Link
+          href="/admin/students"
+          className="p-3.5 rounded-2xl bg-white border border-[#e8e8e0] hover:border-emerald-300 hover:shadow-sm transition group text-right flex items-center justify-between"
+        >
+          <div className="space-y-0.5">
+            <span className="block text-xs font-black text-gray-900 group-hover:text-[#107a57]">
+              إدارة الأفواج والتلاميذ
+            </span>
+            <span className="text-[10px] text-gray-500 font-medium">
+              أفواج خاصة (1م3، 2م5) • ترتيب أبجدي
+            </span>
+          </div>
+          <div className="w-8 h-8 rounded-xl bg-[#e6f4ee] text-[#107a57] border border-[#107a57]/20 flex items-center justify-center shrink-0">
+            <Users className="w-4 h-4" />
+          </div>
+        </Link>
+
+        <Link
+          href="/admin/timetable"
+          className="p-3.5 rounded-2xl bg-white border border-[#e8e8e0] hover:border-blue-300 hover:shadow-sm transition group text-right flex items-center justify-between"
+        >
+          <div className="space-y-0.5">
+            <span className="block text-xs font-black text-gray-900 group-hover:text-blue-700">
+              التوقيت الأسبوعي
+            </span>
+            <span className="text-[10px] text-gray-500 font-medium">
+              جدول الحصص • القاعات • طباعة A4
+            </span>
+          </div>
+          <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-700 border border-blue-200 flex items-center justify-center shrink-0">
+            <Calendar className="w-4 h-4" />
+          </div>
+        </Link>
+
+        <Link
+          href="/admin/diary"
+          className="p-3.5 rounded-2xl bg-white border border-[#e8e8e0] hover:border-amber-300 hover:shadow-sm transition group text-right flex items-center justify-between"
+        >
+          <div className="space-y-0.5">
+            <span className="block text-xs font-black text-gray-900 group-hover:text-amber-800">
+              الدفتر اليومي (ماذا سأدرس غداً)
+            </span>
+            <span className="text-[10px] text-gray-500 font-medium">
+              تحضير الحصص • مؤشرات الكفاءة • دفتر النصوص
+            </span>
+          </div>
+          <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 flex items-center justify-center shrink-0">
+            <ClipboardList className="w-4 h-4" />
+          </div>
+        </Link>
+
+        <Link
+          href="/settings/features"
+          className="p-3.5 rounded-2xl bg-white border border-[#e8e8e0] hover:border-purple-300 hover:shadow-sm transition group text-right flex items-center justify-between"
+        >
+          <div className="space-y-0.5">
+            <span className="block text-xs font-black text-gray-900 group-hover:text-purple-700">
+              تخصيص الواجهة
+            </span>
+            <span className="text-[10px] text-gray-500 font-medium">
+              إظهار وإخفاء الصفحات • ما يظهر للولي
+            </span>
+          </div>
+          <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-700 border border-purple-200 flex items-center justify-center shrink-0">
+            <Sliders className="w-4 h-4" />
+          </div>
+        </Link>
       </div>
 
       {/* التبويب الرئيسي: إدارة الدروس أو تقييم الحصة أو الإعلانات أو الرسائل أو الاستدعاءات أو لوحة الشرف أو الخصومات */}

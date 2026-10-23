@@ -33,7 +33,7 @@ export function synchronizeStudents(data: LessonsData): LessonsData {
         id: `eval_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
         studentName: rName,
         className: r.className,
-        groupName: r.groupName || "فوج 1",
+        groupName: (r.groupName as "فوج 1" | "فوج 2" | "القسم كامل") || "فوج 1",
         notebookScore: 5,
         notebookComplete: true,
         homeworkScore: 5,
@@ -77,9 +77,9 @@ export function synchronizeStudents(data: LessonsData): LessonsData {
 // ==========================================================
 
 // ما يراه الأولياء والتلاميذ
-const PUBLIC_KEYS = ["lessons", "honors", "announcements", "summons", "featureFlags", "subject", "customClasses"] as const;
+const PUBLIC_KEYS = ["lessons", "honors", "announcements", "summons", "featureFlags", "subject", "customClasses", "timetable"] as const;
 // ما يبقى خاصاً بالأستاذ وحده
-const PRIVATE_KEYS = ["evaluations", "penalties", "inspectionSessions", "studentRoster", "anonymousMessages"] as const;
+const PRIVATE_KEYS = ["evaluations", "penalties", "inspectionSessions", "studentRoster", "anonymousMessages", "diaryEntries"] as const;
 
 export function normalizeData(json: any): LessonsData {
   return {
@@ -95,6 +95,8 @@ export function normalizeData(json: any): LessonsData {
     featureFlags: json?.featureFlags || json?.feature_flags || undefined,
     subject: json?.subject || undefined,
     customClasses: Array.isArray(json?.customClasses) ? json.customClasses : undefined,
+    timetable: json?.timetable || undefined,
+    diaryEntries: Array.isArray(json?.diaryEntries) ? json.diaryEntries : [],
   };
 }
 
