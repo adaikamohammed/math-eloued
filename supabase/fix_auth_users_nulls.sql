@@ -1,18 +1,16 @@
 -- ====================================================================
 -- حل فوري لمشكلة: AuthRetryableFetchError (Database error querying schema)
--- مع الحفاظ على قيد الفرادة users_phone_key (حقل phone يجب أن يبقى NULL)
 -- ====================================================================
 -- انسخ هذا الاستعلام بالكامل والصقه في:
 -- Supabase Dashboard -> SQL Editor -> New Query -> Run
 -- ====================================================================
 
--- 1. إعادة phone إلى NULL في حال تم تعيينه كنص فارغ سابقاً
--- (في PostgreSQL: الـ NULL مسموح تكراره في الـ UNIQUE constraint، بينما '' يسبب duplicate key)
+-- 1. إعادة phone إلى NULL في حال تم إسناد نص فارغ سابقاً لتفادي انتهاك users_phone_key
 UPDATE auth.users
 SET phone = NULL
 WHERE phone = '';
 
--- 2. ضبط حقول الرموز فقط التي يطلبها محرك GoTrue كنصوص فارغة
+-- 2. ضبط حقول الرموز التي يطلبها محرك GoTrue كنصوص فارغة
 UPDATE auth.users
 SET 
   confirmation_token = COALESCE(confirmation_token, ''),
@@ -27,14 +25,14 @@ WHERE
   OR email_change IS NULL
   OR email_change_token_new IS NULL;
 
--- 3. تأكيد البريد الإلكتروني لحسابات العرض التجريبي للدخول الفوري
+-- 3. تأكيد البريد الإلكتروني لحسابات العرض التجريبي للدخول المباشر
+-- (ملاحظة: confirmed_at هو عمود يتم توليده تلقائياً من Postgres لذا نحدث فقط email_confirmed_at)
 UPDATE auth.users
 SET 
-  email_confirmed_at = COALESCE(email_confirmed_at, NOW()),
-  confirmed_at = COALESCE(confirmed_at, NOW())
+  email_confirmed_at = COALESCE(email_confirmed_at, NOW())
 WHERE 
   email LIKE '%@eloued-math.dz';
 
 -- 4. إظهار النتيجة للتأكد
-SELECT id, email, role, email_confirmed_at, confirmation_token, phone 
+SELECT id, email, role, email_confirmed_at, confirmation_token 
 FROM auth.users;
