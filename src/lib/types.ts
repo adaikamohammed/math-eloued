@@ -1,4 +1,17 @@
-export type NotebookType = "lessons" | "directed_work" | "worksheets" | "summaries";
+export type NotebookType = "lessons" | "directed_work" | "worksheets" | "summaries" | string;
+
+export type CustomNotebook = {
+  id: string;
+  label: string;
+  icon?: string;
+  canDelete?: boolean;
+};
+
+export type BoardNomenclature = {
+  fieldLabel: string;   // تسمية الميدان / المجال / المحور
+  sectionLabel: string; // تسمية المقطع / الوحدة / المركبة
+  lessonLabel: string;  // تسمية عنوان الدرس / المورد
+};
 
 export type LessonImage = {
   id: string;
@@ -261,6 +274,8 @@ export type LessonsData = {
   customClasses?: string[];
   timetable?: TeacherTimetable;
   diaryEntries?: DailyDiaryEntry[];
+  customNotebooks?: CustomNotebook[];
+  boardNomenclature?: BoardNomenclature;
 };
 
 export const LEVELS = {

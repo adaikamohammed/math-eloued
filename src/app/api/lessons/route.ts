@@ -53,6 +53,8 @@ export async function GET(
       studentRoster: data.studentRoster || [],
       featureFlags: data.featureFlags || null,
       subject: data.subject || null,
+      customNotebooks: data.customNotebooks || null,
+      boardNomenclature: data.boardNomenclature || null,
     },
     {
       headers: {
@@ -81,7 +83,7 @@ export async function POST(req: NextRequest) {
 
     title = String(title).trim();
     const validTypes: NotebookType[] = ["lessons", "directed_work", "worksheets", "summaries"];
-    const notebookType: NotebookType = validTypes.includes(type) ? type : "lessons";
+    const notebookType: NotebookType = type ? String(type).trim() : "lessons";
 
     // استخراج الرقم تلقائياً إذا كان مكتوباً في العنوان ولم يُدخل يدوياً
     const match = title.match(/^(?:(?:الدرس|المورد|الحصة|سلسلة|ملخص)\s*)?0*(\d+)\s*[:\-–]\s*(.+)$/i);
@@ -101,14 +103,16 @@ export async function POST(req: NextRequest) {
 
     const newLesson: Lesson = {
       id: `lesson_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-      level: Number(level) as 1 | 2,
+      level: Number(level) as 1 | 2 | 3 | 4,
       type: notebookType,
-      field: notebookType === "lessons" ? (field ? String(field).trim() : "أنشطة عددية") : (field ? String(field).trim() : undefined),
-      section: section ? String(section).trim() : (notebookType === "lessons" ? "المقطع 1 : الأعداد الطبيعية والأعداد العشرية" : undefined),
+      field: field ? String(field).trim() : undefined,
+      section: section ? String(section).trim() : undefined,
       number: itemNum,
       title: title,
       notes: notes ? String(notes).trim() : undefined,
       homeworkNotes: homeworkNotes ? String(homeworkNotes).trim() : undefined,
+      homeworkDueAt: body.homeworkDueAt || undefined,
+      solutionPublishAt: body.solutionPublishAt || undefined,
       createdAt: new Date().toISOString(),
       images: [],
       homeworkImages: [],
@@ -144,18 +148,22 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ success: true, timetable: data.timetable });
     }
 
-    // 2. حفظ قائمة التلاميذ أو الأفواج أو دفتر النصوص
-    if (body.studentRoster !== undefined || body.customClasses !== undefined || body.diaryEntries !== undefined) {
+    // 2. حفظ قائمة التلاميذ أو الأفواج أو دفتر النصوص أو الكراريس المخصصة والتسميات
+    if (body.studentRoster !== undefined || body.customClasses !== undefined || body.diaryEntries !== undefined || body.customNotebooks !== undefined || body.boardNomenclature !== undefined) {
       const data = await getLessonsData(ctx);
       if (body.studentRoster !== undefined) data.studentRoster = body.studentRoster;
       if (body.customClasses !== undefined) data.customClasses = body.customClasses;
       if (body.diaryEntries !== undefined) data.diaryEntries = body.diaryEntries;
+      if (body.customNotebooks !== undefined) data.customNotebooks = body.customNotebooks;
+      if (body.boardNomenclature !== undefined) data.boardNomenclature = body.boardNomenclature;
       await saveLessonsData(ctx, data);
       return NextResponse.json({
         success: true,
         studentRoster: data.studentRoster,
         customClasses: data.customClasses,
         diaryEntries: data.diaryEntries,
+        customNotebooks: data.customNotebooks,
+        boardNomenclature: data.boardNomenclature,
       });
     }
 
@@ -185,8 +193,8 @@ export async function PUT(req: NextRequest) {
     if (homeworkDueAt !== undefined) lesson.homeworkDueAt = toIso(homeworkDueAt);
     if (solutionPublishAt !== undefined) lesson.solutionPublishAt = toIso(solutionPublishAt);
     if (type !== undefined) {
-      const validTypes: NotebookType[] = ["lessons", "directed_work", "worksheets", "summaries"];
-      if (validTypes.includes(type)) lesson.type = type;
+    if (body.level !== undefined) lesson.level = Number(body.level) as 1 | 2 | 3 | 4;
+      lesson.type = String(type).trim();
     }
 
     await saveLessonsData(ctx, data);

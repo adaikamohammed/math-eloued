@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
@@ -18,59 +18,156 @@ import {
   Loader2,
   ArrowRight,
   ExternalLink,
-  Share2,
   Eye,
   Maximize2,
   X,
-  FileText,
   Clock,
   Sparkles,
-  Users,
   Copy,
   Check,
-  School,
   Download,
-  RotateCw,
+  Settings,
+  RotateCcw,
+  CheckSquare,
+  FileCheck,
+  ChevronDown,
+  HelpCircle,
 } from "lucide-react";
 import { LoginRequired } from "@/components/LoginRequired";
 import { PageExplainer } from "@/components/PageExplainer";
 import {
   Lesson,
   LessonImage,
-  NotebookType,
   LEVELS,
   LessonsData,
+  CustomNotebook,
+  BoardNomenclature,
 } from "@/lib/types";
 import { compressIfImage, validateUpload } from "@/lib/compress";
 
 const LOCAL_STORAGE_CLASSES_KEYS = ["last_active_classes", "math_custom_classes"];
+const LOCAL_STORAGE_NOTEBOOKS_KEY = "teacher_custom_notebooks";
+const LOCAL_STORAGE_NOMENCLATURE_KEY = "teacher_board_nomenclature";
 
-// الميادين والمقاطع البيداغوجية الرسمية لبرنامج الرياضيات في التعليم المتوسط
-const CURRICULUM_PRESETS = [
+// الكراريس الافتراضية للتعليم المتوسط
+const DEFAULT_NOTEBOOKS: CustomNotebook[] = [
+  { id: "lessons", label: "كراس الدروس (صور السبورة)", icon: "📘", canDelete: false },
+  { id: "directed_work", label: "أعمال موجهة وتطبيقات", icon: "📑", canDelete: true },
+  { id: "worksheets", label: "أوراق عمل وفروض", icon: "📋", canDelete: true },
+  { id: "summaries", label: "ملخصات ومطويات", icon: "📂", canDelete: true },
+];
+
+// قوالب التسميات الرسمية حسب المادة التعليمية
+const NOMENCLATURE_PRESETS: {
+  id: string;
+  name: string;
+  nomenclature: BoardNomenclature;
+  suggestions: { field: string; sections: string[] }[];
+}[] = [
   {
-    field: "أنشطة عددية",
-    sections: [
-      "المقطع 1: الأعداد الطبيعية والأعداد العشرية",
-      "المقطع 2: الكسور والعمليات عليها",
-      "المقطع 3: الأعداد النسبية والحساب الحرفي",
-      "المقطع 4: المعادلات وترييض المشكلات",
+    id: "math_physics",
+    name: "📐 رياضيات وفيزياء",
+    nomenclature: {
+      fieldLabel: "الميدان التعليمي",
+      sectionLabel: "المقطع التعلمي",
+      lessonLabel: "عنوان المورد / الدرس",
+    },
+    suggestions: [
+      {
+        field: "أنشطة عددية",
+        sections: [
+          "الأعداد الطبيعية والأعداد العشرية",
+          "الكسور والعمليات عليها",
+          "الأعداد النسبية والحساب الحرفي",
+          "المعادلات وترييض المشكلات",
+        ],
+      },
+      {
+        field: "أنشطة هندسية",
+        sections: [
+          "التوازي والتعامد والأشكال المستوية",
+          "التناظر المحوري والمركزي",
+          "المثلثات والدائرة وخاصية فيثاغورس",
+          "المجسمات والحجوم والمساحات",
+        ],
+      },
+      {
+        field: "تنظيم معطيات ودوال",
+        sections: [
+          "التناسبية والنسبة المئوية",
+          "تنظيم المعطيات والإحصاء",
+          "الدوال الخطية والتآلفية",
+        ],
+      },
     ],
   },
   {
-    field: "أنشطة هندسية",
-    sections: [
-      "المقطع 1: التوازي والتعامد والأشكال المستوية",
-      "المقطع 2: التناظر المحوري والمركزي",
-      "المقطع 3: المثلثات والدائرة وخاصية فيثاغورس",
-      "المقطع 4: المجسمات والحجوم والمساحات",
+    id: "arabic_languages",
+    name: "📖 لغة عربية ولغات",
+    nomenclature: {
+      fieldLabel: "الميدان / المجال",
+      sectionLabel: "المقطع / المحور",
+      lessonLabel: "عنوان النص / الدرس",
+    },
+    suggestions: [
+      {
+        field: "فهم المنطوق وإنتاجه",
+        sections: ["قضايا المجتمع والحياة الاجتماعية", "الإعلام والمجتمع", "التضامن الإنساني", "العلم والاكتشافات"],
+      },
+      {
+        field: "فهم المكتوب وقواعد اللغة",
+        sections: ["ظواهر نحوية وصرفية", "ظواهر بلاغية ورسم إملائي"],
+      },
+      {
+        field: "إنتاج المكتوب",
+        sections: ["التعبير الكتابي وتطوير الأسلوب", "المشاريع والإنتاج"],
+      },
     ],
   },
   {
-    field: "تنظيم معطيات ودوال",
-    sections: [
-      "المقطع 1: التناسبية والنسبة المئوية",
-      "المقطع 2: تنظيم المعطيات والإحصاء",
-      "المقطع 3: الدوال الخطية والتآلفية",
+    id: "islamic_civics",
+    name: "🕌 تربية إسلامية ومدنية",
+    nomenclature: {
+      fieldLabel: "الميدان / المحور",
+      sectionLabel: "الوحدة التعليمية",
+      lessonLabel: "عنوان الدرس / الموضوع",
+    },
+    suggestions: [
+      {
+        field: "القرآن الكريم والحديث الشريف",
+        sections: ["سورة التكوير وسورة المطففين", "أحاديث الأخلاق والمعاملات"],
+      },
+      {
+        field: "العقيدة الإسلامية والعبادات",
+        sections: ["أركان الإيمان وأثرها", "أحكام الصلاة والطهارة والزكاة"],
+      },
+      {
+        field: "السيرة النبوية والقصص",
+        sections: ["الهجرة النبوية وبناء المجتمع", "الصحابة الكرام ومواقف العبر"],
+      },
+    ],
+  },
+  {
+    id: "history_geo",
+    name: "🗺️ تاريخ وجغرافيا",
+    nomenclature: {
+      fieldLabel: "الميدان التعليمي",
+      sectionLabel: "المركبة / الكفاءة",
+      lessonLabel: "الوضعية التعلمية / الدرس",
+    },
+    suggestions: [
+      {
+        field: "الوثائق التاريخية والمصادر",
+        sections: ["دراسة ونقد الوثيقة التاريخية", "معالم وآثار الجزائر القديمة"],
+      },
+      {
+        field: "التاريخ الوطني والعالمي",
+        sections: ["الحركة الوطنية والثورة التحريرية", "الدولة الجزائرية الحديثة"],
+      },
+      {
+        field: "المجال الجغرافي والبيئة",
+        sections: ["الموقع والخصائص الطبيعية للجزائر", "السكان والتنمية الاقتصادية"],
+      },
     ],
   },
 ];
@@ -82,15 +179,30 @@ export default function AdminBoardPage() {
   const [profile, setProfile] = useState<any>(null);
   const [customClasses, setCustomClasses] = useState<string[]>([]);
 
+  // الكراريس المفعلة لدى الأستاذ (مع إمكانية الحذف والإضافة)
+  const [notebooks, setNotebooks] = useState<CustomNotebook[]>(DEFAULT_NOTEBOOKS);
+  const [showAddNotebookInput, setShowAddNotebookInput] = useState(false);
+  const [newNotebookName, setNewNotebookName] = useState("");
+
+  // تسميات الميدان والمقطع والدرس حسب مادة الأستاذ
+  const [nomenclature, setNomenclature] = useState<BoardNomenclature>({
+    fieldLabel: "الميدان التعليمي",
+    sectionLabel: "المقطع التعلمي",
+    lessonLabel: "عنوان المورد / الدرس",
+  });
+  const [activePresetId, setActivePresetId] = useState<string>("math_physics");
+  const [showNomenclatureCustomizer, setShowNomenclatureCustomizer] = useState(false);
+
   // الفلاتر والبحث
   const [selectedLevel, setSelectedLevel] = useState<number | "all">("all");
-  const [selectedClassFilter, setSelectedClassFilter] = useState<string>("all");
   const [selectedType, setSelectedType] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
 
-  // حالة النافذة المنبثقة لإضافة/تعديل درس سبورة
-  const [showModal, setShowModal] = useState(false);
-  const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
+  // وضع التعديل (في نفس الصفحة مباشرة دون أي نافذة منبثقة)
+  const [editingLessonId, setEditingLessonId] = useState<string | null>(null);
+
+  // مرجع لتمرير الشاشة نحو نموذج الإضافة مباشرة
+  const formSectionRef = useRef<HTMLDivElement>(null);
 
   const teacherLevels = useMemo(() => {
     if (Array.isArray(profile?.levels_taught) && profile.levels_taught.length > 0) {
@@ -99,19 +211,20 @@ export default function AdminBoardPage() {
     return [1, 2, 3, 4];
   }, [profile]);
 
-  // حقول نموذج الدرس
+  // حقول نموذج الدرس المباشر في الصفحة
   const [formLevel, setFormLevel] = useState<number>(1);
-  const [formType, setFormType] = useState<NotebookType>("lessons");
-  const [formTitle, setFormTitle] = useState("");
+  const [formType, setFormType] = useState<string>("lessons");
   const [formField, setFormField] = useState("أنشطة عددية");
-  const [formSection, setFormSection] = useState("المقطع 1: الأعداد الطبيعية والأعداد العشرية");
+  const [formSectionNumber, setFormSectionNumber] = useState<string>("1");
+  const [formSectionTitle, setFormSectionTitle] = useState("الأعداد الطبيعية والأعداد العشرية");
   const [formNumber, setFormNumber] = useState<number>(1);
+  const [formTitle, setFormTitle] = useState("");
   const [formNotes, setFormNotes] = useState("");
   const [formHomeworkNotes, setFormHomeworkNotes] = useState("");
   const [formHomeworkDueAt, setFormHomeworkDueAt] = useState("");
   const [formSolutionPublishAt, setFormSolutionPublishAt] = useState("");
 
-  // رفع الصور
+  // رفع الصور بالكاميرا أو المعرض
   const [boardFiles, setBoardFiles] = useState<File[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -125,26 +238,31 @@ export default function AdminBoardPage() {
   const [copiedLink, setCopiedLink] = useState(false);
   const [mounted, setMounted] = useState(false);
 
-  // التحقق الأولي الفوري (0ms) من الجلسة والتخزين المحلي
+  // 1. التحقق الفوري الأولي من الجلسة والكراريس والتسميات المحفوظة
   useEffect(() => {
     setMounted(true);
 
+    // استرجاع الكراريس من التخزين المحلي إن وجدت
     if (typeof window !== "undefined") {
       try {
-        for (const k of LOCAL_STORAGE_CLASSES_KEYS) {
-          const val = localStorage.getItem(k);
-          if (val) {
-            const parsed = JSON.parse(val);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              setCustomClasses(parsed);
-              break;
-            }
+        const savedNotebooks = localStorage.getItem(LOCAL_STORAGE_NOTEBOOKS_KEY);
+        if (savedNotebooks) {
+          const parsed = JSON.parse(savedNotebooks);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setNotebooks(parsed);
+          }
+        }
+        const savedNomenclature = localStorage.getItem(LOCAL_STORAGE_NOMENCLATURE_KEY);
+        if (savedNomenclature) {
+          const parsed = JSON.parse(savedNomenclature);
+          if (parsed?.fieldLabel) {
+            setNomenclature(parsed);
           }
         }
       } catch {}
     }
 
-    // التحقق من الجلسة عبر /api/auth
+    // التحقق من الجلسة
     fetch("/api/auth")
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
@@ -164,23 +282,12 @@ export default function AdminBoardPage() {
     loadLessons();
   }, []);
 
-  // قفل تمرير الصفحة أثناء فتح النافذة أو عارض الصور
-  useEffect(() => {
-    if (showModal || Boolean(lightboxImg)) {
-      const orig = document.body.style.overflow;
-      document.body.style.overflow = "hidden";
-      return () => {
-        document.body.style.overflow = orig;
-      };
-    }
-  }, [showModal, lightboxImg]);
-
   const showToast = (type: "ok" | "err", msg: string) => {
     setToast({ type, msg });
     setTimeout(() => setToast(null), 3500);
   };
 
-  // تحميل البيانات
+  // تحميل الدروس والكراريس والتسميات من الخادم
   const loadLessons = useCallback(async () => {
     try {
       setLoading(true);
@@ -188,8 +295,21 @@ export default function AdminBoardPage() {
       if (!res.ok) throw new Error("تعذر جلب الدروس");
       const data: LessonsData = await res.json();
       setLessons(data.lessons || []);
+
       if (Array.isArray(data.customClasses) && data.customClasses.length > 0) {
         setCustomClasses(data.customClasses);
+      }
+
+      // مزامنة الكراريس المخصصة المحفوظة في قاعدة بيانات الأستاذ
+      if (Array.isArray(data.customNotebooks) && data.customNotebooks.length > 0) {
+        setNotebooks(data.customNotebooks);
+        localStorage.setItem(LOCAL_STORAGE_NOTEBOOKS_KEY, JSON.stringify(data.customNotebooks));
+      }
+
+      // مزامنة تسميات الأستاذ
+      if (data.boardNomenclature?.fieldLabel) {
+        setNomenclature(data.boardNomenclature);
+        localStorage.setItem(LOCAL_STORAGE_NOMENCLATURE_KEY, JSON.stringify(data.boardNomenclature));
       }
     } catch (err: any) {
       console.error(err);
@@ -199,75 +319,165 @@ export default function AdminBoardPage() {
     }
   }, []);
 
-  // فلترة الدروس
-  const filteredLessons = useMemo(() => {
-    return lessons
-      .filter((l) => {
-        if (selectedLevel !== "all" && l.level !== selectedLevel) return false;
-        if (selectedType !== "all") {
-          const t = l.type || "lessons";
-          if (t !== selectedType) return false;
-        }
-        if (searchQuery.trim()) {
-          const q = searchQuery.toLowerCase();
-          const matchTitle = (l.title || "").toLowerCase().includes(q);
-          const matchField = (l.field || "").toLowerCase().includes(q);
-          const matchSection = (l.section || "").toLowerCase().includes(q);
-          const matchNotes = (l.notes || "").toLowerCase().includes(q);
-          if (!matchTitle && !matchField && !matchSection && !matchNotes) return false;
-        }
-        return true;
-      })
-      .sort((a, b) => b.number - a.number || (b.createdAt || "").localeCompare(a.createdAt || ""));
-  }, [lessons, selectedLevel, selectedType, searchQuery]);
+  // حساب الرقم المقترح للدرس التالي حسب المستوى والكراس المختار
+  const computeNextNumber = useCallback(
+    (lvl: number, typeStr: string) => {
+      const match = lessons.filter(
+        (l) => l.level === lvl && (typeStr === "lessons" ? !l.type || l.type === "lessons" : l.type === typeStr)
+      );
+      if (!match.length) return 1;
+      return Math.max(...match.map((l) => l.number || 0)) + 1;
+    },
+    [lessons]
+  );
 
-  // إحصائيات كراس الدروس
-  const stats = useMemo(() => {
-    let boardImagesCount = 0;
-    let homeworkCount = 0;
-    lessons.forEach((l) => {
-      if (l.images) boardImagesCount += l.images.length;
-      if (l.homeworkNotes || l.homeworkDueAt) homeworkCount++;
-    });
-    return {
-      totalLessons: lessons.length,
-      boardImagesCount,
-      homeworkCount,
-    };
-  }, [lessons]);
+  // تحديث رقم الدرس تلقائياً عند تغيير المستوى أو الكراس أثناء الإضافة الجديدة
+  useEffect(() => {
+    if (!editingLessonId) {
+      setFormNumber(computeNextNumber(formLevel, formType));
+    }
+  }, [formLevel, formType, computeNextNumber, editingLessonId]);
 
-  // فتح نافذة الإضافة
-  const openAddModal = () => {
-    setEditingLesson(null);
-    setFormTitle("");
-    const maxNum = lessons.length ? Math.max(...lessons.map((l) => l.number || 0)) + 1 : 1;
-    setFormNumber(maxNum);
-    setFormNotes("");
-    setFormHomeworkNotes("");
-    setFormHomeworkDueAt("");
-    setFormSolutionPublishAt("");
-    setBoardFiles([]);
-    setShowModal(true);
+  // حفظ الكراريس المخصصة في الخادم والمحلي
+  const persistNotebooks = async (newList: CustomNotebook[]) => {
+    setNotebooks(newList);
+    try {
+      localStorage.setItem(LOCAL_STORAGE_NOTEBOOKS_KEY, JSON.stringify(newList));
+      await fetch("/api/lessons", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ customNotebooks: newList }),
+      });
+    } catch (err) {
+      console.error("فشل حفظ الكراريس المخصصة:", err);
+    }
   };
 
-  // فتح نافذة التعديل
-  const openEditModal = (lesson: Lesson) => {
-    setEditingLesson(lesson);
+  // حفظ التسميات في الخادم والمحلي
+  const persistNomenclature = async (newNom: BoardNomenclature) => {
+    setNomenclature(newNom);
+    try {
+      localStorage.setItem(LOCAL_STORAGE_NOMENCLATURE_KEY, JSON.stringify(newNom));
+      await fetch("/api/lessons", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ boardNomenclature: newNom }),
+      });
+    } catch (err) {
+      console.error("فشل حفظ التسميات:", err);
+    }
+  };
+
+  // إضافة كراس جديد
+  const handleAddCustomNotebook = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanName = newNotebookName.trim();
+    if (!cleanName) return;
+
+    const id = `nb_${Date.now()}`;
+    const newNb: CustomNotebook = {
+      id,
+      label: cleanName,
+      icon: "📙",
+      canDelete: true,
+    };
+
+    const updated = [...notebooks, newNb];
+    await persistNotebooks(updated);
+    setFormType(id);
+    setNewNotebookName("");
+    setShowAddNotebookInput(false);
+    showToast("ok", `تمت إضافة "${cleanName}" إلى قائمة الكراريس بنجاح ✨`);
+  };
+
+  // حذف كراس لا تحتاجه المادة
+  const handleDeleteNotebook = async (id: string, label: string) => {
+    if (!confirm(`هل أنت متأكد من رغبتك في حذف "${label}" من قائمة الكراريس؟`)) return;
+
+    const filtered = notebooks.filter((n) => n.id !== id);
+    await persistNotebooks(filtered);
+
+    // إذا كان الكراس المحذوف هو المختار حالياً، نرجع للكراس الأول
+    if (formType === id) {
+      setFormType(filtered[0]?.id || "lessons");
+    }
+    if (selectedType === id) {
+      setSelectedType("all");
+    }
+    showToast("ok", `تم حذف كراس "${label}" بنجاح`);
+  };
+
+  // استعادة الكراريس الافتراضية
+  const handleRestoreDefaultNotebooks = async () => {
+    if (!confirm("هل تريد استعادة قائمة الكراريس الافتراضية للمنصة؟")) return;
+    await persistNotebooks(DEFAULT_NOTEBOOKS);
+    setFormType("lessons");
+    showToast("ok", "تمت استعادة الكراريس الافتراضية");
+  };
+
+  // تطبيق قالب تسميات جاهز
+  const applyPresetNomenclature = (presetId: string) => {
+    setActivePresetId(presetId);
+    const found = NOMENCLATURE_PRESETS.find((p) => p.id === presetId);
+    if (found) {
+      persistNomenclature(found.nomenclature);
+      if (found.suggestions[0]) {
+        setFormField(found.suggestions[0].field);
+        if (found.suggestions[0].sections[0]) {
+          setFormSectionTitle(found.suggestions[0].sections[0]);
+        }
+      }
+      showToast("ok", `تم تطبيق نمط: ${found.name}`);
+    }
+  };
+
+  // بدء تعديل درس مباشرة في الصفحة
+  const handleStartEditLesson = (lesson: Lesson) => {
+    setEditingLessonId(lesson.id);
     setFormLevel(lesson.level);
     setFormType(lesson.type || "lessons");
     setFormTitle(lesson.title || "");
-    setFormField(lesson.field || "أنشطة عددية");
-    setFormSection(lesson.section || "");
     setFormNumber(lesson.number || 1);
+    setFormField(lesson.field || "");
+
+    // تفكيك المقطع إن وُجد رقم واسم
+    if (lesson.section) {
+      const match = lesson.section.match(/(?:المقطع|الوحدة|المركبة)\s*(\d+)\s*[:\-–]?\s*(.*)/i);
+      if (match) {
+        setFormSectionNumber(match[1]);
+        setFormSectionTitle(match[2] || lesson.section);
+      } else {
+        setFormSectionTitle(lesson.section);
+      }
+    } else {
+      setFormSectionTitle("");
+    }
+
     setFormNotes(lesson.notes || "");
     setFormHomeworkNotes(lesson.homeworkNotes || "");
     setFormHomeworkDueAt(lesson.homeworkDueAt || "");
     setFormSolutionPublishAt(lesson.solutionPublishAt || "");
     setBoardFiles([]);
-    setShowModal(true);
+
+    // تمرير الشاشة بسلاسة نحو النموذج
+    if (formSectionRef.current) {
+      formSectionRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
   };
 
-  // معالجة اختيار ملفات السبورة
+  // إلغاء التعديل والرجوع للوضع العادي
+  const handleCancelEdit = () => {
+    setEditingLessonId(null);
+    setFormTitle("");
+    setFormNotes("");
+    setFormHomeworkNotes("");
+    setFormHomeworkDueAt("");
+    setFormSolutionPublishAt("");
+    setBoardFiles([]);
+    setFormNumber(computeNextNumber(formLevel, formType));
+  };
+
+  // معالجة اختيار ملفات السبورة بالكاميرا أو المعرض
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.length) return;
     const rawList = Array.from(e.target.files);
@@ -295,24 +505,31 @@ export default function AdminBoardPage() {
     setBoardFiles((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  // حفظ الدرس ورفع الصور
+  // حفظ أو تحديث الدرس مباشرة في الصفحة
   const handleSaveLesson = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formTitle.trim()) {
-      showToast("err", "يرجى كتابة عنوان المورد / الدرس");
+      showToast("err", `يرجى كتابة ${nomenclature.lessonLabel}`);
       return;
     }
 
+    // تجميع نص المقطع كاملاً
+    const fullSection = formSectionTitle.trim()
+      ? formSectionNumber.trim()
+        ? `${nomenclature.sectionLabel} ${formSectionNumber.trim()}: ${formSectionTitle.trim()}`
+        : formSectionTitle.trim()
+      : "";
+
     setSubmitting(true);
-    setUploadProgress(15);
+    setUploadProgress(20);
     setUploadStatus("جارٍ حفظ بيانات الدرس...");
 
     try {
       let currentLessonId: string;
 
-      if (editingLesson) {
-        currentLessonId = editingLesson.id;
-        const res = await fetch(`/api/lessons/${editingLesson.id}`, {
+      if (editingLessonId) {
+        currentLessonId = editingLessonId;
+        const res = await fetch(`/api/lessons/${editingLessonId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -320,7 +537,7 @@ export default function AdminBoardPage() {
             type: formType,
             title: formTitle.trim(),
             field: formField.trim(),
-            section: formSection.trim(),
+            section: fullSection,
             number: formNumber,
             notes: formNotes.trim(),
             homeworkNotes: formHomeworkNotes.trim(),
@@ -328,7 +545,7 @@ export default function AdminBoardPage() {
             solutionPublishAt: formSolutionPublishAt || null,
           }),
         });
-        if (!res.ok) throw new Error("فشل تعديل الدرس");
+        if (!res.ok) throw new Error("فشل تعديل بيانات الدرس");
       } else {
         const res = await fetch("/api/lessons", {
           method: "POST",
@@ -338,7 +555,7 @@ export default function AdminBoardPage() {
             type: formType,
             title: formTitle.trim(),
             field: formField.trim(),
-            section: formSection.trim(),
+            section: fullSection,
             number: formNumber,
             notes: formNotes.trim(),
             homeworkNotes: formHomeworkNotes.trim(),
@@ -351,9 +568,9 @@ export default function AdminBoardPage() {
         currentLessonId = created.lesson.id;
       }
 
-      // رفع الصور إن وجدت
+      // رفع الصور المحددة إن وجدت
       if (boardFiles.length > 0) {
-        setUploadProgress(40);
+        setUploadProgress(50);
         setUploadStatus(`جارٍ رفع ${boardFiles.length} صورة للسبورة...`);
 
         const formData = new FormData();
@@ -375,8 +592,10 @@ export default function AdminBoardPage() {
 
       setUploadProgress(100);
       setUploadStatus("تم الحفظ بنجاح!");
-      showToast("ok", editingLesson ? "تم تعديل الدرس بنجاح ✨" : "تم نشر درس السبورة بنجاح 📋");
-      setShowModal(false);
+      showToast("ok", editingLessonId ? "تم تعديل الدرس وتحديثه بنجاح ✨" : "تم نشر درس السبورة بنجاح 📋");
+
+      // تفريغ النموذج وتجهيزه للدرس القادم
+      handleCancelEdit();
       await loadLessons();
     } catch (err: any) {
       console.error(err);
@@ -396,27 +615,30 @@ export default function AdminBoardPage() {
       if (!res.ok) throw new Error("تعذر حذف الدرس");
       showToast("ok", "تم حذف الدرس بنجاح");
       setLessons((prev) => prev.filter((l) => l.id !== id));
+      if (editingLessonId === id) {
+        handleCancelEdit();
+      }
     } catch (err: any) {
       showToast("err", err.message || "فشل الحذف");
     }
   };
 
-  // حذف صورة محددة من الدرس
+  // حذف صورة محددة من السبورة
   const handleDeleteImage = async (lessonId: string, imageId: string) => {
     if (!confirm("هل تريد حذف هذه الصورة من السبورة؟")) return;
     try {
-      const res = await fetch(`/api/lessons/${lessonId}/image/${imageId}`, {
+      const res = await fetch(`/api/images?lessonId=${lessonId}&imageId=${imageId}`, {
         method: "DELETE",
       });
       if (!res.ok) throw new Error("تعذر حذف الصورة");
-      showToast("ok", "تم حذف الصورة");
+      showToast("ok", "تم حذف صورة السبورة بنجاح");
       await loadLessons();
     } catch (err: any) {
       showToast("err", err.message || "فشل حذف الصورة");
     }
   };
 
-  // نسخ رابط السبورة للأولياء
+  // نسخ رابط مشاركة الأولياء
   const handleCopyParentShareLink = () => {
     if (typeof window === "undefined") return;
     const url = profile?.slug
@@ -428,13 +650,62 @@ export default function AdminBoardPage() {
     setTimeout(() => setCopiedLink(false), 3000);
   };
 
+  // تصفية وعرض الدروس
+  const filteredLessons = useMemo(() => {
+    return lessons
+      .filter((l) => {
+        if (selectedLevel !== "all" && l.level !== selectedLevel) return false;
+        if (selectedType !== "all") {
+          const t = l.type || "lessons";
+          if (t !== selectedType) return false;
+        }
+        if (searchQuery.trim()) {
+          const q = searchQuery.toLowerCase();
+          const matchTitle = (l.title || "").toLowerCase().includes(q);
+          const matchField = (l.field || "").toLowerCase().includes(q);
+          const matchSection = (l.section || "").toLowerCase().includes(q);
+          const matchNotes = (l.notes || "").toLowerCase().includes(q);
+          if (!matchTitle && !matchField && !matchSection && !matchNotes) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => b.number - a.number || (b.createdAt || "").localeCompare(a.createdAt || ""));
+  }, [lessons, selectedLevel, selectedType, searchQuery]);
+
+  // إحصاءات الصفحة
+  const stats = useMemo(() => {
+    let boardImagesCount = 0;
+    let homeworkCount = 0;
+    lessons.forEach((l) => {
+      if (l.images) boardImagesCount += l.images.length;
+      if (l.homeworkNotes || l.homeworkDueAt) homeworkCount++;
+    });
+    return {
+      totalLessons: lessons.length,
+      boardImagesCount,
+      homeworkCount,
+    };
+  }, [lessons]);
+
+  // الحصول على اسم وأيقونة أي كراس
+  const getNotebookMeta = (typeId?: string) => {
+    const target = typeId || "lessons";
+    const found = notebooks.find((n) => n.id === target);
+    if (found) return { label: found.label, icon: found.icon || "📘" };
+    if (target === "lessons") return { label: "كراس الدروس", icon: "📘" };
+    if (target === "directed_work") return { label: "أعمال موجهة", icon: "📑" };
+    if (target === "worksheets") return { label: "أوراق عمل", icon: "📋" };
+    if (target === "summaries") return { label: "ملخصات", icon: "📂" };
+    return { label: target, icon: "📙" };
+  };
+
   if (authenticated === false) {
     return <LoginRequired next="/admin/board" title="كراس الدروس والسبورة الرقمية" />;
   }
 
   return (
-    <div className="min-h-screen bg-[#fafaf7] text-gray-900 pb-20 font-sans" dir="rtl">
-      {/* شريط الإشعار السريع */}
+    <div className="min-h-screen bg-[#fafaf7] text-gray-900 pb-24 font-sans" dir="rtl">
+      {/* ── شريط الإشعار السريع الفوري ── */}
       {toast && (
         <div
           className={`fixed top-4 left-1/2 -translate-x-1/2 z-[99999] flex items-center gap-2 px-5 py-2.5 rounded-2xl shadow-xl text-xs font-black transition-all animate-in fade-in duration-150 ${
@@ -446,7 +717,7 @@ export default function AdminBoardPage() {
         </div>
       )}
 
-      {/* ── رأس الصفحة والهوية البصرية ── */}
+      {/* ── رأس الصفحة والهوية ── */}
       <div className="bg-white border-b border-[#e8e8e0] px-4 sm:px-8 py-5">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1">
@@ -465,12 +736,11 @@ export default function AdminBoardPage() {
               كراس الدروس والسبورة الرقمية
             </h1>
             <p className="text-xs text-gray-500 max-w-2xl leading-relaxed">
-              ارفع صور السبورة اليومية والملخصات والواجبات المدرسية. يستطيع الولي والتلميذ الاطلاع عليها مباشرة ومتابعة الدروس ونقلها في حال الغياب.
+              إضافة وتوثيق مباشر لدروس السبورة اليومية والملخصات والواجبات المدرسية دون أي نوافذ منبثقة، ليتابعها الأولياء والتلاميذ فوراً.
             </p>
           </div>
 
           <div className="flex items-center gap-2.5 flex-wrap">
-            {/* زر مشاركة الرابط مع الأولياء ومجموعات القسم */}
             <button
               type="button"
               onClick={handleCopyParentShareLink}
@@ -492,21 +762,12 @@ export default function AdminBoardPage() {
                 <ExternalLink className="w-3 h-3 text-gray-400" />
               </Link>
             )}
-
-            <button
-              type="button"
-              onClick={openAddModal}
-              className="btn-primary text-xs py-2.5 px-4 font-black shadow-sm flex items-center gap-2 cursor-pointer active:scale-95 transition"
-            >
-              <Plus className="w-4 h-4" />
-              <span>رفع درس / سبورة جديدة</span>
-            </button>
           </div>
         </div>
       </div>
 
       {/* ── المحتوى الرئيسي ── */}
-      <main className="max-w-6xl mx-auto px-4 sm:px-8 py-6 space-y-5">
+      <main className="max-w-6xl mx-auto px-4 sm:px-8 py-6 space-y-6">
         {/* بطاقات الإحصاءات السريعة */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="bg-white p-4 rounded-2xl border border-[#e8e8e0] shadow-2xs flex items-center gap-3">
@@ -540,6 +801,601 @@ export default function AdminBoardPage() {
           </div>
         </div>
 
+        {/* ════════════════════════════════════════════════════════════════
+            قسم الإضافة المباشرة في الصفحة (دون نوافذ منبثقة إطلاقاً)
+            ════════════════════════════════════════════════════════════════ */}
+        <section
+          ref={formSectionRef}
+          className={`bg-white rounded-3xl border transition-all duration-200 shadow-sm overflow-hidden ${
+            editingLessonId ? "border-amber-400 ring-4 ring-amber-100" : "border-[#107a57]/30"
+          }`}
+        >
+          {/* رأس بطاقة الإدخال */}
+          <div
+            className={`p-4 sm:p-5 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+              editingLessonId ? "bg-amber-50/70 border-amber-200" : "bg-gradient-to-r from-emerald-50/60 to-white border-[#e8e8e0]"
+            }`}
+          >
+            <div className="flex items-center gap-2.5">
+              <div
+                className={`w-9 h-9 rounded-2xl flex items-center justify-center shadow-2xs ${
+                  editingLessonId ? "bg-amber-600 text-white" : "bg-[#107a57] text-white"
+                }`}
+              >
+                {editingLessonId ? <Edit3 className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
+              </div>
+              <div>
+                <h2 className="text-base font-black text-gray-900 flex items-center gap-2">
+                  <span>{editingLessonId ? "تعديل درس منشوَر في السبورة" : "إضافة درس وسبورة اليوم مباشرة"}</span>
+                  {editingLessonId && (
+                    <span className="text-[11px] bg-amber-200 text-amber-900 font-bold px-2 py-0.5 rounded-full">
+                      وضع التعديل
+                    </span>
+                  )}
+                </h2>
+                <p className="text-xs text-gray-500 font-medium">
+                  {editingLessonId
+                    ? "عدّل البيانات والصور ثم اضغط على زر التحديث في الأسفل."
+                    : "اتبع الخطوات المتسلسلة: اختر المستوى ثم الكراس، واكتب عناصر الدرس والواجب."}
+                </p>
+              </div>
+            </div>
+
+            {/* أدوات التحكم في التسميات والقوالب */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {editingLessonId && (
+                <button
+                  type="button"
+                  onClick={handleCancelEdit}
+                  className="px-3.5 py-1.5 rounded-xl border border-gray-300 bg-white hover:bg-gray-100 text-gray-700 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  <span>إلغاء التعديل</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setShowNomenclatureCustomizer(!showNomenclatureCustomizer)}
+                className="px-3 py-1.5 rounded-xl border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                title="تخصيص تسميات الحقول حسب مادتك التعليمية"
+              >
+                <Settings className="w-3.5 h-3.5 text-gray-500" />
+                <span>تسميات مادتي</span>
+                <ChevronDown className="w-3 h-3 text-gray-400" />
+              </button>
+            </div>
+          </div>
+
+          {/* لوحة تخصيص تسميات المادة إن فُتحت */}
+          {showNomenclatureCustomizer && (
+            <div className="p-4 bg-slate-50 border-b border-gray-200 space-y-3 animate-in fade-in duration-150">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <span className="text-xs font-black text-gray-800 flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-emerald-600" />
+                  اختر نمط مادتك لتكييف مسميات الحقول فوراً:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowNomenclatureCustomizer(false)}
+                  className="text-xs text-gray-400 hover:text-gray-600"
+                >
+                  إغلاق ✕
+                </button>
+              </div>
+
+              {/* أزرار القوالب الجاهزة بنقرة واحدة */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {NOMENCLATURE_PRESETS.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => applyPresetNomenclature(p.id)}
+                    className={`p-2.5 rounded-xl border text-xs font-bold text-right transition cursor-pointer flex flex-col gap-1 ${
+                      activePresetId === p.id
+                        ? "border-[#107a57] bg-white text-[#107a57] shadow-2xs ring-2 ring-[#107a57]/20"
+                        : "border-gray-200 bg-white hover:bg-gray-50 text-gray-700"
+                    }`}
+                  >
+                    <span className="font-black">{p.name}</span>
+                    <span className="text-[10px] text-gray-500">
+                      {p.nomenclature.fieldLabel} • {p.nomenclature.sectionLabel}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              {/* تخصيص يدوي للمسميات */}
+              <div className="pt-2 border-t border-gray-200 grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-600 mb-1">
+                    تسمية الحقل الأول:
+                  </label>
+                  <input
+                    type="text"
+                    value={nomenclature.fieldLabel}
+                    onChange={(e) =>
+                      persistNomenclature({ ...nomenclature, fieldLabel: e.target.value })
+                    }
+                    className="w-full py-1.5 px-2.5 rounded-lg border border-gray-300 text-xs bg-white focus:outline-none focus:border-[#107a57]"
+                    placeholder="مثال: الميدان أو المجال"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-600 mb-1">
+                    تسمية الحقل الثاني:
+                  </label>
+                  <input
+                    type="text"
+                    value={nomenclature.sectionLabel}
+                    onChange={(e) =>
+                      persistNomenclature({ ...nomenclature, sectionLabel: e.target.value })
+                    }
+                    className="w-full py-1.5 px-2.5 rounded-lg border border-gray-300 text-xs bg-white focus:outline-none focus:border-[#107a57]"
+                    placeholder="مثال: المقطع أو الوحدة"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-600 mb-1">
+                    تسمية الحقل الثالث:
+                  </label>
+                  <input
+                    type="text"
+                    value={nomenclature.lessonLabel}
+                    onChange={(e) =>
+                      persistNomenclature({ ...nomenclature, lessonLabel: e.target.value })
+                    }
+                    className="w-full py-1.5 px-2.5 rounded-lg border border-gray-300 text-xs bg-white focus:outline-none focus:border-[#107a57]"
+                    placeholder="مثال: عنوان الدرس أو المورد"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* النموذج المباشر */}
+          <form onSubmit={handleSaveLesson} className="p-4 sm:p-6 space-y-6">
+            {/* ── الخطوة 1: اختيار المستوى الدراسي ── */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-black text-gray-900 flex items-center gap-1.5">
+                  <span className="w-5 h-5 rounded-full bg-[#107a57] text-white flex items-center justify-center text-[11px] font-bold">
+                    1
+                  </span>
+                  <span>المستوى الدراسي المستهدف:</span>
+                </label>
+                <span className="text-[11px] text-gray-400 font-bold">انقر لتحديد المستوى</span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {teacherLevels.map((lv) => {
+                  const isSelected = formLevel === lv;
+                  return (
+                    <button
+                      key={lv}
+                      type="button"
+                      onClick={() => setFormLevel(lv)}
+                      className={`py-2.5 px-3 rounded-2xl border text-xs font-black transition flex items-center justify-center gap-2 cursor-pointer ${
+                        isSelected
+                          ? "bg-[#107a57] text-white border-[#107a57] shadow-sm ring-2 ring-[#107a57]/30 scale-[1.01]"
+                          : "bg-[#fafaf7] hover:bg-gray-100 text-gray-700 border-[#e8e8e0]"
+                      }`}
+                    >
+                      <span className="text-base">{lv === 4 ? "🎓" : lv === 3 ? "📐" : lv === 2 ? "✏️" : "🌱"}</span>
+                      <span>{LEVELS[lv as 1 | 2 | 3 | 4].label} ({lv}م)</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* ── الخطوة 2: اختيار الكراس (مع سهولة الحذف والإضافة) ── */}
+            <div className="space-y-2 pt-2 border-t border-gray-100">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <label className="text-xs font-black text-gray-900 flex items-center gap-1.5">
+                  <span className="w-5 h-5 rounded-full bg-[#107a57] text-white flex items-center justify-center text-[11px] font-bold">
+                    2
+                  </span>
+                  <span>نوع الكراس أو المورد:</span>
+                </label>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddNotebookInput(!showAddNotebookInput)}
+                    className="text-[11px] font-black text-[#107a57] bg-[#e6f4ee] hover:bg-emerald-100 border border-[#107a57]/30 px-2.5 py-1 rounded-xl transition flex items-center gap-1 cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>إضافة كراس مخصص</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleRestoreDefaultNotebooks}
+                    className="text-[11px] font-medium text-gray-400 hover:text-gray-600 transition flex items-center gap-1 cursor-pointer"
+                    title="استعادة الكراريس الافتراضية"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>استعادة الافتراضية</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* حقل إضافة كراس مخصص جديد */}
+              {showAddNotebookInput && (
+                <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-2xl flex items-center gap-2 animate-in fade-in duration-150">
+                  <input
+                    type="text"
+                    value={newNotebookName}
+                    onChange={(e) => setNewNotebookName(e.target.value)}
+                    placeholder="اكتب اسم الكراس الجديد (مثلاً: دفتر الأنشطة، كراس الفروض...)"
+                    className="flex-1 py-1.5 px-3 rounded-xl border border-emerald-300 text-xs bg-white focus:outline-none focus:border-[#107a57] font-bold"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddCustomNotebook}
+                    className="px-4 py-1.5 rounded-xl bg-[#107a57] hover:bg-[#0c5c41] text-white text-xs font-black transition cursor-pointer"
+                  >
+                    إضافة
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddNotebookInput(false)}
+                    className="px-2.5 py-1.5 rounded-xl text-gray-500 hover:bg-gray-100 text-xs transition cursor-pointer"
+                  >
+                    إلغاء
+                  </button>
+                </div>
+              )}
+
+              {/* أزرار الكراريس المتاحة مع زر الحذف السريع */}
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 flex-wrap">
+                {notebooks.map((nb) => {
+                  const isSelected = formType === nb.id;
+                  return (
+                    <div
+                      key={nb.id}
+                      className={`group relative inline-flex items-center rounded-2xl border transition cursor-pointer ${
+                        isSelected
+                          ? "bg-[#e6f4ee] border-[#107a57] text-[#107a57] font-black shadow-2xs ring-2 ring-[#107a57]/20"
+                          : "bg-white hover:bg-gray-50 border-[#e8e8e0] text-gray-700"
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setFormType(nb.id)}
+                        className="py-2 pr-3 pl-2.5 text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <span>{nb.icon || "📘"}</span>
+                        <span>{nb.label}</span>
+                      </button>
+
+                      {/* زر حذف الكراس بسهولة إذا كانت المادة لا تحتاجه */}
+                      {nb.canDelete !== false && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteNotebook(nb.id, nb.label);
+                          }}
+                          className="w-5 h-5 ml-2 mr-1 rounded-full text-gray-400 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition cursor-pointer"
+                          title={`حذف "${nb.label}" من القائمة إذا كانت مادتك لا تحتاجه`}
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* ── الخطوة 3: التسميات والمعلومات البيداغوجية ── */}
+            <div className="space-y-3 pt-2 border-t border-gray-100">
+              <label className="text-xs font-black text-gray-900 flex items-center gap-1.5">
+                <span className="w-5 h-5 rounded-full bg-[#107a57] text-white flex items-center justify-center text-[11px] font-bold">
+                  3
+                </span>
+                <span>المعلومات البيداغوجية وعنوان الدرس:</span>
+              </label>
+
+              {/* سطر الميدان والمقطع */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* حقل الميدان */}
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-gray-700">
+                    {nomenclature.fieldLabel}:
+                  </label>
+                  <input
+                    type="text"
+                    value={formField}
+                    onChange={(e) => setFormField(e.target.value)}
+                    placeholder={`اكتب ${nomenclature.fieldLabel} هنا...`}
+                    className="w-full py-2 px-3 rounded-xl border border-[#e8e8e0] text-xs bg-[#fafaf7] focus:bg-white focus:outline-none focus:border-[#107a57] font-bold"
+                  />
+
+                  {/* اقتراحات سريعة للميدان */}
+                  {NOMENCLATURE_PRESETS.find((p) => p.id === activePresetId)?.suggestions && (
+                    <div className="flex items-center gap-1 flex-wrap pt-0.5">
+                      <span className="text-[10px] text-gray-400 font-bold">اقتراحات:</span>
+                      {NOMENCLATURE_PRESETS.find((p) => p.id === activePresetId)!.suggestions.map(
+                        (sug) => (
+                          <button
+                            key={sug.field}
+                            type="button"
+                            onClick={() => {
+                              setFormField(sug.field);
+                              if (sug.sections[0]) {
+                                setFormSectionTitle(sug.sections[0]);
+                              }
+                            }}
+                            className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-gray-100 hover:bg-emerald-50 text-gray-600 hover:text-emerald-900 border border-gray-200 transition cursor-pointer"
+                          >
+                            {sug.field}
+                          </button>
+                        )
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* حقل المقطع مع رقمه */}
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-gray-700">
+                    {nomenclature.sectionLabel} والرقم:
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={formSectionNumber}
+                      onChange={(e) => setFormSectionNumber(e.target.value)}
+                      placeholder="رقم 1"
+                      className="w-16 py-2 px-2 rounded-xl border border-[#e8e8e0] text-xs bg-[#fafaf7] focus:bg-white focus:outline-none focus:border-[#107a57] font-black text-center font-mono"
+                    />
+                    <input
+                      type="text"
+                      value={formSectionTitle}
+                      onChange={(e) => setFormSectionTitle(e.target.value)}
+                      placeholder={`عنوان ${nomenclature.sectionLabel}...`}
+                      className="flex-1 py-2 px-3 rounded-xl border border-[#e8e8e0] text-xs bg-[#fafaf7] focus:bg-white focus:outline-none focus:border-[#107a57] font-medium"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* سطر رقم الدرس وعنوان الدرس */}
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-1">
+                {/* رقم الدرس */}
+                <div className="sm:col-span-1 space-y-1">
+                  <label className="block text-xs font-bold text-gray-700">
+                    رقم الدرس / الحصة:
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={formNumber}
+                    onChange={(e) => setFormNumber(Number(e.target.value))}
+                    className="w-full py-2 px-3 rounded-xl border border-[#e8e8e0] text-xs bg-[#fafaf7] focus:bg-white focus:outline-none focus:border-[#107a57] font-black text-center font-mono"
+                  />
+                </div>
+
+                {/* عنوان الدرس البارز */}
+                <div className="sm:col-span-3 space-y-1">
+                  <label className="block text-xs font-black text-gray-900">
+                    {nomenclature.lessonLabel} *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formTitle}
+                    onChange={(e) => setFormTitle(e.target.value)}
+                    placeholder="مثال: قسمة عدد عشري على عدد طبيعي / حساب مساحة المثلث..."
+                    className="w-full py-2.5 px-3.5 rounded-xl border-2 border-emerald-200 focus:border-[#107a57] text-xs bg-white focus:outline-none font-black shadow-2xs"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* ── الخطوة 4: التقاط صور السبورة والملفات ── */}
+            <div className="space-y-2 pt-2 border-t border-gray-100">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-black text-gray-900 flex items-center gap-1.5">
+                  <span className="w-5 h-5 rounded-full bg-[#107a57] text-white flex items-center justify-center text-[11px] font-bold">
+                    4
+                  </span>
+                  <span>صور السبورة وكراس القسم:</span>
+                </label>
+                <span className="text-[11px] text-gray-500 font-bold">
+                  {boardFiles.length > 0 ? `تم اختيار (${boardFiles.length}) ملفات` : "التقاط فوري أو رفع ملفات"}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* التقاط مباشر بالكاميرا الخلفية للهاتف والتابلت */}
+                <label className="p-3.5 rounded-2xl border-2 border-dashed border-emerald-400 hover:border-emerald-600 bg-emerald-50/50 hover:bg-emerald-50 text-center transition cursor-pointer flex items-center justify-center gap-2.5 shadow-2xs group">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+                  <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center group-hover:scale-105 transition-transform">
+                    <Camera className="w-4 h-4" />
+                  </div>
+                  <div className="text-right">
+                    <span className="block text-xs font-black text-emerald-950">
+                      التقاط بالكاميرا مباشرة 📷
+                    </span>
+                    <span className="block text-[10px] text-emerald-700">
+                      يفتح كاميرا الهاتف فوراً لتصوير السبورة بنهاية الحصة
+                    </span>
+                  </div>
+                </label>
+
+                {/* رفع من المعرض أو الملفات */}
+                <label className="p-3.5 rounded-2xl border-2 border-dashed border-[#e8e8e0] hover:border-[#107a57] bg-[#fafaf7] hover:bg-gray-100 text-center transition cursor-pointer flex items-center justify-center gap-2.5 shadow-2xs group">
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*,application/pdf"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+                  <div className="w-8 h-8 rounded-xl bg-gray-200 text-gray-700 flex items-center justify-center group-hover:scale-105 transition-transform">
+                    <Upload className="w-4 h-4" />
+                  </div>
+                  <div className="text-right">
+                    <span className="block text-xs font-bold text-gray-800">
+                      اختيار صور أو PDF من الجهاز 📁
+                    </span>
+                    <span className="block text-[10px] text-gray-500">
+                      من ألبوم الصور أو مستندات الحاسوب
+                    </span>
+                  </div>
+                </label>
+              </div>
+
+              {/* معاينة الصور المختارة قبل الحفظ */}
+              {boardFiles.length > 0 && (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2">
+                  {boardFiles.map((f, idx) => (
+                    <div
+                      key={idx}
+                      className="relative p-2 rounded-xl border border-[#107a57]/40 bg-emerald-50/30 flex items-center justify-between text-xs"
+                    >
+                      <div className="truncate pl-2">
+                        <span className="block font-bold text-gray-800 text-[11px] truncate">
+                          {f.name}
+                        </span>
+                        <span className="block text-[10px] text-[#107a57] font-mono">
+                          {(f.size / 1024).toFixed(0)} KB
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeSelectedFile(idx)}
+                        className="w-5 h-5 rounded-full bg-red-600 text-white flex items-center justify-center text-xs shrink-0 cursor-pointer"
+                        title="إلغاء هذا الملف"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* ── الخطوة 5: عناصر وملخص السبورة والواجب المنزلي (اختياري) ── */}
+            <div className="space-y-3 pt-2 border-t border-gray-100">
+              <label className="text-xs font-black text-gray-900 flex items-center gap-1.5">
+                <span className="w-5 h-5 rounded-full bg-[#107a57] text-white flex items-center justify-center text-[11px] font-bold">
+                  5
+                </span>
+                <span>الملخص والواجب المنزلي (اختياري):</span>
+              </label>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* ملخص عناصر الدرس */}
+                <div className="space-y-1">
+                  <label className="block text-[11px] font-bold text-gray-700">
+                    عناصر وخلاصة ما كُتب على السبورة:
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={formNotes}
+                    onChange={(e) => setFormNotes(e.target.value)}
+                    placeholder="اكتب النقاط الرئيسية، القوانين الرياضية المستخلصة، أو توجيهات الأستاذ..."
+                    className="w-full py-2 px-3 rounded-xl border border-[#e8e8e0] text-xs bg-[#fafaf7] focus:bg-white focus:outline-none focus:border-[#107a57]"
+                  />
+                </div>
+
+                {/* الواجب المنزلي */}
+                <div className="space-y-1 p-2.5 bg-amber-50/70 border border-amber-200 rounded-2xl">
+                  <label className="block text-[11px] font-black text-amber-950">
+                    الواجب المنزلي المطلوب من التلاميذ:
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={formHomeworkNotes}
+                    onChange={(e) => setFormHomeworkNotes(e.target.value)}
+                    placeholder="مثال: حل التمرين 14 و 15 صفحة 60 في كراس المحاولات..."
+                    className="w-full py-1.5 px-2.5 rounded-xl border border-amber-300 bg-white text-xs focus:outline-none focus:border-amber-600 font-medium"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* شريط التقدم عند الرفع */}
+            {submitting && (
+              <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-200 text-xs text-emerald-900 space-y-1.5">
+                <div className="flex items-center justify-between font-bold">
+                  <span className="flex items-center gap-1.5">
+                    <Loader2 className="w-4 h-4 animate-spin text-[#107a57]" />
+                    {uploadStatus}
+                  </span>
+                  <span className="font-mono">{uploadProgress}%</span>
+                </div>
+                <div className="w-full bg-emerald-200 rounded-full h-2 overflow-hidden">
+                  <div
+                    className="bg-[#107a57] h-full transition-all duration-300"
+                    style={{ width: `${uploadProgress}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* ── الخطوة 6: زر الحفظ الواضح والمباشر ── */}
+            <div className="flex items-center justify-between gap-3 pt-3 border-t border-[#e8e8e0]">
+              <div className="text-xs text-gray-500 font-medium">
+                {editingLessonId ? (
+                  <span className="text-amber-700 font-bold">
+                    ✏️ سيتم تحديث الدرس المختار مباشرة في قاعدة البيانات.
+                  </span>
+                ) : (
+                  <span>✨ سيظهر الدرس فوراً لجميع الأولياء والتلاميذ والمفتشية.</span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                {editingLessonId && (
+                  <button
+                    type="button"
+                    disabled={submitting}
+                    onClick={handleCancelEdit}
+                    className="px-4 py-2.5 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-100 transition cursor-pointer"
+                  >
+                    إلغاء التعديل
+                  </button>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="btn-primary text-xs py-3 px-6 font-black shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-50 active:scale-95 transition"
+                >
+                  {submitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>جارٍ الحفظ والرفع...</span>
+                    </>
+                  ) : editingLessonId ? (
+                    <>
+                      <Check className="w-4 h-4" />
+                      <span>حفظ تعديلات الدرس الآن</span>
+                    </>
+                  ) : (
+                    <>
+                      <FileCheck className="w-4 h-4" />
+                      <span>حفظ ونشر درس السبورة الآن</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </form>
+        </section>
+
         {/* دليل الصفحة البيداغوجي */}
         <PageExplainer
           pageId="board"
@@ -549,7 +1405,7 @@ export default function AdminBoardPage() {
           inspectorExplanation="يمكّن المفتش من متابعة جودة التوثيق والمنتوج التعليمي المكتوب على السبورة لتقويم الأثر البيداغوجي."
         />
 
-        {/* ── شريط الفلاتر والبحث ── */}
+        {/* ── شريط الفلاتر والبحث في الدروس السابقة ── */}
         <div className="bg-white rounded-3xl border border-[#e8e8e0] p-4 sm:p-5 shadow-xs space-y-3.5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             {/* فلاتر المستوى */}
@@ -598,33 +1454,39 @@ export default function AdminBoardPage() {
             </div>
           </div>
 
-          {/* تصنيف نوع الكراس */}
+          {/* تصنيف نوع الكراس في الفلترة */}
           <div className="flex items-center gap-2 pt-2 border-t border-gray-100 overflow-x-auto text-xs">
-            <span className="text-gray-500 font-bold shrink-0">نوع المورد:</span>
-            {[
-              { id: "all", label: "كافة الأقسام" },
-              { id: "lessons", label: "كراس الدروس (السبورة)" },
-              { id: "directed_work", label: "أعمال موجهة" },
-              { id: "worksheets", label: "أوراق عمل وفروض" },
-              { id: "summaries", label: "ملخصات ومطويات" },
-            ].map((cat) => (
+            <span className="text-gray-500 font-bold shrink-0">نوع الكراس:</span>
+            <button
+              type="button"
+              onClick={() => setSelectedType("all")}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition shrink-0 cursor-pointer ${
+                selectedType === "all"
+                  ? "bg-[#e6f4ee] text-[#107a57] font-black border border-[#107a57]/30 shadow-2xs"
+                  : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+              }`}
+            >
+              كافة الكراريس
+            </button>
+            {notebooks.map((cat) => (
               <button
                 key={cat.id}
                 type="button"
                 onClick={() => setSelectedType(cat.id)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition shrink-0 cursor-pointer ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition shrink-0 cursor-pointer flex items-center gap-1 ${
                   selectedType === cat.id
                     ? "bg-[#e6f4ee] text-[#107a57] font-black border border-[#107a57]/30 shadow-2xs"
                     : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                 }`}
               >
-                {cat.label}
+                <span>{cat.icon || "📘"}</span>
+                <span>{cat.label}</span>
               </button>
             ))}
           </div>
         </div>
 
-        {/* ── معرض الدروس ── */}
+        {/* ── معرض الدروس المنشورة ── */}
         {loading ? (
           <div className="p-12 text-center space-y-3 bg-white rounded-3xl border border-[#e8e8e0]">
             <Loader2 className="w-8 h-8 text-[#107a57] animate-spin mx-auto" />
@@ -640,40 +1502,29 @@ export default function AdminBoardPage() {
               <p className="text-xs text-gray-500 max-w-md mx-auto">
                 {searchQuery || selectedLevel !== "all" || selectedType !== "all"
                   ? "لا توجد نتائج تطابق خيارات الفلترة المحددة."
-                  : "ابدأ برفع أول صورة سبورة ووثّق عناصر درسك لتظهر فوراً لجميع الأولياء والتلاميذ."}
+                  : "استخدم النموذج بالأعلى لرفع وتوثيق أول درس لسبورة القسم."}
               </p>
             </div>
-            <button
-              type="button"
-              onClick={openAddModal}
-              className="btn-primary text-xs py-2.5 px-5 font-black inline-flex items-center gap-2 cursor-pointer shadow-sm"
-            >
-              <Plus className="w-4 h-4" />
-              <span>رفع درس وسبورة جديدة الآن</span>
-            </button>
           </div>
         ) : (
           <div className="space-y-4">
             <div className="flex items-center justify-between text-xs text-gray-500 px-1 font-bold">
-              <span>إجمالي الدروس المعروضة: {filteredLessons.length}</span>
+              <span>إجمالي الدروس المنشورة: {filteredLessons.length}</span>
               <span>الأحدث أولاً</span>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {filteredLessons.map((lesson) => {
-                const typeLabel =
-                  lesson.type === "directed_work"
-                    ? "أعمال موجهة"
-                    : lesson.type === "worksheets"
-                    ? "ورقة عمل"
-                    : lesson.type === "summaries"
-                    ? "ملخص"
-                    : "درس سبورة";
+                const nbMeta = getNotebookMeta(lesson.type);
 
                 return (
                   <div
                     key={lesson.id}
-                    className="bg-white rounded-3xl border border-[#e8e8e0] shadow-xs hover:border-[#107a57]/40 hover:shadow-sm transition-all flex flex-col justify-between overflow-hidden"
+                    className={`bg-white rounded-3xl border shadow-xs hover:shadow-sm transition-all flex flex-col justify-between overflow-hidden ${
+                      editingLessonId === lesson.id
+                        ? "border-amber-400 ring-2 ring-amber-200"
+                        : "border-[#e8e8e0] hover:border-[#107a57]/40"
+                    }`}
                   >
                     <div className="p-4 sm:p-5 space-y-3">
                       {/* الشارات العلوية */}
@@ -682,8 +1533,9 @@ export default function AdminBoardPage() {
                           <span className="w-7 h-7 rounded-lg bg-[#e6f4ee] text-[#107a57] border border-[#107a57]/20 flex items-center justify-center text-xs font-black">
                             {lesson.level}م
                           </span>
-                          <span className="text-[11px] font-bold bg-gray-100 text-gray-700 px-2 py-0.5 rounded-md">
-                            {typeLabel}
+                          <span className="text-[11px] font-bold bg-gray-100 text-gray-700 px-2 py-0.5 rounded-md flex items-center gap-1">
+                            <span>{nbMeta.icon}</span>
+                            <span>{nbMeta.label}</span>
                           </span>
                           <span className="text-[11px] font-mono text-gray-400">
                             #{lesson.number}
@@ -758,7 +1610,7 @@ export default function AdminBoardPage() {
                         </div>
                       ) : (
                         <div className="p-3 bg-gray-50 rounded-xl border border-dashed border-gray-200 text-center text-xs text-gray-400">
-                          لا توجد صور سبورة مرفوعة لهذا الدرس حتى الآن.
+                          لا توجد صور سبورة مرفوعة لهذا الدرس.
                         </div>
                       )}
 
@@ -766,7 +1618,7 @@ export default function AdminBoardPage() {
                       {lesson.notes && (
                         <div className="p-3 bg-[#fafaf7] rounded-xl border border-[#e8e8e0] text-xs text-gray-700 space-y-1">
                           <span className="font-bold text-gray-800 block text-[11px]">
-                            عناصر وملخص السبورة:
+                            عناصر وخلاصة السبورة:
                           </span>
                           <p className="whitespace-pre-wrap leading-relaxed text-gray-600">
                             {lesson.notes}
@@ -779,7 +1631,7 @@ export default function AdminBoardPage() {
                         <div className="p-3 bg-amber-50/80 rounded-xl border border-amber-200/60 text-xs text-amber-900 space-y-1">
                           <span className="font-black text-amber-950 block text-[11px] flex items-center gap-1">
                             <span>📝</span>
-                            الواجب المنزلي من السبورة:
+                            الواجب المنزلي المطلوب من التلاميذ:
                           </span>
                           <p className="whitespace-pre-wrap leading-relaxed">
                             {lesson.homeworkNotes}
@@ -793,11 +1645,12 @@ export default function AdminBoardPage() {
                       <div className="flex items-center gap-1.5">
                         <button
                           type="button"
-                          onClick={() => openEditModal(lesson)}
-                          className="p-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-200/70 transition cursor-pointer"
-                          title="تعديل الدرس"
+                          onClick={() => handleStartEditLesson(lesson)}
+                          className="px-2.5 py-1.5 rounded-lg text-xs font-bold text-gray-700 hover:text-gray-900 hover:bg-gray-200/70 transition cursor-pointer flex items-center gap-1"
+                          title="تعديل هذا الدرس في النموذج بالأعلى"
                         >
-                          <Edit3 className="w-4 h-4" />
+                          <Edit3 className="w-3.5 h-3.5 text-amber-600" />
+                          <span>تعديل</span>
                         </button>
                         <button
                           type="button"
@@ -815,7 +1668,7 @@ export default function AdminBoardPage() {
                           target="_blank"
                           className="text-xs font-bold text-[#107a57] hover:underline flex items-center gap-1"
                         >
-                          <span>عرض كما يراه الولي</span>
+                          <span>معاينة في فضاء الولي</span>
                           <ExternalLink className="w-3 h-3" />
                         </Link>
                       )}
@@ -827,277 +1680,6 @@ export default function AdminBoardPage() {
           </div>
         )}
       </main>
-
-      {/* ── نافذة إضافة / تعديل الدرس وصور السبورة ── */}
-      {mounted && showModal && createPortal(
-        <div className="fixed inset-0 z-[999999] bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150" dir="rtl">
-          <div className="bg-white rounded-3xl max-w-xl w-full border border-slate-200 shadow-2xl overflow-hidden my-auto max-h-[92vh] flex flex-col animate-in zoom-in-95 duration-150">
-            <div className="p-5 border-b border-[#e8e8e0] flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-[#e6f4ee] text-[#107a57] flex items-center justify-center">
-                  <Camera className="w-4 h-4" />
-                </div>
-                <h2 className="text-base font-black text-gray-900">
-                  {editingLesson ? "تعديل درس السبورة" : "رفع درس وسبورة جديدة"}
-                </h2>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowModal(false)}
-                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center transition cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveLesson} className="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    المستوى الدراسي *
-                  </label>
-                  <select
-                    value={formLevel}
-                    onChange={(e) => setFormLevel(Number(e.target.value))}
-                    className="w-full py-2 px-3 rounded-xl border border-[#e8e8e0] text-xs bg-[#fafaf7] focus:bg-white focus:outline-none focus:border-[#107a57] font-bold"
-                  >
-                    {teacherLevels.map((lv) => (
-                      <option key={lv} value={lv}>
-                        {LEVELS[lv as 1 | 2 | 3 | 4].label} ({lv}م)
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    نوع الكراس / القسم *
-                  </label>
-                  <select
-                    value={formType}
-                    onChange={(e) => setFormType(e.target.value as NotebookType)}
-                    className="w-full py-2 px-3 rounded-xl border border-[#e8e8e0] text-xs bg-[#fafaf7] focus:bg-white focus:outline-none focus:border-[#107a57] font-bold"
-                  >
-                    <option value="lessons">كراس الدروس (صور السبورة)</option>
-                    <option value="directed_work">أعمال موجهة وتطبيقات</option>
-                    <option value="worksheets">أوراق عمل وسلاسل</option>
-                    <option value="summaries">ملخصات ومطويات</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                <div className="col-span-2">
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    عنوان المورد / الدرس *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="مثال: قسمة عدد عشري على عدد طبيعي"
-                    value={formTitle}
-                    onChange={(e) => setFormTitle(e.target.value)}
-                    className="w-full py-2 px-3 rounded-xl border border-[#e8e8e0] text-xs bg-[#fafaf7] focus:bg-white focus:outline-none focus:border-[#107a57] font-bold"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    رقم الدرس
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={formNumber}
-                    onChange={(e) => setFormNumber(Number(e.target.value))}
-                    className="w-full py-2 px-3 rounded-xl border border-[#e8e8e0] text-xs bg-[#fafaf7] font-mono text-center focus:bg-white focus:outline-none focus:border-[#107a57] font-black"
-                  />
-                </div>
-              </div>
-
-              {/* الميدان والمقطع مع اقتراحات سريعة بنقرة واحدة */}
-              <div className="space-y-2">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">
-                      الميدان التعليمي
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="أنشطة عددية / أنشطة هندسية..."
-                      value={formField}
-                      onChange={(e) => setFormField(e.target.value)}
-                      className="w-full py-2 px-3 rounded-xl border border-[#e8e8e0] text-xs bg-[#fafaf7] focus:bg-white focus:outline-none focus:border-[#107a57]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">
-                      المقطع التعليمي
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="المقطع 1 : الأعداد والعمليات عليها"
-                      value={formSection}
-                      onChange={(e) => setFormSection(e.target.value)}
-                      className="w-full py-2 px-3 rounded-xl border border-[#e8e8e0] text-xs bg-[#fafaf7] focus:bg-white focus:outline-none focus:border-[#107a57]"
-                    />
-                  </div>
-                </div>
-
-                {/* اقتراحات الميادين والمقاطع الرسمية */}
-                <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
-                  <span className="text-[10px] text-gray-400 font-bold">اقتراحات سريعة:</span>
-                  {CURRICULUM_PRESETS.map((p) => (
-                    <button
-                      key={p.field}
-                      type="button"
-                      onClick={() => {
-                        setFormField(p.field);
-                        if (p.sections[0]) setFormSection(p.sections[0]);
-                      }}
-                      className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-gray-100 hover:bg-emerald-50 text-gray-700 hover:text-emerald-900 border border-gray-200 transition cursor-pointer"
-                    >
-                      {p.field}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* منطقة رفع صور السبورة: التقاط بالكاميرا مباشرة + رفع من الجهاز */}
-              <div className="space-y-2 pt-1">
-                <label className="block text-xs font-bold text-gray-700">
-                  صور السبورة وكراس القسم
-                </label>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {/* زر التقاط مباشر بالكاميرا للأجهزة الذكية والهواتف */}
-                  <label className="p-3 rounded-2xl border-2 border-dashed border-emerald-300 hover:border-emerald-500 bg-emerald-50/40 hover:bg-emerald-50 text-center transition cursor-pointer flex items-center justify-center gap-2">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      onChange={handleFileSelect}
-                      className="hidden"
-                    />
-                    <Camera className="w-5 h-5 text-emerald-700" />
-                    <span className="text-xs font-black text-emerald-900">التقاط بالكاميرا مباشرة 📷</span>
-                  </label>
-
-                  {/* زر الرفع من المعرض أو الملفات */}
-                  <label className="p-3 rounded-2xl border-2 border-dashed border-[#e8e8e0] hover:border-[#107a57] bg-[#fafaf7] hover:bg-gray-100 text-center transition cursor-pointer flex items-center justify-center gap-2">
-                    <input
-                      type="file"
-                      multiple
-                      accept="image/*,application/pdf"
-                      onChange={handleFileSelect}
-                      className="hidden"
-                    />
-                    <Upload className="w-5 h-5 text-gray-600" />
-                    <span className="text-xs font-bold text-gray-800">اختيار صور من الجهاز 📁</span>
-                  </label>
-                </div>
-
-                {boardFiles.length > 0 && (
-                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 pt-2">
-                    {boardFiles.map((f, idx) => (
-                      <div
-                        key={idx}
-                        className="relative aspect-4/3 rounded-xl overflow-hidden border border-[#107a57]/30 bg-white p-1 flex flex-col justify-between shadow-2xs"
-                      >
-                        <span className="text-[10px] font-mono text-gray-600 truncate block">
-                          {f.name}
-                        </span>
-                        <span className="text-[9px] text-[#107a57] font-bold">
-                          {(f.size / 1024).toFixed(0)} KB
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => removeSelectedFile(idx)}
-                          className="absolute top-1 left-1 w-5 h-5 rounded-full bg-red-600 text-white flex items-center justify-center text-xs cursor-pointer"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* عناصر وملخص ما كُتب على السبورة */}
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">
-                  عناصر وملخص ما كُتب على السبورة (اختياري)
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="اكتب النقاط الرئيسية، القوانين الرياضية المستخلصة، أو توجيهات الأستاذ..."
-                  value={formNotes}
-                  onChange={(e) => setFormNotes(e.target.value)}
-                  className="w-full py-2 px-3 rounded-xl border border-[#e8e8e0] text-xs bg-[#fafaf7] focus:bg-white focus:outline-none focus:border-[#107a57]"
-                />
-              </div>
-
-              {/* الواجب المنزلي وموعد التسليم */}
-              <div className="space-y-2 p-3 bg-amber-50/60 rounded-2xl border border-amber-200">
-                <label className="block text-xs font-black text-amber-950">
-                  الواجب المنزلي المطلوب من التلاميذ (اختياري):
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="مثال: حل التمرين 12 و 13 صفحة 45 من الكتاب المدرسي في كراس المحاولات..."
-                  value={formHomeworkNotes}
-                  onChange={(e) => setFormHomeworkNotes(e.target.value)}
-                  className="w-full py-2 px-3 rounded-xl border border-amber-200 bg-white text-xs focus:outline-none focus:border-amber-500"
-                />
-              </div>
-
-              {/* شريط التقدم عند الرفع */}
-              {submitting && (
-                <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-xs text-emerald-900 space-y-1.5">
-                  <div className="flex items-center justify-between font-bold">
-                    <span className="flex items-center gap-1.5">
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      {uploadStatus}
-                    </span>
-                    <span>{uploadProgress}%</span>
-                  </div>
-                  <div className="w-full bg-emerald-200 rounded-full h-2 overflow-hidden">
-                    <div
-                      className="bg-[#107a57] h-full transition-all duration-300"
-                      style={{ width: `${uploadProgress}%` }}
-                    />
-                  </div>
-                </div>
-              )}
-
-              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[#e8e8e0]">
-                <button
-                  type="button"
-                  disabled={submitting}
-                  onClick={() => setShowModal(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-100 transition cursor-pointer"
-                >
-                  إلغاء
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="btn-primary text-xs py-2 px-5 font-black shadow-sm flex items-center gap-2 cursor-pointer disabled:opacity-50"
-                >
-                  {submitting ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>جارٍ الحفظ والرفع...</span>
-                    </>
-                  ) : (
-                    <span>{editingLesson ? "تحديث ونشر الدرس" : "نشر درس السبورة الآن"}</span>
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>,
-        document.body
-      )}
 
       {/* ── عارض الصور المكبر (Lightbox) ── */}
       {mounted && lightboxImg && createPortal(
