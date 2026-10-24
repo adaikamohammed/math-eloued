@@ -71,15 +71,11 @@ export function DesktopSidebar() {
           label: "لوحة التحكم والمتابعة",
           href: "/admin",
           icon: GraduationCap,
-          badge: "رئيسية",
-          badgeColor: "bg-emerald-600 text-white",
         },
         {
           label: "كراس الدروس والسبورة",
           href: "/admin/board",
           icon: BookOpen,
-          badge: "سبورة",
-          badgeColor: "bg-emerald-50 text-emerald-800 border border-emerald-200/80",
         },
       ];
 
@@ -88,8 +84,6 @@ export function DesktopSidebar() {
           label: "إدارة الأفواج والتلاميذ",
           href: "/admin/students",
           icon: Users,
-          badge: "أبجدي",
-          badgeColor: "bg-emerald-50 text-emerald-800 border border-emerald-200/80",
         });
       }
 
@@ -98,8 +92,6 @@ export function DesktopSidebar() {
           label: "التوقيت الأسبوعي",
           href: "/admin/timetable",
           icon: Calendar,
-          badge: "جدول",
-          badgeColor: "bg-blue-50 text-blue-800 border border-blue-200/80",
         });
       }
 
@@ -108,8 +100,6 @@ export function DesktopSidebar() {
           label: "الدفتر اليومي (ماذا سأدرس غداً)",
           href: "/admin/diary",
           icon: ClipboardList,
-          badge: "يومي",
-          badgeColor: "bg-amber-50 text-amber-800 border border-amber-200/80",
         });
       }
 
@@ -119,8 +109,6 @@ export function DesktopSidebar() {
           label: "ميثاق التقويم (20/20)",
           href: "/assessment",
           icon: Scale,
-          badge: "شفافية ⚖️",
-          badgeColor: "bg-emerald-50 text-emerald-700 border border-emerald-200/80",
         });
       }
       if (flags.honors !== false) {
@@ -137,8 +125,6 @@ export function DesktopSidebar() {
           label: "ملتقى الأساتذة البيداغوجي",
           href: "/forum",
           icon: Sparkles,
-          badge: "💬 تفاعلي",
-          badgeColor: "bg-indigo-50 text-indigo-700 border border-indigo-200/80",
         });
       }
       if (flags.inspectorSync !== false) {
@@ -146,8 +132,6 @@ export function DesktopSidebar() {
           label: "فضاء التفتيش والمناشير",
           href: "/inspector",
           icon: ShieldCheck,
-          badge: "رسمي",
-          badgeColor: "bg-amber-50 text-amber-700 border border-amber-200/80",
         });
       }
 
@@ -170,8 +154,6 @@ export function DesktopSidebar() {
             label: "تخصيص الواجهة والصفحات",
             href: "/settings/features",
             icon: Sliders,
-            badge: "تحكم ⚙️",
-            badgeColor: "bg-[#e6f4ee] text-[#107a57] border border-[#107a57]/20",
           },
           { label: "إعدادات الحساب وكلمة المرور", href: "/settings", icon: Settings },
         ],

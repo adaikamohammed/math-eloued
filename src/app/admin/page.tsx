@@ -1208,58 +1208,31 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
               {profile.teacher_code && <span className="font-mono text-slate-500 mr-2">({profile.teacher_code})</span>}
             </p>
           </div>
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <button
-              type="button"
-              onClick={() => {
-                const inviteUrl = `${window.location.origin}/join?key=asateza-2026`;
-                navigator.clipboard.writeText(inviteUrl);
-                setToastMsg({ type: "success", text: "تم نسخ رابط دعوة الأساتذة السري! شاركه مع زملائك الأساتذة عبر واتساب أو فيبر 📋" });
-              }}
-              className="flex items-center gap-1.5 text-xs text-[#107a57] bg-[#e6f4ee] hover:bg-[#d5eee2] border border-[#107a57]/25 font-bold px-3 py-1.5 rounded-xl transition cursor-pointer"
-              title="نسخ الرابط السري لدعوة وتسجيل أساتذة جدد"
-            >
-              <Copy className="w-3.5 h-3.5" />
-              <span>رابط دعوة أستاذ 🔗</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setShareModalOpen(true)}
-              className="flex items-center gap-1.5 text-xs text-white bg-emerald-600 hover:bg-emerald-500 font-bold px-3 py-1.5 rounded-xl shadow-md shadow-emerald-700/20 transition cursor-pointer"
-            >
-              <Share2 className="w-3.5 h-3.5" />
-              <span>إرسال الكود للأولياء 📲</span>
-            </button>
+          <div className="flex items-center gap-2 flex-wrap">
             <Link
               href={`/t/${profile.slug || profile.id}`}
               target="_blank"
-              className="hidden lg:flex items-center gap-1 text-xs text-slate-600 hover:text-emerald-700 px-3 py-1.5 rounded-xl border border-slate-200 transition"
+              className="flex items-center gap-1.5 text-xs text-slate-700 bg-slate-50 hover:bg-slate-100 font-bold px-3 py-2 rounded-xl border border-slate-200 transition"
+              title="معاينة الصفحة العامة كما يراها الأولياء والتلاميذ"
             >
-              <Globe className="w-3.5 h-3.5" /> معاينة فضائي
-            </Link>
-            <Link
-              href="/pedagogy"
-              className="hidden lg:flex items-center gap-1 text-xs text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-xl transition"
-            >
-              <ShieldCheck className="w-3.5 h-3.5" /> الملف البيداغوجي
-            </Link>
-            <Link
-              href="/forum"
-              className="hidden lg:flex items-center gap-1 text-xs text-slate-600 hover:text-indigo-700 px-3 py-1.5 rounded-xl border border-slate-200 transition"
-            >
-              💬 الملتقى
-            </Link>
-            <Link
-              href="/settings"
-              className="flex items-center gap-1 text-xs text-slate-600 hover:text-emerald-700 px-3 py-1.5 rounded-xl border border-slate-200 transition"
-            >
-              <Settings className="w-3.5 h-3.5" /> الإعدادات و QR
+              <Eye className="w-3.5 h-3.5 text-emerald-600" />
+              <span>معاينة فضاء الأولياء</span>
             </Link>
             <button
-              onClick={handleLogout}
-              className="flex items-center gap-1 text-xs text-slate-500 hover:text-red-600 px-3 py-1.5 rounded-xl border border-slate-200 transition"
+              type="button"
+              onClick={() => setShareModalOpen(true)}
+              className="flex items-center gap-1.5 text-xs text-white bg-emerald-600 hover:bg-emerald-700 font-bold px-3.5 py-2 rounded-xl shadow-xs transition cursor-pointer active:scale-95"
             >
-              <LogOut className="w-3.5 h-3.5" /> خروج
+              <Share2 className="w-3.5 h-3.5" />
+              <span>مشاركة الرمز للأولياء 📲</span>
+            </button>
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-1 text-xs text-slate-500 hover:text-red-600 px-2.5 py-2 rounded-xl hover:bg-red-50 border border-slate-200 transition"
+              title="تسجيل الخروج"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">خروج</span>
             </button>
           </div>
         </div>
@@ -1420,277 +1393,131 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
             </div>
           )}
         </div>
-
-        {/* أزرار سريعة للمعاينة */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 pt-1 border-t border-slate-100 text-xs font-bold">
-          <Link
-            href={`/t/${profile.slug || profile.id}`}
-            target="_blank"
-            className="flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100 transition text-[11px]"
-          >
-            <Globe className="w-3.5 h-3.5 text-emerald-600" />
-            <span>الموقع الرئيسي</span>
-          </Link>
-          <Link
-            href={withTeacher("/assessment", profile.id)}
-            target="_blank"
-            className="flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200/70 hover:bg-emerald-100 transition text-[11px]"
-          >
-            <Scale className="w-3.5 h-3.5 text-emerald-600" />
-            <span>ميثاق التقويم ⚖️</span>
-          </Link>
-          <Link
-            href={withTeacher("/honor", profile.id)}
-            target="_blank"
-            className="flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl bg-amber-50 text-amber-900 border border-amber-200/70 hover:bg-amber-100 transition text-[11px]"
-          >
-            <Trophy className="w-3.5 h-3.5 text-amber-600" />
-            <span>لوحة الشرف</span>
-          </Link>
-          <Link
-            href={withTeacher("/parents", profile.id)}
-            target="_blank"
-            className="flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl bg-sky-50 text-sky-800 border border-sky-200/70 hover:bg-sky-100 transition text-[11px]"
-          >
-            <Users className="w-3.5 h-3.5 text-sky-600" />
-            <span>أولياء أود استقبالهم</span>
-          </Link>
-          <Link
-            href="/penalties"
-            target="_blank"
-            className="flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100 transition text-[11px]"
-          >
-            <Lock className="w-3.5 h-3.5 text-slate-500" />
-            <span>الخصومات (خاص 🔒)</span>
-          </Link>
-          <Link
-            href={withTeacher("/announcement", profile.id)}
-            target="_blank"
-            className="flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100 transition text-[11px]"
-          >
-            <Megaphone className="w-3.5 h-3.5 text-emerald-600" />
-            <span>الإعلان والتوجيهات</span>
-          </Link>
-        </div>
-
-        {/* الملف البيداغوجي: الفضاء السري مع مفتش المقاطعة */}
-        <Link
-          href="/pedagogy"
-          className="flex lg:hidden items-center gap-3 p-3 rounded-2xl bg-gradient-to-l from-indigo-600 to-blue-700 text-white hover:opacity-95 transition"
-        >
-          <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
-            <ShieldCheck className="w-5 h-5" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-xs font-black">الملف البيداغوجي مع المفتش 🔒</div>
-            <p className="text-[10px] text-indigo-100 mt-0.5">المذكرات والوثائق • مناشير المفتش • جدول التوقيت الأسبوعي</p>
-            <PedagogyAlerts teacherId={profile.id} />
-          </div>
-          <ExternalLink className="w-4 h-4 text-indigo-200" />
-        </Link>
-
-        {/* ملتقى الأساتذة وبنك الوضعيات */}
-        <Link
-          href="/forum"
-          className="flex lg:hidden items-center gap-3 p-3 rounded-2xl bg-white border border-indigo-100 hover:border-indigo-300 transition"
-        >
-          <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center shrink-0 text-lg">💬</div>
-          <div className="flex-1 min-w-0">
-            <div className="text-xs font-black text-slate-800">ملتقى أساتذة الرياضيات وبنك الوضعيات</div>
-            <p className="text-[10px] text-slate-500 mt-0.5">اطرح إشكالية، شارك وضعية أو سلسلة، واستفد من توجيهات المفتشين</p>
-          </div>
-          <ExternalLink className="w-4 h-4 text-slate-400" />
-        </Link>
-
-        {/* بطاقة التقييم الميداني السريع المستقل (مخصصة للهاتف أثناء الحصة) */}
-        <div className="pt-2 border-t border-slate-100 lg:hidden">
-          <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 p-3 rounded-2xl text-white shadow-sm flex items-center justify-between gap-3 flex-wrap">
-            <div className="flex items-center gap-2.5">
-              <span className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center text-lg font-black shrink-0">
-                ⚡
-              </span>
-              <div>
-                <div className="text-xs font-black flex items-center gap-1.5">
-                  <span>دفتر التقييم الميداني السريع (صفحة مستقلة للهاتف)</span>
-                  <span className="bg-amber-400 text-slate-900 px-1.5 py-0.2 rounded text-[10px] font-black">
-                    جديد 🚀
-                  </span>
-                </div>
-                <p className="text-[11px] text-emerald-100 font-medium">
-                  تفقد الكراريس والواجبات الدورية (8 دروس + 8 واجبات + سلوك + نشاط) مع حساب المعدل التلقائي
-                </p>
-              </div>
-            </div>
-
-            <Link
-              href="/eval"
-              className="py-1.5 px-3.5 rounded-xl bg-white text-emerald-800 hover:bg-emerald-50 text-xs font-black shrink-0 flex items-center gap-1.5 shadow-sm transition active:scale-95"
-            >
-              <span>فتح دفتر التقييم السريع</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-        </div>
       </div>
 
-      {/* ── لوحة الوحدات التعليمية والتنظيمية المتقدمة (مستوحاة من فرسان القرآن) ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
-        <Link
-          href="/admin/students"
-          className="p-3.5 rounded-2xl bg-white border border-[#e8e8e0] hover:border-emerald-300 hover:shadow-sm transition group text-right flex items-center justify-between"
-        >
-          <div className="space-y-0.5">
-            <span className="block text-xs font-black text-gray-900 group-hover:text-[#107a57]">
-              إدارة الأفواج والتلاميذ
-            </span>
-            <span className="text-[10px] text-gray-500 font-medium">
-              أفواج خاصة (1م3، 2م5) • ترتيب أبجدي
-            </span>
-          </div>
-          <div className="w-8 h-8 rounded-xl bg-[#e6f4ee] text-[#107a57] border border-[#107a57]/20 flex items-center justify-center shrink-0">
-            <Users className="w-4 h-4" />
-          </div>
-        </Link>
-
-        <Link
-          href="/admin/timetable"
-          className="p-3.5 rounded-2xl bg-white border border-[#e8e8e0] hover:border-blue-300 hover:shadow-sm transition group text-right flex items-center justify-between"
-        >
-          <div className="space-y-0.5">
-            <span className="block text-xs font-black text-gray-900 group-hover:text-blue-700">
-              التوقيت الأسبوعي
-            </span>
-            <span className="text-[10px] text-gray-500 font-medium">
-              جدول الحصص • القاعات • طباعة A4
-            </span>
-          </div>
-          <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-700 border border-blue-200 flex items-center justify-center shrink-0">
-            <Calendar className="w-4 h-4" />
-          </div>
-        </Link>
-
-        <Link
-          href="/admin/diary"
-          className="p-3.5 rounded-2xl bg-white border border-[#e8e8e0] hover:border-amber-300 hover:shadow-sm transition group text-right flex items-center justify-between"
-        >
-          <div className="space-y-0.5">
-            <span className="block text-xs font-black text-gray-900 group-hover:text-amber-800">
-              الدفتر اليومي (ماذا سأدرس غداً)
-            </span>
-            <span className="text-[10px] text-gray-500 font-medium">
-              تحضير الحصص • مؤشرات الكفاءة • دفتر النصوص
-            </span>
-          </div>
-          <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 flex items-center justify-center shrink-0">
-            <ClipboardList className="w-4 h-4" />
-          </div>
-        </Link>
-
-        <Link
-          href="/settings/features"
-          className="p-3.5 rounded-2xl bg-white border border-[#e8e8e0] hover:border-purple-300 hover:shadow-sm transition group text-right flex items-center justify-between"
-        >
-          <div className="space-y-0.5">
-            <span className="block text-xs font-black text-gray-900 group-hover:text-purple-700">
-              تخصيص الواجهة
-            </span>
-            <span className="text-[10px] text-gray-500 font-medium">
-              إظهار وإخفاء الصفحات • ما يظهر للولي
-            </span>
-          </div>
-          <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-700 border border-purple-200 flex items-center justify-center shrink-0">
-            <Sliders className="w-4 h-4" />
-          </div>
-        </Link>
-      </div>
-
-      {/* التبويب الرئيسي: إدارة الدروس أو تقييم الحصة أو الإعلانات أو الرسائل أو الاستدعاءات أو لوحة الشرف أو الخصومات */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-1.5 bg-white p-1.5 rounded-2xl border border-slate-100 shadow-2xs">
+      {/* ── التبويب الرئيسي للمتابعة والعمل ── */}
+      <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar bg-white p-2 rounded-2xl border border-slate-100 shadow-2xs">
         <button
+          type="button"
           onClick={() => setMainTab("lessons")}
-          className={`py-2 px-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 ${
+          className={`py-2 px-3.5 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 shrink-0 cursor-pointer ${
             mainTab === "lessons"
-              ? "bg-emerald-600 text-white shadow-sm"
+              ? "bg-emerald-600 text-white shadow-xs"
               : "text-slate-600 hover:bg-slate-50"
           }`}
         >
-          <BookOpen className="w-3.5 h-3.5" />
-          <span>الدروس</span>
+          <BookOpen className="w-4 h-4" />
+          <span>الدروس والواجبات</span>
         </button>
 
         <button
+          type="button"
           onClick={() => setMainTab("evaluations")}
-          className={`py-2 px-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 ${
+          className={`py-2 px-3.5 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 shrink-0 cursor-pointer ${
             mainTab === "evaluations"
-              ? "bg-emerald-700 text-white shadow-sm"
+              ? "bg-emerald-700 text-white shadow-xs"
               : "text-slate-600 hover:bg-slate-50"
           }`}
         >
-          <ClipboardCheck className="w-3.5 h-3.5" />
-          <span>📱 تقييم الحصة ({evaluationsList.length})</span>
-        </button>
-
-        <button
-          onClick={() => setMainTab("announcements")}
-          className={`py-2 px-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 ${
-            mainTab === "announcements"
-              ? "bg-teal-600 text-white shadow-sm"
-              : "text-slate-600 hover:bg-slate-50"
-          }`}
-        >
-          <Megaphone className="w-3.5 h-3.5 text-teal-300" />
-          <span>📢 الإعلانات ({announcementsList.length})</span>
-        </button>
-
-        <button
-          onClick={() => setMainTab("messages")}
-          className={`relative py-2 px-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 ${
-            mainTab === "messages"
-              ? "bg-purple-700 text-white shadow-sm"
-              : "text-slate-600 hover:bg-slate-50"
-          }`}
-        >
-          <MessageSquare className="w-3.5 h-3.5 text-purple-300" />
-          <span>📬 الرسائل ({messagesList.length})</span>
-          {unreadMessagesCount > 0 && (
-            <span className="w-2.5 h-2.5 rounded-full bg-red-500 absolute top-1.5 left-1.5 ring-2 ring-white animate-pulse" />
+          <ClipboardCheck className="w-4 h-4" />
+          <span>تقييم الحصة</span>
+          {evaluationsList.length > 0 && (
+            <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${mainTab === "evaluations" ? "bg-white/20 text-white" : "bg-emerald-100 text-emerald-800"}`}>
+              {evaluationsList.length}
+            </span>
           )}
         </button>
 
         <button
+          type="button"
           onClick={() => setMainTab("summons")}
-          className={`py-2 px-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 ${
+          className={`py-2 px-3.5 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 shrink-0 cursor-pointer ${
             mainTab === "summons"
-              ? "bg-sky-600 text-white shadow-sm"
+              ? "bg-sky-600 text-white shadow-xs"
               : "text-slate-600 hover:bg-slate-50"
           }`}
         >
-          <Users className="w-3.5 h-3.5" />
-          <span>أولياء أود استقبالهم ({summonsList.length})</span>
+          <Users className="w-4 h-4" />
+          <span>أولياء أود استقبالهم</span>
+          {summonsList.length > 0 && (
+            <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${mainTab === "summons" ? "bg-white/20 text-white" : "bg-sky-100 text-sky-800"}`}>
+              {summonsList.length}
+            </span>
+          )}
         </button>
 
         <button
+          type="button"
           onClick={() => setMainTab("honors")}
-          className={`py-2 px-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 ${
+          className={`py-2 px-3.5 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 shrink-0 cursor-pointer ${
             mainTab === "honors"
-              ? "bg-amber-500 text-white shadow-sm"
+              ? "bg-amber-500 text-white shadow-xs"
               : "text-slate-600 hover:bg-slate-50"
           }`}
         >
-          <Trophy className="w-3.5 h-3.5" />
-          <span>لوحة الشرف ({honorsList.length})</span>
+          <Trophy className="w-4 h-4" />
+          <span>لوحة الشرف</span>
+          {honorsList.length > 0 && (
+            <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${mainTab === "honors" ? "bg-white/20 text-white" : "bg-amber-100 text-amber-800"}`}>
+              {honorsList.length}
+            </span>
+          )}
         </button>
 
         <button
-          onClick={() => setMainTab("penalties")}
-          className={`py-2 px-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 ${
-            mainTab === "penalties"
-              ? "bg-slate-800 text-white shadow-sm"
-              : "text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200"
+          type="button"
+          onClick={() => setMainTab("announcements")}
+          className={`py-2 px-3.5 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 shrink-0 cursor-pointer ${
+            mainTab === "announcements"
+              ? "bg-teal-600 text-white shadow-xs"
+              : "text-slate-600 hover:bg-slate-50"
           }`}
         >
-          <OctagonAlert className="w-3.5 h-3.5 text-slate-500" />
-          <span>الخصومات (خاص 🔒) ({penaltiesList.length})</span>
+          <Megaphone className="w-4 h-4" />
+          <span>الإعلانات</span>
+          {announcementsList.length > 0 && (
+            <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${mainTab === "announcements" ? "bg-white/20 text-white" : "bg-teal-100 text-teal-800"}`}>
+              {announcementsList.length}
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setMainTab("messages")}
+          className={`relative py-2 px-3.5 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 shrink-0 cursor-pointer ${
+            mainTab === "messages"
+              ? "bg-purple-700 text-white shadow-xs"
+              : "text-slate-600 hover:bg-slate-50"
+          }`}
+        >
+          <MessageSquare className="w-4 h-4" />
+          <span>صندوق الرسائل</span>
+          {unreadMessagesCount > 0 ? (
+            <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse ring-2 ring-white" />
+          ) : messagesList.length > 0 ? (
+            <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${mainTab === "messages" ? "bg-white/20 text-white" : "bg-purple-100 text-purple-800"}`}>
+              {messagesList.length}
+            </span>
+          ) : null}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setMainTab("penalties")}
+          className={`py-2 px-3.5 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 shrink-0 cursor-pointer ${
+            mainTab === "penalties"
+              ? "bg-slate-800 text-white shadow-xs"
+              : "text-slate-600 hover:bg-slate-50"
+          }`}
+        >
+          <Lock className="w-3.5 h-3.5 text-amber-500" />
+          <span>سجل الخصومات (خاص 🔒)</span>
+          {penaltiesList.length > 0 && (
+            <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${mainTab === "penalties" ? "bg-white/20 text-white" : "bg-slate-200 text-slate-800"}`}>
+              {penaltiesList.length}
+            </span>
+          )}
         </button>
       </div>
 
