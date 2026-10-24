@@ -385,10 +385,12 @@ export interface TimetableSlot {
   day: (typeof SCHOOL_DAYS)[number];
   start: string; // "08:00"
   end: string; // "09:00"
-  className: string; // "1م1" أو "استقبال الأولياء" أو "استدراك"
-  subgroup?: "فوج 1" | "فوج 2" | "تناوب" | "القسم كامل" | string;
-  sessionType?: "lesson" | "td" | "remedial" | "reception";
-  room?: string; // "قاعة 04"
+  className: string; // "1م1" أو "استقبال الأولياء" أو "استدراك" أو "فراغ"
+  subgroup?: "فوج 1" | "فوج 2" | "كامل القسم" | "القسم كامل" | string;
+  sessionType?: "lesson" | "td" | "remedial" | "reception" | "free";
+  room?: string; // "قاعة 04" (اختياري)
+  remedialClasses?: string[]; // الأفواج المعنية بالاستدراك
+  remedialStudents?: string[]; // أسماء التلاميذ المحددين للاستدراك
   notes?: string;
 }
 
