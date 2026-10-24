@@ -152,6 +152,7 @@ export type StudentRosterItem = {
   parentPhone?: string;
   birthDate?: string;
   gender?: "ذكر" | "أنثى";
+  isRepeater?: boolean; // معيد للسنة (نعم أو لا)
   notes?: string;
   createdAt?: string;
 };
