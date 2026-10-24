@@ -72,56 +72,51 @@ export default function TeacherDiaryPage() {
   const [mounted, setMounted] = useState(false);
 
   // التحقق من الجلسة
+  // التحقق من الجلسة وجلب البيانات بالتوازي
   useEffect(() => {
     setMounted(true);
-    fetch("/api/auth")
-      .then((res) => res.json())
-      .then((data) => {
-        setAuthenticated(data.authenticated === true);
+    if (typeof window !== "undefined") {
+      try {
+        const storedClasses = localStorage.getItem("last_active_classes");
+        if (storedClasses) {
+          const parsed = JSON.parse(storedClasses);
+          if (Array.isArray(parsed) && parsed.length > 0) setCustomClasses(parsed);
+        }
+      } catch {}
+    }
+
+    setLoading(true);
+    Promise.all([
+      fetch("/api/auth")
+        .then((res) => res.json())
+        .catch(() => ({ authenticated: false })),
+      fetch("/api/lessons")
+        .then((res) => (res.ok ? res.json() : null))
+        .catch(() => null),
+    ])
+      .then(([authData, data]: [any, LessonsData | null]) => {
+        setAuthenticated(authData?.authenticated === true);
+
+        if (data) {
+          const teacherClasses =
+            Array.isArray(data.customClasses) && data.customClasses.length > 0
+              ? data.customClasses
+              : [];
+          setCustomClasses(teacherClasses);
+
+          if (Array.isArray(data.diaryEntries)) {
+            setEntries(data.diaryEntries);
+          }
+        }
       })
-      .catch(() => setAuthenticated(false));
+      .catch((err) => {
+        console.error(err);
+        setMessage({ type: "err", text: "حدث خطأ أثناء تحميل الدفتر" });
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   }, []);
-
-  // قفل تمرير الصفحة عند فتح النافذة
-  useEffect(() => {
-    if (isModalOpen) {
-      const orig = document.body.style.overflow;
-      document.body.style.overflow = "hidden";
-      return () => {
-        document.body.style.overflow = orig;
-      };
-    }
-  }, [isModalOpen]);
-
-  // تحميل البيانات
-  const loadData = useCallback(async () => {
-    try {
-      setLoading(true);
-      const res = await fetch("/api/lessons");
-      if (!res.ok) throw new Error("تعذر تحميل الدفتر اليومي");
-      const data: LessonsData = await res.json();
-
-      const teacherClasses = Array.isArray(data.customClasses) && data.customClasses.length > 0
-        ? data.customClasses
-        : [];
-      setCustomClasses(teacherClasses);
-
-      if (Array.isArray(data.diaryEntries)) {
-        setEntries(data.diaryEntries);
-      }
-    } catch (err: any) {
-      console.error(err);
-      setMessage({ type: "err", text: err.message || "حدث خطأ أثناء تحميل الدفتر" });
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (authenticated) {
-      loadData();
-    }
-  }, [authenticated, loadData]);
 
   // حفظ التعديلات
   const persistEntries = async (newEntries: DailyDiaryEntry[]) => {
@@ -276,13 +271,16 @@ export default function TeacherDiaryPage() {
     return entries.filter((e) => e.date === tomorrowStr);
   }, [entries, tomorrowStr]);
 
-  if (authenticated === null) {
-    return (
-      <div className="min-h-[60vh] flex items-center justify-center font-sans">
-        <Loader2 className="w-8 h-8 animate-spin text-[#107a57]" />
-      </div>
-    );
-  }
+  // قفل تمرير الصفحة عند فتح النافذة
+  useEffect(() => {
+    if (isModalOpen) {
+      const orig = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = orig;
+      };
+    }
+  }, [isModalOpen]);
 
   if (authenticated === false) {
     return <LoginRequired next="/admin/diary" title="الدفتر اليومي ودفتر النصوص" />;

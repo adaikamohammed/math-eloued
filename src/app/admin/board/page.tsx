@@ -348,14 +348,6 @@ export default function AdminBoardPage() {
     }
   };
 
-  if (authenticated === null) {
-    return (
-      <div className="min-h-[60vh] flex items-center justify-center font-sans">
-        <Loader2 className="w-8 h-8 animate-spin text-[#107a57]" />
-      </div>
-    );
-  }
-
   if (authenticated === false) {
     return <LoginRequired next="/admin/board" title="كراس الدروس والسبورة الرقمية" />;
   }

@@ -8,14 +8,12 @@ import {
   UserPlus,
   Plus,
   Search,
-  Filter,
   ArrowUpDown,
   Pencil,
   Trash2,
   Phone,
   FileSpreadsheet,
   Printer,
-  ChevronDown,
   X,
   CheckCircle2,
   AlertCircle,
@@ -25,14 +23,19 @@ import {
   Sparkles,
   School,
   GraduationCap,
+  Check,
+  BookOpen,
 } from "lucide-react";
 import { LoginRequired } from "@/components/LoginRequired";
 import { PageExplainer } from "@/components/PageExplainer";
 import { StudentRosterItem, LessonsData } from "@/lib/types";
 
+const LOCAL_STORAGE_CLASSES_KEY = "last_active_classes";
+const LOCAL_STORAGE_STUDENTS_KEY = "math_teacher_students_cache";
+
 export default function StudentsManagementPage() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
@@ -41,7 +44,7 @@ export default function StudentsManagementPage() {
   const [students, setStudents] = useState<StudentRosterItem[]>([]);
 
   // الفلاتر والبحث
-  const [selectedClass, setSelectedClass] = useState<string>("all");
+  const [selectedClass, setSelectedClass] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
@@ -68,18 +71,118 @@ export default function StudentsManagementPage() {
   const [newClassName, setNewClassName] = useState("");
   const [mounted, setMounted] = useState(false);
 
-  // التحقق من الجلسة ومصدر الدخول
+  // تحميل أولي فوري بدون أي تأخير (0ms) من التخزين المحلي، وجلب متوازٍ في الخلفية
   useEffect(() => {
     setMounted(true);
+
+    let activeParam = "";
+    let cachedCls: string[] = [];
+
     if (typeof window !== "undefined") {
-      setIsFromOnboarding(window.location.search.includes("from=onboarding"));
+      const urlParams = new URLSearchParams(window.location.search);
+      activeParam = urlParams.get("activeClass") || "";
+      setIsFromOnboarding(urlParams.get("from") === "onboarding");
+
+      // قراءة فورية للأفواج المحفوظة
+      try {
+        const storedClasses = localStorage.getItem(LOCAL_STORAGE_CLASSES_KEY);
+        if (storedClasses) {
+          const parsed = JSON.parse(storedClasses);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            cachedCls = parsed;
+            setCustomClasses(parsed);
+          }
+        }
+      } catch (e) {
+        console.warn("Error reading cached classes", e);
+      }
+
+      // قراءة فورية لقائمة التلاميذ المحفوظة
+      try {
+        const storedStudents = localStorage.getItem(LOCAL_STORAGE_STUDENTS_KEY);
+        if (storedStudents) {
+          const parsedStudents = JSON.parse(storedStudents);
+          if (Array.isArray(parsedStudents)) {
+            setStudents(parsedStudents);
+          }
+        }
+      } catch (e) {
+        console.warn("Error reading cached students", e);
+      }
+
+      // تحديد الفوج النشط الافتراضي فوراً (الفوج من الرابط أو أول فوج للأستاذ)
+      if (activeParam && (cachedCls.length === 0 || cachedCls.includes(activeParam))) {
+        setSelectedClass(activeParam);
+        setBatchClass(activeParam);
+      } else if (cachedCls.length > 0) {
+        setSelectedClass(cachedCls[0]);
+        setBatchClass(cachedCls[0]);
+      } else {
+        setSelectedClass("all");
+      }
     }
-    fetch("/api/auth")
-      .then((res) => res.json())
-      .then((data) => {
-        setAuthenticated(data.authenticated === true);
+
+    // جلب متوازٍ وسريع للمصادقة وبيانات الأستاذ في نفس اللحظة
+    setLoading(true);
+    Promise.all([
+      fetch("/api/auth")
+        .then((res) => res.json())
+        .catch(() => ({ authenticated: false })),
+      fetch("/api/lessons")
+        .then((res) => (res.ok ? res.json() : null))
+        .catch(() => null),
+    ])
+      .then(([authData, lessonsData]: [any, LessonsData | null]) => {
+        setAuthenticated(authData?.authenticated === true);
+
+        if (lessonsData) {
+          const teacherClasses =
+            Array.isArray(lessonsData.customClasses) && lessonsData.customClasses.length > 0
+              ? lessonsData.customClasses
+              : cachedCls;
+
+          setCustomClasses(teacherClasses);
+
+          let loadedStudents: StudentRosterItem[] = [];
+          if (Array.isArray(lessonsData.studentRoster)) {
+            loadedStudents = lessonsData.studentRoster;
+          } else if (Array.isArray(lessonsData.evaluations) && lessonsData.evaluations.length > 0) {
+            loadedStudents = lessonsData.evaluations.map((ev) => ({
+              id: ev.id,
+              studentName: ev.studentName,
+              className: ev.className,
+              groupName: ev.groupName || "القسم كامل",
+              createdAt: ev.updatedAt || new Date().toISOString(),
+            }));
+          }
+          setStudents(loadedStudents);
+
+          // تحديث التخزين المحلي للاستجابة الفورية في المرات القادمة
+          if (typeof window !== "undefined") {
+            try {
+              localStorage.setItem(LOCAL_STORAGE_STUDENTS_KEY, JSON.stringify(loadedStudents));
+              if (teacherClasses.length > 0) {
+                localStorage.setItem(LOCAL_STORAGE_CLASSES_KEY, JSON.stringify(teacherClasses));
+              }
+            } catch (e) {
+              console.warn("Storage save error", e);
+            }
+          }
+
+          // ضبط الفوج النشط إذا لم يكن محدداً بشكل ملائم
+          setSelectedClass((curr) => {
+            if (curr && curr !== "all" && teacherClasses.includes(curr)) return curr;
+            if (activeParam && teacherClasses.includes(activeParam)) return activeParam;
+            return teacherClasses[0] || "all";
+          });
+        }
       })
-      .catch(() => setAuthenticated(false));
+      .catch((err) => {
+        console.error("Data fetch error", err);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   }, []);
 
   // قفل تمرير الصفحة خلف النوافذ المنبثقة
@@ -94,49 +197,17 @@ export default function StudentsManagementPage() {
     }
   }, [anyModalOpen]);
 
-  // تحميل البيانات
-  const loadData = useCallback(async () => {
-    try {
-      setLoading(true);
-      const res = await fetch("/api/lessons");
-      if (!res.ok) throw new Error("تعذر تحميل البيانات");
-      const data: LessonsData = await res.json();
-      
-      const teacherClasses = Array.isArray(data.customClasses) && data.customClasses.length > 0
-        ? data.customClasses
-        : [];
-      setCustomClasses(teacherClasses);
-
-      if (Array.isArray(data.studentRoster)) {
-        setStudents(data.studentRoster);
-      } else if (Array.isArray(data.evaluations) && data.evaluations.length > 0) {
-        // إذا لم تكن هناك قائمة roster، استخراجها من evaluations
-        const initialRoster: StudentRosterItem[] = data.evaluations.map((ev) => ({
-          id: ev.id,
-          studentName: ev.studentName,
-          className: ev.className,
-          groupName: ev.groupName || "القسم كامل",
-          createdAt: ev.updatedAt || new Date().toISOString(),
-        }));
-        setStudents(initialRoster);
-      }
-    } catch (err: any) {
-      console.error(err);
-      setMessage({ type: "err", text: err.message || "حدث خطأ أثناء تحميل التلاميذ" });
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (authenticated) {
-      loadData();
-    }
-  }, [authenticated, loadData]);
-
-  // حفظ البيانات
+  // حفظ البيانات وتحديث التخزين المحلي
   const persistChanges = async (newStudents: StudentRosterItem[], newClasses: string[]) => {
     setSaving(true);
+    // تحديث فوري محلياً للسرعة القصوى
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem(LOCAL_STORAGE_STUDENTS_KEY, JSON.stringify(newStudents));
+        localStorage.setItem(LOCAL_STORAGE_CLASSES_KEY, JSON.stringify(newClasses));
+      } catch {}
+    }
+
     try {
       const res = await fetch("/api/lessons", {
         method: "PUT",
@@ -148,7 +219,7 @@ export default function StudentsManagementPage() {
       });
       if (!res.ok) throw new Error("فشل حفظ التعديلات");
       setMessage({ type: "ok", text: "تم حفظ التعديلات بنجاح ✨" });
-      setTimeout(() => setMessage(null), 3000);
+      setTimeout(() => setMessage(null), 3500);
     } catch (err: any) {
       console.error(err);
       setMessage({ type: "err", text: err.message || "حدث خطأ أثناء الحفظ" });
@@ -161,7 +232,7 @@ export default function StudentsManagementPage() {
   const handleOpenAddStudent = () => {
     setEditingStudent(null);
     setFormName("");
-    setFormClass(selectedClass !== "all" ? selectedClass : customClasses[0] || "");
+    setFormClass(selectedClass !== "all" && selectedClass ? selectedClass : customClasses[0] || "");
     setFormRegNum("");
     setFormPhone("");
     setFormGender("ذكر");
@@ -238,9 +309,7 @@ export default function StudentsManagementPage() {
     return batchRawText
       .split(/\r?\n/)
       .map((line) => {
-        // إزالة الترقيم (مثال: 1. أو 1- أو 1) أو النقاط)
         let cleaned = line.replace(/^\s*\d+[\.\-\)\/\t\s]+/, "");
-        // إزالة الأعمدة الإضافية في حال تم نسخ عدة أعمدة من إكسل (الاسم عادة بالعمود الأول)
         const parts = cleaned.split(/\t/);
         cleaned = parts[0]?.trim() || "";
         return cleaned;
@@ -276,7 +345,7 @@ export default function StudentsManagementPage() {
     await persistChanges(updated, customClasses);
     setMessage({
       type: "ok",
-      text: `تمت إضافة ${newItems.length} تلميذ بنجاح إلى الفوج ${targetClass} ✨`,
+      text: `تمت إضافة (${newItems.length}) تلميذ بنجاح إلى فوج ${targetClass} وتم ترتيبهم أبجدياً تلقائياً ✨`,
     });
   };
 
@@ -291,6 +360,8 @@ export default function StudentsManagementPage() {
     }
     const updatedClasses = [...customClasses, cleanClass];
     setCustomClasses(updatedClasses);
+    setSelectedClass(cleanClass);
+    setBatchClass(cleanClass);
     setNewClassName("");
     setIsClassModalOpen(false);
     await persistChanges(students, updatedClasses);
@@ -310,16 +381,18 @@ export default function StudentsManagementPage() {
 
     const updatedClasses = customClasses.filter((c) => c !== clsToDelete);
     setCustomClasses(updatedClasses);
-    if (selectedClass === clsToDelete) setSelectedClass("all");
+    if (selectedClass === clsToDelete) {
+      setSelectedClass(updatedClasses[0] || "all");
+    }
     await persistChanges(students, updatedClasses);
   };
 
-  // فلترة وترتيب التلاميذ أبجدياً
+  // فلترة وترتيب التلاميذ أبجدياً آلياً بدقة عالية
   const filteredAndSortedStudents = useMemo(() => {
     return students
       .filter((s) => {
         // فلترة الفوج
-        if (selectedClass !== "all" && s.className !== selectedClass) return false;
+        if (selectedClass && selectedClass !== "all" && s.className !== selectedClass) return false;
         // فلترة البحث
         if (searchQuery.trim()) {
           const q = searchQuery.trim().toLowerCase();
@@ -331,28 +404,34 @@ export default function StudentsManagementPage() {
         return true;
       })
       .sort((a, b) => {
-        // ترتيب أبجدي عربي سليم
-        const comparison = a.studentName.localeCompare(b.studentName, "ar");
+        const comparison = a.studentName.localeCompare(b.studentName, "ar", { sensitivity: "base" });
         return sortDirection === "asc" ? comparison : -comparison;
       });
   }, [students, selectedClass, searchQuery, sortDirection]);
 
-  if (authenticated === null) {
-    return (
-      <div className="min-h-[60vh] flex items-center justify-center font-sans">
-        <Loader2 className="w-8 h-8 animate-spin text-[#107a57]" />
-      </div>
-    );
-  }
+  // إحصائيات الفوج النشط المحدد
+  const activeClassStudents = useMemo(() => {
+    if (!selectedClass || selectedClass === "all") return students;
+    return students.filter((s) => s.className === selectedClass);
+  }, [students, selectedClass]);
 
+  const maleCount = useMemo(() => {
+    return activeClassStudents.filter((s) => s.gender === "ذكر" || !s.gender).length;
+  }, [activeClassStudents]);
+
+  const femaleCount = useMemo(() => {
+    return activeClassStudents.filter((s) => s.gender === "أنثى").length;
+  }, [activeClassStudents]);
+
+  // إذا تم التأكد من عدم تسجيل الدخول، عرض نافذة الدخول
   if (authenticated === false) {
     return <LoginRequired next="/admin/students" title="إدارة الأفواج والتلاميذ" />;
   }
 
   return (
-    <div className="min-h-screen bg-[#fafaf7] py-6 sm:py-8 px-4 font-sans" dir="rtl">
-      <div className="max-w-6xl mx-auto space-y-6">
-        {/* شريط المسار والتنقل */}
+    <div className="min-h-screen bg-[#fafaf7] py-5 sm:py-8 px-3 sm:px-6 font-sans" dir="rtl">
+      <div className="max-w-6xl mx-auto space-y-5">
+        {/* شريط المسار والتنقل والإجراءات السريعة */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-xs font-bold text-gray-500">
             <Link href="/admin" className="hover:text-gray-900 transition flex items-center gap-1">
@@ -360,10 +439,10 @@ export default function StudentsManagementPage() {
               لوحة الأستاذ
             </Link>
             <span>/</span>
-            <span className="text-gray-900">إدارة الأفواج والتلاميذ</span>
+            <span className="text-gray-900 font-black">إدارة وتوثيق الأفواج والتلاميذ</span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={() => window.print()}
               className="px-3 py-1.5 rounded-xl border border-[#e8e8e0] bg-white text-xs font-bold text-gray-700 hover:bg-gray-50 transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
@@ -373,10 +452,10 @@ export default function StudentsManagementPage() {
             </button>
             <button
               onClick={() => {
-                setBatchClass(selectedClass !== "all" ? selectedClass : customClasses[0] || "");
+                setBatchClass(selectedClass !== "all" && selectedClass ? selectedClass : customClasses[0] || "");
                 setIsBatchModalOpen(true);
               }}
-              className="px-3 py-1.5 rounded-xl border border-emerald-300 bg-emerald-50 text-xs font-black text-emerald-900 hover:bg-emerald-100 transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
+              className="px-3.5 py-1.5 rounded-xl border border-emerald-300 bg-emerald-50 text-xs font-black text-emerald-900 hover:bg-emerald-100 transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
             >
               <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-700" />
               <span>لصق قائمة كاملة 📋</span>
@@ -402,12 +481,12 @@ export default function StudentsManagementPage() {
         <PageExplainer
           pageId="students"
           title="إدارة الأفواج والتلاميذ"
-          teacherRoleExplanation="هنا تضيف أقسامك التربوية الفعلية (مثل 1م3، 2م5) وتدون أسماء تلاميذك مع الترتيب الأبجدي الآلي وطباعة القوائم بضغطة زر واحدة."
+          teacherRoleExplanation="هنا تحدد الفوج التربوي، تضيف أسماء التلاميذ، وترتبهم أبجدياً تلقائياً مع إمكانية لصق قائمة القسم كاملة من إكسل في ثانية واحدة."
           parentRoleExplanation="يضمن خصوصية تامة؛ لا يطلع أي ولي على أسماء أو بيانات التلاميذ الآخرين في الفوج."
           inspectorExplanation="يطلع المفتش البيداغوجي على إسناد الأفواج وتعداد التلاميذ لمطابقة التنظيم التربوي الرسمي."
         />
 
-        {/* شريط التوجيه البيداغوجي للخطوة 2 */}
+        {/* شريط التوجيه البيداغوجي للخطوة 2 بعد تجهيز الأفواج */}
         {(isFromOnboarding || (students.length === 0 && customClasses.length > 0)) && (
           <div className="bg-gradient-to-r from-emerald-800 via-teal-800 to-emerald-900 text-white rounded-2xl p-4 sm:p-5 shadow-lg border border-emerald-500/30 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
             <div className="flex items-start gap-3">
@@ -419,13 +498,18 @@ export default function StudentsManagementPage() {
                   <span className="text-[10px] bg-amber-400 text-emerald-950 font-black px-2 py-0.5 rounded-full">
                     الخطوة ② من 6 ✨
                   </span>
-                  <span className="text-xs font-bold text-emerald-200">إضافة وتوثيق التلاميذ</span>
+                  <span className="text-xs font-bold text-emerald-200">إضافة وتوثيق التلاميذ في الأفواج</span>
                 </div>
                 <h3 className="text-sm sm:text-base font-black text-white">
-                  أهلاً بك أستاذنا الفاضل في فضاء إدارة التلاميذ والأفواج!
+                  أهلاً بك أستاذنا الفاضل! ها هي الأفواج التي اخترتها جاهزة أمامك:
                 </h3>
                 <p className="text-xs text-emerald-100/90 leading-relaxed max-w-2xl">
-                  الأفواج المسندة إليك ({customClasses.join("، ") || "لم تُحدد بعد"}). لتوفير وقتك وجهدك، يمكنك إضافة التلاميذ تلميذاً تلميذاً، أو استخدام زر <strong className="text-white underline">«لصق قائمة كاملة 📋»</strong> لنسخ أسماء القسم دفعة واحدة من ملف إكسل أو الوورد في ثانية واحدة!
+                  الأفواج المعتمدة في حسابك:{" "}
+                  <strong className="text-amber-300 underline font-black">
+                    {customClasses.length > 0 ? customClasses.join("، ") : "لم تقم باختيار أي فوج بعد"}
+                  </strong>
+                  . انقر على أي فوج بالأسفل للبدء بإضافة تلاميذه وترتيبهم أبجدياً، أو استخدم زر{" "}
+                  <strong className="text-white underline">«لصق قائمة الفوج دفعة واحدة 📋»</strong> لنسخ أسماء القسم دفعة واحدة من ملف إكسل أو الوورد في لحظة واحدة!
                 </p>
               </div>
             </div>
@@ -434,13 +518,13 @@ export default function StudentsManagementPage() {
               <button
                 type="button"
                 onClick={() => {
-                  setBatchClass(selectedClass !== "all" ? selectedClass : customClasses[0] || "");
+                  setBatchClass(selectedClass !== "all" && selectedClass ? selectedClass : customClasses[0] || "");
                   setIsBatchModalOpen(true);
                 }}
                 className="w-full md:w-auto px-4 py-2.5 bg-white text-emerald-950 hover:bg-emerald-50 rounded-xl text-xs font-black shadow-md transition flex items-center justify-center gap-2 cursor-pointer active:scale-95"
               >
                 <FileSpreadsheet className="w-4 h-4 text-emerald-700" />
-                <span>لصق قائمة القسم كاملة دفعة واحدة 📋</span>
+                <span>لصق قائمة الفوج دفعة واحدة 📋</span>
               </button>
             </div>
           </div>
@@ -464,163 +548,225 @@ export default function StudentsManagementPage() {
           </div>
         )}
 
-        {/* بطاقات الإحصائيات السريعة */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
-          <div className="bg-white rounded-2xl p-4 border border-[#e8e8e0] shadow-2xs space-y-1">
-            <span className="text-[11px] font-bold text-gray-500">إجمالي التلاميذ</span>
-            <div className="flex items-baseline justify-between">
-              <span className="text-2xl font-black text-gray-900 font-mono">{students.length}</span>
-              <Users className="w-4 h-4 text-[#107a57]" />
+        {/* ─── محدد الأفواج الرئيسي (Class Workspace Selector) ─── */}
+        <div className="bg-white rounded-2xl p-4 sm:p-5 border border-[#e8e8e0] shadow-sm space-y-3">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <School className="w-4 h-4 text-[#107a57]" />
+              <h2 className="text-xs sm:text-sm font-black text-gray-900">
+                اختر الفوج لإدارته وتوثيق تلاميذه وترتيبهم:
+              </h2>
+            </div>
+            <button
+              onClick={() => setIsClassModalOpen(true)}
+              className="text-xs font-bold text-[#107a57] hover:underline flex items-center gap-1 cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>إضافة فوج جديد (مثل 1م3، 2م5)</span>
+            </button>
+          </div>
+
+          {/* تبويبات الأفواج التربوية البارزة */}
+          <div className="flex items-center gap-2 flex-wrap pt-1">
+            {customClasses.length === 0 ? (
+              <div className="w-full text-center py-4 px-4 bg-amber-50 rounded-xl border border-amber-200 text-amber-900 text-xs font-bold space-y-2">
+                <p>⚠️ لم يتم تحديد أي فوج بعد في حسابك.</p>
+                <button
+                  type="button"
+                  onClick={() => setIsClassModalOpen(true)}
+                  className="btn-primary text-xs px-4 py-1.5 inline-flex items-center gap-1.5"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>إضافة أول فوج تربوي الآن</span>
+                </button>
+              </div>
+            ) : (
+              <>
+                {customClasses.map((cls) => {
+                  const count = students.filter((s) => s.className === cls).length;
+                  const isSelected = selectedClass === cls;
+                  return (
+                    <button
+                      key={cls}
+                      onClick={() => {
+                        setSelectedClass(cls);
+                        setBatchClass(cls);
+                      }}
+                      className={`px-4 py-2.5 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer shadow-2xs ${
+                        isSelected
+                          ? "bg-gradient-to-r from-emerald-800 to-teal-800 text-white ring-2 ring-emerald-500/40 shadow-sm scale-102"
+                          : "bg-[#fafaf7] text-gray-700 hover:bg-gray-100 border border-[#e8e8e0] hover:border-gray-300"
+                      }`}
+                    >
+                      <School className={`w-3.5 h-3.5 ${isSelected ? "text-amber-300" : "text-emerald-700"}`} />
+                      <span>فوج {cls}</span>
+                      <span
+                        className={`text-[11px] font-mono px-2 py-0.5 rounded-full font-bold ${
+                          isSelected ? "bg-white/20 text-white" : "bg-gray-200 text-gray-800"
+                        }`}
+                      >
+                        {count} تلميذ
+                      </span>
+                      {isSelected && <Check className="w-3.5 h-3.5 text-amber-300" />}
+                    </button>
+                  );
+                })}
+
+                <button
+                  onClick={() => setSelectedClass("all")}
+                  className={`px-3.5 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                    selectedClass === "all"
+                      ? "bg-gray-900 text-white shadow-xs"
+                      : "bg-[#fafaf7] text-gray-600 hover:bg-gray-100 border border-[#e8e8e0]"
+                  }`}
+                >
+                  <Users className="w-3.5 h-3.5" />
+                  <span>جميع الأقسام ({students.length})</span>
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* ─── مساحة عمل الفوج المحدد (Active Class Dedicated Banner) ─── */}
+        <div className="bg-white rounded-2xl p-4 sm:p-5 border border-[#e8e8e0] shadow-2xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#e8e8e0] pb-3">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 animate-pulse" />
+                <h3 className="text-sm sm:text-base font-black text-gray-900">
+                  {selectedClass === "all" ? (
+                    "قائمة جميع التلاميذ في كافة الأفواج"
+                  ) : (
+                    <span>
+                      قائمة وتوثيق تلاميذ: <strong className="text-[#107a57]">فوج {selectedClass}</strong>
+                    </span>
+                  )}
+                </h3>
+              </div>
+              <div className="flex items-center gap-3 text-xs text-gray-500 font-bold flex-wrap">
+                <span>
+                  تعداد الفوج: <strong className="text-gray-900 font-mono">{activeClassStudents.length}</strong> تلميذ
+                </span>
+                <span>•</span>
+                <span className="text-emerald-700">👦 {maleCount} ذكور</span>
+                <span>•</span>
+                <span className="text-rose-600">👧 {femaleCount} إناث</span>
+                <span>•</span>
+                <span className="text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                  🔤 الترتيب الأبجدي الآلي (أ ← ي) مفعل تلقائياً
+                </span>
+              </div>
+            </div>
+
+            {/* أزرار الإجراءات السريعة للفوج النشط */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={() => {
+                  setBatchClass(selectedClass !== "all" && selectedClass ? selectedClass : customClasses[0] || "");
+                  setIsBatchModalOpen(true);
+                }}
+                className="px-3.5 py-2 rounded-xl bg-emerald-50 text-emerald-950 hover:bg-emerald-100 border border-emerald-300 text-xs font-black shadow-2xs transition flex items-center gap-1.5 cursor-pointer active:scale-95"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-700" />
+                <span>لصق قائمة الفوج من إكسل 📋</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleOpenAddStudent}
+                className="btn-primary text-xs px-3.5 py-2 flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                <span>
+                  إضافة تلميذ {selectedClass !== "all" && selectedClass ? `لفوج (${selectedClass})` : ""}
+                </span>
+              </button>
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl p-4 border border-[#e8e8e0] shadow-2xs space-y-1">
-            <span className="text-[11px] font-bold text-gray-500">الأفواج المسندة</span>
-            <div className="flex items-baseline justify-between">
-              <span className="text-2xl font-black text-gray-900 font-mono">{customClasses.length}</span>
-              <School className="w-4 h-4 text-emerald-600" />
+          {/* شريط البحث والترتيب */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
+            <div className="relative flex-1 max-w-md">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="ابحث بالاسم أو اللقب أو رقم التعريف..."
+                className="w-full pl-3 pr-9 py-2 rounded-xl bg-[#fafaf7] border border-[#e8e8e0] text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57]"
+              />
+              <Search className="w-4 h-4 text-gray-400 absolute right-3 top-2.5 pointer-events-none" />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute left-2.5 top-2.5 text-gray-400 hover:text-gray-600 cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
-          </div>
 
-          <div className="bg-white rounded-2xl p-4 border border-[#e8e8e0] shadow-2xs space-y-1">
-            <span className="text-[11px] font-bold text-gray-500">الفوج المحدد</span>
-            <div className="flex items-baseline justify-between">
-              <span className="text-sm font-black text-gray-800">
-                {selectedClass === "all" ? "جميع الأفواج" : selectedClass}
-              </span>
-              <span className="text-xs font-mono font-bold text-[#107a57] bg-[#e6f4ee] px-2 py-0.5 rounded-md">
-                {filteredAndSortedStudents.length} تلميذ
-              </span>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl p-4 border border-[#e8e8e0] shadow-2xs space-y-1">
-            <span className="text-[11px] font-bold text-gray-500">ترتيب الأسماء</span>
-            <div className="flex items-baseline justify-between">
+            <div className="flex items-center gap-3 text-xs font-bold text-gray-600">
               <button
                 onClick={() => setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"))}
-                className="text-xs font-black text-[#107a57] hover:underline flex items-center gap-1 cursor-pointer"
+                className="px-3 py-1.5 rounded-xl border border-[#e8e8e0] bg-white text-xs font-black text-[#107a57] hover:bg-gray-50 flex items-center gap-1.5 cursor-pointer"
               >
                 <ArrowUpDown className="w-3.5 h-3.5" />
                 <span>{sortDirection === "asc" ? "أبجدياً (أ ← ي)" : "أبجدياً (ي ← أ)"}</span>
               </button>
+
+              <span className="font-mono text-gray-900 bg-[#fafaf7] px-2.5 py-1 rounded-lg border border-[#e8e8e0]">
+                {filteredAndSortedStudents.length} معروض
+              </span>
             </div>
           </div>
         </div>
 
-        {/* شريط الأفواج التربوية (Custom Classes Filter) */}
-        <div className="bg-white rounded-2xl p-3 sm:p-4 border border-[#e8e8e0] shadow-2xs flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-xs font-bold text-gray-500 ml-1">تصفية حسب الفوج:</span>
-            <button
-              onClick={() => setSelectedClass("all")}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
-                selectedClass === "all"
-                  ? "bg-[#107a57] text-white shadow-xs"
-                  : "bg-[#fafaf7] text-gray-600 hover:bg-gray-100 border border-[#e8e8e0]"
-              }`}
-            >
-              الكل ({students.length})
-            </button>
-            {customClasses.map((cls) => {
-              const count = students.filter((s) => s.className === cls).length;
-              return (
-                <button
-                  key={cls}
-                  onClick={() => setSelectedClass(cls)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                    selectedClass === cls
-                      ? "bg-[#107a57] text-white shadow-xs"
-                      : "bg-[#fafaf7] text-gray-600 hover:bg-gray-100 border border-[#e8e8e0]"
-                  }`}
-                >
-                  <span>{cls}</span>
-                  <span
-                    className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
-                      selectedClass === cls ? "bg-white/20 text-white" : "bg-gray-200 text-gray-700"
-                    }`}
-                  >
-                    {count}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* إضافة فوج سريع */}
-          <button
-            onClick={() => setIsClassModalOpen(true)}
-            className="text-xs font-bold text-[#107a57] hover:underline flex items-center gap-1 cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>إضافة فوج جديد (مثل 1م3، 2م5)</span>
-          </button>
-        </div>
-
-        {/* شريط البحث والفرز */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-          <div className="relative flex-1 max-w-md">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="ابحث بالاسم أو اللقب أو رقم التعريف..."
-              className="w-full pl-3 pr-9 py-2 rounded-xl bg-white border border-[#e8e8e0] text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57]"
-            />
-            <Search className="w-4 h-4 text-gray-400 absolute right-3 top-2.5 pointer-events-none" />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery("")}
-                className="absolute left-2.5 top-2.5 text-gray-400 hover:text-gray-600 cursor-pointer"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2 text-xs font-bold text-gray-600">
-            <span>عدد النتائج:</span>
-            <span className="font-mono text-gray-900 bg-white px-2 py-1 rounded-lg border border-[#e8e8e0]">
-              {filteredAndSortedStudents.length} تلميذ
-            </span>
-          </div>
-        </div>
-
-        {/* جدول التلاميذ */}
+        {/* ─── جدول التلاميذ الفعلي للفوج ─── */}
         <div className="bg-white rounded-3xl border border-[#e8e8e0] shadow-sm overflow-hidden">
-          {loading ? (
-            <div className="py-16 text-center text-xs text-gray-500 space-y-2">
-              <Loader2 className="w-6 h-6 animate-spin mx-auto text-[#107a57]" />
-              <p>جارٍ تحميل قائمة التلاميذ...</p>
+          {loading && students.length === 0 ? (
+            /* وميض تحميل أنيق وسريع دون حجب الشاشة */
+            <div className="p-8 space-y-3">
+              <div className="h-8 bg-gray-100 rounded-xl animate-pulse" />
+              <div className="h-12 bg-gray-50 rounded-xl animate-pulse" />
+              <div className="h-12 bg-gray-50 rounded-xl animate-pulse" />
+              <div className="h-12 bg-gray-50 rounded-xl animate-pulse" />
             </div>
           ) : filteredAndSortedStudents.length === 0 ? (
-            <div className="py-16 text-center text-xs text-gray-500 space-y-3">
-              <div className="w-12 h-12 rounded-2xl bg-gray-50 border border-gray-200 text-gray-400 flex items-center justify-center mx-auto">
-                <Users className="w-6 h-6" />
+            /* شاشة الفوج الفارغ مع أزرار مباشرة لإضافة أو لصق القائمة */
+            <div className="py-14 sm:py-16 text-center text-xs text-gray-500 space-y-3 px-4">
+              <div className="w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center mx-auto">
+                <GraduationCap className="w-7 h-7" />
               </div>
-              <p className="font-bold text-gray-700">لا يوجد تلاميذ مسجلين حالياً في هذا العرض</p>
-              <p className="text-[11px] text-gray-400 max-w-sm mx-auto">
-                يمكنك البدء بإضافة تلميذ جديد أو استخدام النسخ واللصق لإدراج قائمة القسم كاملة دفعة واحدة.
+              <h4 className="text-sm font-black text-gray-800">
+                {selectedClass !== "all" && selectedClass
+                  ? `فوج ${selectedClass} لا يحتوي على تلاميذ حتى الآن`
+                  : "لا يوجد تلاميذ مسجلين حالياً"}
+              </h4>
+              <p className="text-xs text-gray-500 max-w-md mx-auto leading-relaxed">
+                أضف تلاميذ هذا الفوج لترتيبهم أبجدياً تلقائياً، وتوثيق سجلات التقويم، ومتابعة الواجبات وإشعارات الأولياء.
               </p>
-              <div className="flex items-center justify-center gap-2 flex-wrap pt-1">
+              <div className="flex items-center justify-center gap-2.5 flex-wrap pt-2">
                 <button
                   type="button"
                   onClick={() => {
-                    setBatchClass(selectedClass !== "all" ? selectedClass : customClasses[0] || "");
+                    setBatchClass(selectedClass !== "all" && selectedClass ? selectedClass : customClasses[0] || "");
                     setIsBatchModalOpen(true);
                   }}
-                  className="px-4 py-2 rounded-xl bg-emerald-50 border border-emerald-300 text-xs font-black text-emerald-900 hover:bg-emerald-100 inline-flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-800 to-teal-800 text-white text-xs font-black hover:opacity-95 inline-flex items-center gap-2 cursor-pointer shadow-md active:scale-95"
                 >
-                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-700" />
-                  <span>لصق قائمة الفوج دفعة واحدة 📋</span>
+                  <FileSpreadsheet className="w-4 h-4 text-amber-300" />
+                  <span>
+                    لصق قائمة {selectedClass !== "all" && selectedClass ? `فوج (${selectedClass})` : "الفوج"} من إكسل دفعة واحدة 📋
+                  </span>
                 </button>
                 <button
                   type="button"
                   onClick={handleOpenAddStudent}
-                  className="btn-primary text-xs px-4 py-2 inline-flex items-center gap-1.5 cursor-pointer"
+                  className="px-4 py-2.5 rounded-xl border border-gray-300 bg-white hover:bg-gray-50 text-gray-800 text-xs font-black inline-flex items-center gap-1.5 cursor-pointer shadow-2xs active:scale-95"
                 >
-                  <UserPlus className="w-3.5 h-3.5" />
-                  <span>إضافة تلميذ فردي</span>
+                  <UserPlus className="w-4 h-4 text-[#107a57]" />
+                  <span>إضافة تلميذ فردي يدوياً</span>
                 </button>
               </div>
             </div>
@@ -629,7 +775,7 @@ export default function StudentsManagementPage() {
               <table className="w-full text-right border-collapse">
                 <thead>
                   <tr className="bg-[#fafaf7] border-b border-[#e8e8e0] text-[11px] font-black text-gray-600">
-                    <th className="py-3 px-4 w-12 text-center">#</th>
+                    <th className="py-3 px-4 w-12 text-center">الرقم</th>
                     <th className="py-3 px-4">
                       <button
                         onClick={() => setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"))}
@@ -641,23 +787,24 @@ export default function StudentsManagementPage() {
                     </th>
                     <th className="py-3 px-4">الفوج التربوي</th>
                     <th className="py-3 px-4">رقم التعريف</th>
-                    <th className="py-3 px-4">هاتف الولي</th>
-                    <th className="py-3 px-4">ملاحظات وتوجيهات الأستاذ</th>
+                    <th className="py-3 px-4">هاتف ولي الأمر</th>
+                    <th className="py-3 px-4">ملاحظات الأستاذ البيداغوجية</th>
                     <th className="py-3 px-4 w-28 text-center">الإجراءات</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#e8e8e0] text-xs">
                   {filteredAndSortedStudents.map((st, idx) => (
                     <tr key={st.id} className="hover:bg-gray-50/80 transition group">
-                      <td className="py-3 px-4 text-center font-mono font-bold text-gray-400 text-[11px]">
+                      <td className="py-3 px-4 text-center font-mono font-bold text-gray-500 text-[11px]">
                         {idx + 1}
                       </td>
                       <td className="py-3 px-4 font-black text-gray-900">
                         <div className="flex items-center gap-2">
                           <span
-                            className={`w-2 h-2 rounded-full ${
+                            className={`w-2.5 h-2.5 rounded-full shrink-0 ${
                               st.gender === "أنثى" ? "bg-rose-400" : "bg-emerald-500"
                             }`}
+                            title={st.gender === "أنثى" ? "أنثى" : "ذكر"}
                           />
                           <span>{st.studentName}</span>
                         </div>
@@ -690,14 +837,14 @@ export default function StudentsManagementPage() {
                         <div className="flex items-center justify-center gap-1.5 opacity-90 group-hover:opacity-100">
                           <button
                             onClick={() => handleOpenEditStudent(st)}
-                            title="تعديل"
+                            title="تعديل بيانات التلميذ"
                             className="p-1.5 rounded-lg text-gray-500 hover:text-emerald-700 hover:bg-emerald-50 transition cursor-pointer"
                           >
                             <Pencil className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => handleDeleteStudent(st.id, st.studentName)}
-                            title="حذف"
+                            title="حذف من القائمة"
                             className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition cursor-pointer"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -717,9 +864,14 @@ export default function StudentsManagementPage() {
           <div className="fixed inset-0 z-[999999] bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150" dir="rtl">
             <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full border border-slate-200 shadow-2xl space-y-5 my-auto max-h-[92vh] flex flex-col overflow-y-auto animate-in zoom-in-95 duration-150">
               <div className="flex items-center justify-between border-b border-[#e8e8e0] pb-3 shrink-0">
-                <h3 className="text-base font-black text-gray-900">
-                  {editingStudent ? "تعديل بيانات التلميذ" : "إضافة تلميذ جديد"}
-                </h3>
+                <div>
+                  <h3 className="text-base font-black text-gray-900">
+                    {editingStudent ? "تعديل بيانات التلميذ" : `إضافة تلميذ جديد`}
+                  </h3>
+                  <p className="text-[11px] text-gray-500">
+                    {editingStudent ? "تعديل بيانات التلميذ وتحديث الفوج" : `سيتم الترتيب الأبجدي آلياً (أ ← ي)`}
+                  </p>
+                </div>
                 <button
                   onClick={() => setIsStudentModalOpen(false)}
                   className="p-1 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 cursor-pointer"
@@ -738,7 +890,7 @@ export default function StudentsManagementPage() {
                     required
                     value={formName}
                     onChange={(e) => setFormName(e.target.value)}
-                    placeholder="مثال: أحمد عبد الله أو مريم قدوري"
+                    placeholder="مثال: عبد الرحمن بن علي"
                     className="w-full px-3 py-2 rounded-xl bg-[#fafaf7] border border-[#e8e8e0] text-xs text-gray-900 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57]"
                   />
                 </div>
@@ -758,7 +910,7 @@ export default function StudentsManagementPage() {
                       ) : (
                         customClasses.map((c) => (
                           <option key={c} value={c}>
-                            {c}
+                            فوج {c}
                           </option>
                         ))
                       )}
@@ -808,7 +960,7 @@ export default function StudentsManagementPage() {
                     rows={2}
                     value={formNotes}
                     onChange={(e) => setFormNotes(e.target.value)}
-                    placeholder="ملاحظات حول الانضباط، مستلزمات الدرس، الواجبات..."
+                    placeholder="ملاحظات حول الانضباط، مستلزمات الدرس، الواجبات، النظارات..."
                     className="w-full px-3 py-2 rounded-xl bg-[#fafaf7] border border-[#e8e8e0] text-xs text-gray-900 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57]"
                   />
                 </div>
@@ -841,7 +993,10 @@ export default function StudentsManagementPage() {
           <div className="fixed inset-0 z-[999999] bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150" dir="rtl">
             <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full border border-slate-200 shadow-2xl space-y-5 my-auto max-h-[92vh] flex flex-col overflow-y-auto animate-in zoom-in-95 duration-150">
               <div className="flex items-center justify-between border-b border-[#e8e8e0] pb-3 shrink-0">
-                <h3 className="text-base font-black text-gray-900">إدارة الأفواج التربوية المسندة</h3>
+                <div>
+                  <h3 className="text-base font-black text-gray-900">إدارة الأفواج التربوية المسندة</h3>
+                  <p className="text-[11px] text-gray-500">إضافة أو حذف الأفواج الخاصة بك</p>
+                </div>
                 <button
                   onClick={() => setIsClassModalOpen(false)}
                   className="p-1 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 cursor-pointer"
@@ -867,7 +1022,7 @@ export default function StudentsManagementPage() {
               </form>
 
               <div className="space-y-2 pt-2 border-t border-[#e8e8e0] overflow-y-auto flex-1">
-                <label className="block text-xs font-bold text-gray-600">الأفواج الحالية لديك:</label>
+                <label className="block text-xs font-bold text-gray-600">الأفواج الحالية لديك ({customClasses.length}):</label>
                 <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
                   {customClasses.map((cls) => {
                     const count = students.filter((s) => s.className === cls).length;
@@ -877,7 +1032,7 @@ export default function StudentsManagementPage() {
                         className="flex items-center justify-between p-2 rounded-xl bg-[#fafaf7] border border-[#e8e8e0] text-xs font-bold"
                       >
                         <div className="flex items-center gap-1.5">
-                          <span className="text-[#107a57]">{cls}</span>
+                          <span className="text-[#107a57]">فوج {cls}</span>
                           <span className="text-[10px] text-gray-400 font-mono">({count})</span>
                         </div>
                         <button
@@ -919,9 +1074,9 @@ export default function StudentsManagementPage() {
                   </span>
                   <div>
                     <h3 className="text-sm sm:text-base font-black text-gray-900">
-                      لصق قائمة التلاميذ دفعة واحدة (إكسل / وورد)
+                      لصق قائمة تلاميذ {batchClass ? `فوج (${batchClass})` : "الفوج"} دفعة واحدة
                     </h3>
-                    <p className="text-[11px] text-gray-500">انسخ عمود الأسماء والصقه هنا مباشرة دون كتابة يدوية</p>
+                    <p className="text-[11px] text-gray-500">انسخ عمود الأسماء من Excel أو Word والصقه هنا مباشرة</p>
                   </div>
                 </div>
                 <button
@@ -948,7 +1103,7 @@ export default function StudentsManagementPage() {
                     <option value="">-- اختر الفوج المطلوب إلحاق التلاميذ به --</option>
                     {customClasses.map((c) => (
                       <option key={c} value={c}>
-                        {c}
+                        فوج {c}
                       </option>
                     ))}
                   </select>
@@ -970,11 +1125,11 @@ export default function StudentsManagementPage() {
                     rows={7}
                     value={batchRawText}
                     onChange={(e) => setBatchRawText(e.target.value)}
-                    placeholder={`مثال:\n1. محمد بن علي\n2. سارة عمراني\n3. عبد القادر زروقي\nأو الصق عمود كامل تم نسخه من Excel مباشرة...`}
+                    placeholder={`مثال:\n1. عبد الرحمن بن علي\n2. مريم قدوري\n3. بلال زرواطي\nأو الصق عمود كامل تم نسخه من Excel مباشرة...`}
                     className="w-full p-3 rounded-xl bg-[#fafaf7] border border-[#e8e8e0] text-xs text-gray-900 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57] font-mono leading-relaxed"
                   />
                   <p className="text-[10px] text-gray-400">
-                    * يتكفل النظام تلقائياً بإزالة الأرقام (1. 2.) والنقاط والأعمدة والترتيب الأبجدي الآلي.
+                    * يقوم النظام تلقائياً بتنظيف الأرقام والبادئات والترتيب الأبجدي الآلي لجميع التلاميذ.
                   </p>
                 </div>
 
@@ -1018,13 +1173,13 @@ export default function StudentsManagementPage() {
                     {saving ? (
                       <>
                         <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        <span>جارٍ الحفظ...</span>
+                        <span>جارٍ الحفظ والترتيب...</span>
                       </>
                     ) : (
                       <>
                         <CheckCircle2 className="w-3.5 h-3.5" />
                         <span>
-                          إدراج ({parsedBatchNames.length}) تلميذ في الفوج {batchClass || ""} بنقرة واحدة
+                          إدراج ({parsedBatchNames.length}) تلميذ في فوج {batchClass || ""} وترتيبهم أبجدياً
                         </span>
                       </>
                     )}

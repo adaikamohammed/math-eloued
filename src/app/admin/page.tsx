@@ -106,12 +106,29 @@ export default function AdminPage() {
       const data = await res.json();
       setProfile(data.profile ?? null);
       setAuthenticated(Boolean(data.authenticated));
+      if (data.authenticated && data.profile && typeof window !== "undefined") {
+        try {
+          localStorage.setItem("math_teacher_profile_cache", JSON.stringify(data.profile));
+        } catch {}
+      }
     } catch {
       setAuthenticated(false);
     }
   }, []);
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const cached = localStorage.getItem("math_teacher_profile_cache");
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed && parsed.id) {
+            setProfile(parsed);
+            setAuthenticated(true);
+          }
+        }
+      } catch {}
+    }
     checkAuth();
   }, [checkAuth]);
 

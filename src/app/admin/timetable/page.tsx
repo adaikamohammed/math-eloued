@@ -64,58 +64,52 @@ export default function TeacherTimetablePage() {
   const [editingSlotIndex, setEditingSlotIndex] = useState<number | null>(null);
   const [mounted, setMounted] = useState(false);
 
-  // التحقق من الجلسة
+  // التحقق من الجلسة وجلب البيانات بالتوازي
   useEffect(() => {
     setMounted(true);
-    fetch("/api/auth")
-      .then((res) => res.json())
-      .then((data) => {
-        setAuthenticated(data.authenticated === true);
+    if (typeof window !== "undefined") {
+      try {
+        const storedClasses = localStorage.getItem("last_active_classes");
+        if (storedClasses) {
+          const parsed = JSON.parse(storedClasses);
+          if (Array.isArray(parsed) && parsed.length > 0) setCustomClasses(parsed);
+        }
+      } catch {}
+    }
+
+    setLoading(true);
+    Promise.all([
+      fetch("/api/auth")
+        .then((res) => res.json())
+        .catch(() => ({ authenticated: false })),
+      fetch("/api/lessons")
+        .then((res) => (res.ok ? res.json() : null))
+        .catch(() => null),
+    ])
+      .then(([authData, data]: [any, LessonsData | null]) => {
+        setAuthenticated(authData?.authenticated === true);
+
+        if (data) {
+          const teacherClasses =
+            Array.isArray(data.customClasses) && data.customClasses.length > 0
+              ? data.customClasses
+              : [];
+          setCustomClasses(teacherClasses);
+
+          if (data.timetable && Array.isArray(data.timetable.slots)) {
+            setSlots(data.timetable.slots);
+            setOfficialImagePath(data.timetable.image_path || null);
+          }
+        }
       })
-      .catch(() => setAuthenticated(false));
+      .catch((err) => {
+        console.error(err);
+        setMessage({ type: "err", text: "حدث خطأ أثناء تحميل جدول التوقيت" });
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   }, []);
-
-  // قفل تمرير الصفحة أثناء فتح النافذة المنبثقة
-  useEffect(() => {
-    if (isSlotModalOpen) {
-      const orig = document.body.style.overflow;
-      document.body.style.overflow = "hidden";
-      return () => {
-        document.body.style.overflow = orig;
-      };
-    }
-  }, [isSlotModalOpen]);
-
-  // تحميل البيانات
-  const loadData = useCallback(async () => {
-    try {
-      setLoading(true);
-      const res = await fetch("/api/lessons");
-      if (!res.ok) throw new Error("تعذر تحميل جدول التوقيت");
-      const data: LessonsData = await res.json();
-
-      const teacherClasses = Array.isArray(data.customClasses) && data.customClasses.length > 0
-        ? data.customClasses
-        : [];
-      setCustomClasses(teacherClasses);
-
-      if (data.timetable && Array.isArray(data.timetable.slots)) {
-        setSlots(data.timetable.slots);
-        setOfficialImagePath(data.timetable.image_path || null);
-      }
-    } catch (err: any) {
-      console.error(err);
-      setMessage({ type: "err", text: err.message || "حدث خطأ أثناء تحميل جدول التوقيت" });
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (authenticated) {
-      loadData();
-    }
-  }, [authenticated, loadData]);
 
   // حفظ التعديلات
   const persistTimetable = async (newSlots: TimetableSlot[], imagePath = officialImagePath) => {
@@ -209,16 +203,19 @@ export default function TeacherTimetablePage() {
     return slots.find((s) => s.day === day && s.start === start && s.end === end);
   };
 
+  // قفل تمرير الصفحة أثناء فتح النافذة المنبثقة
+  useEffect(() => {
+    if (isSlotModalOpen) {
+      const orig = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = orig;
+      };
+    }
+  }, [isSlotModalOpen]);
+
   // إحصائيات الحصص
   const totalWeeklyHours = slots.length;
-
-  if (authenticated === null) {
-    return (
-      <div className="min-h-[60vh] flex items-center justify-center font-sans">
-        <Loader2 className="w-8 h-8 animate-spin text-[#107a57]" />
-      </div>
-    );
-  }
 
   if (authenticated === false) {
     return <LoginRequired next="/admin/timetable" title="جدول التوقيت الأسبوعي" />;

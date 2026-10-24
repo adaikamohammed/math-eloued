@@ -176,6 +176,7 @@ export function TeacherOnboardingModal({
       // 3. تخزين محلي لسرعة الاستجابة
       if (typeof window !== "undefined") {
         localStorage.setItem(`custom_classes_${profile.id}`, JSON.stringify(classes));
+        localStorage.setItem("last_active_classes", JSON.stringify(classes));
       }
 
       onComplete(sortedLevels, classes, cleanReception);
@@ -385,8 +386,14 @@ export function TeacherOnboardingModal({
                   الأفواج المعتمدة في حسابك ({classes.length}):
                 </span>
                 {classes.length === 0 ? (
-                  <div className="text-center py-3 bg-amber-50 rounded-xl border border-amber-200 text-amber-800 text-xs">
-                    لم تقم بإضافة أي فوج بعد. انقر على أزرار المقترحات بالأعلى.
+                  <div className="text-center py-3.5 px-4 bg-amber-50 rounded-xl border border-amber-300 text-amber-950 text-xs font-bold space-y-1">
+                    <p className="flex items-center justify-center gap-1.5 text-amber-900">
+                      <span>⚠️</span>
+                      <strong>تنبيه: يجب اختيار أو إضافة فوج واحد على الأقل للمتابعة إلى الخطوة التالية</strong>
+                    </p>
+                    <p className="text-[11px] text-amber-700 font-normal">
+                      انقر على أي من أزرار الأفواج المقترحة أعلاه (مثل {selectedLevels.map(l => `${l}م1`).join("، ")}) لإضافتها بنقرة واحدة.
+                    </p>
                   </div>
                 ) : (
                   <div className="flex flex-wrap gap-1.5">
@@ -771,8 +778,16 @@ export function TeacherOnboardingModal({
             {step < 3 && (
               <button
                 type="button"
-                onClick={() => setStep((s) => (s + 1) as any)}
-                className="btn-primary py-2 px-4 sm:px-5 text-xs font-black cursor-pointer shadow-md"
+                onClick={() => {
+                  if (step === 2 && classes.length === 0) return;
+                  setStep((s) => (s + 1) as any);
+                }}
+                disabled={step === 2 && classes.length === 0}
+                className={`py-2 px-4 sm:px-5 text-xs font-black shadow-md flex items-center gap-1 rounded-xl transition ${
+                  step === 2 && classes.length === 0
+                    ? "bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300"
+                    : "btn-primary cursor-pointer"
+                }`}
               >
                 <span>متابعة</span>
                 <ArrowLeft className="w-3.5 h-3.5 mr-1" />
@@ -813,7 +828,9 @@ export function TeacherOnboardingModal({
                   type="button"
                   onClick={() => {
                     onClose();
-                    router.push("/admin/students?from=onboarding");
+                    router.push(
+                      `/admin/students?from=onboarding&activeClass=${encodeURIComponent(classes[0] || "")}`
+                    );
                   }}
                   className="btn-primary py-2 px-4 sm:px-5 text-xs font-black cursor-pointer shadow-md flex items-center gap-1.5"
                 >
