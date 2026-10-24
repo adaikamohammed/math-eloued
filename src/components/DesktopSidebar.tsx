@@ -23,6 +23,9 @@ import {
   Sliders,
   X,
   UserPlus,
+  FileWarning,
+  Megaphone,
+  MessageSquare,
 } from "lucide-react";
 import { useLayout } from "@/context/LayoutContext";
 import { TeacherFeatureFlags } from "@/lib/types";
@@ -46,18 +49,42 @@ export function DesktopSidebar() {
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
   const [featureFlags, setFeatureFlags] = useState<TeacherFeatureFlags | null>(null);
 
-  // جلب تفضيلات الأستاذ لإظهار وإخفاء الصفحات ديناميكياً
+  // جلب تفضيلات الأستاذ لإظهار وإخفاء الصفحات ديناميكياً ولحظياً
   useEffect(() => {
+    // 1. القراءة الفورية من الكاش المحلي 0ms
+    try {
+      const cached = localStorage.getItem("teacher_feature_flags_cache");
+      if (cached) {
+        setFeatureFlags(JSON.parse(cached));
+      }
+    } catch {}
+
+    // 2. الاستماع لأي تغيير يُجريه الأستاذ فوراً دون الحاجة لتحديث الصفحة
+    const onFlagsUpdated = (e: any) => {
+      if (e?.detail) {
+        setFeatureFlags(e.detail);
+      }
+    };
+    window.addEventListener("featureFlagsUpdated", onFlagsUpdated);
+
+    // 3. المزامنة مع الخادم
     if (user && user.role !== "inspector") {
       fetch("/api/lessons")
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
           if (data?.featureFlags) {
             setFeatureFlags(data.featureFlags);
+            try {
+              localStorage.setItem("teacher_feature_flags_cache", JSON.stringify(data.featureFlags));
+            } catch {}
           }
         })
         .catch(() => {});
     }
+
+    return () => {
+      window.removeEventListener("featureFlagsUpdated", onFlagsUpdated);
+    };
   }, [user]);
 
   // بناء القوائم وفق رتبة المستخدم وإعداداته
@@ -72,12 +99,15 @@ export function DesktopSidebar() {
           href: "/admin",
           icon: GraduationCap,
         },
-        {
+      ];
+
+      if (flags.boardLessons !== false) {
+        pedagogyItems.push({
           label: "كراس الدروس والسبورة",
           href: "/admin/board",
           icon: BookOpen,
-        },
-      ];
+        });
+      }
 
       if (flags.students !== false) {
         pedagogyItems.push({
@@ -104,6 +134,15 @@ export function DesktopSidebar() {
       }
 
       const followupItems: NavItem[] = [];
+
+      if (flags.continuousAssessment !== false) {
+        followupItems.push({
+          label: "ميثاق التقويم (20/20)",
+          href: "/eval",
+          icon: Scale,
+        });
+      }
+
       if (flags.honors !== false) {
         followupItems.push({
           label: "لوحة الشرف وتكريم النوابغ",
@@ -112,7 +151,40 @@ export function DesktopSidebar() {
         });
       }
 
+      if (flags.penalties !== false) {
+        followupItems.push({
+          label: "سجل الخصومات والملاحظات",
+          href: "/penalties",
+          icon: FileWarning,
+        });
+      }
+
+      if (flags.announcements !== false) {
+        followupItems.push({
+          label: "شريط الإعلانات والتنبيهات",
+          href: "/announcement",
+          icon: Megaphone,
+        });
+      }
+
+      if (flags.messages !== false) {
+        followupItems.push({
+          label: "صندوق الرسائل والمقترحات",
+          href: "/messages",
+          icon: MessageSquare,
+        });
+      }
+
+      if (flags.reception !== false) {
+        followupItems.push({
+          label: "استقبال الأولياء",
+          href: "/parents",
+          icon: Users,
+        });
+      }
+
       const inspectionItems: NavItem[] = [];
+
       if (flags.forum !== false) {
         inspectionItems.push({
           label: "ملتقى الأساتذة البيداغوجي",
@@ -120,6 +192,7 @@ export function DesktopSidebar() {
           icon: Sparkles,
         });
       }
+
       if (flags.inspectorSync !== false) {
         inspectionItems.push({
           label: "فضاء التفتيش والمناشير",
@@ -178,185 +251,200 @@ export function DesktopSidebar() {
         title: "فضاء التلميذ والولي",
         items: [
           { label: "الرئيسية", href: "/", icon: Sparkles },
-          { label: "البحث بكود الأستاذ أو المستوى", href: "/t/search", icon: Search, badge: "كود" },
-          { label: "مستجدات أبنائي (المحفظة)", href: "/my-children", icon: Heart },
-        ],
-      },
-      {
-        title: "الشفافية والتحفيز",
-        items: [
+          { label: "بحث عن أستاذ بكود", href: "/t/search", icon: Search },
+          { label: "أبنائي ومحفظتي", href: "/my-children", icon: Heart },
           { label: "لوحة الشرف وتكريم النوابغ", href: "/honor", icon: Trophy },
         ],
       },
       {
-        title: "فضاء الطاقم التربوي",
+        title: "فضاء المربين والأساتذة",
         items: [
           {
-            label: "تسجيل دخول الأستاذ",
+            label: "تسجيل الدخول",
             href: "/login",
-            icon: GraduationCap,
-            badge: "للأساتذة 🔒",
-            badgeColor: "bg-slate-100 text-slate-700 border border-slate-200",
+            icon: LogIn,
+            badge: "للأساتذة",
+            badgeColor: "bg-[#107a57] text-white",
           },
           {
-            label: "انضمام أستاذ جديد",
-            href: "/join",
+            label: "إنشاء حساب أستاذ جديد",
+            href: "/register",
             icon: UserPlus,
-            badge: "فوري ✨",
-            badgeColor: "bg-emerald-50 text-emerald-700 border border-emerald-200",
           },
         ],
       },
     ];
   }, [user, featureFlags]);
 
-  const getWorkspaceUrl = () => {
-    if (!user) return "/login";
-    if (user.role === "inspector") return "/inspector";
-    if (user.role === "admin") return "/super-admin";
-    return "/admin";
-  };
-
-  const isActive = (href: string) => {
-    if (href === "/") return pathname === "/";
-    if (href === "/admin") return pathname === "/admin";
-    if (href === "/inspector") return pathname === "/inspector";
-    return pathname.startsWith(href);
+  // إغلاق قائمة الهاتف عند النقر على رابط
+  const handleItemClick = () => {
+    setIsMobileMenuOpen(false);
   };
 
   return (
     <>
-      {/* Mobile Drawer Overlay */}
+      {/* ── طبقة التعتيم للهواتف (Backdrop) ── */}
       {isMobileMenuOpen && (
         <div
+          className="fixed inset-0 bg-black/40 z-40 lg:hidden backdrop-blur-2xs transition-opacity"
           onClick={() => setIsMobileMenuOpen(false)}
-          className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs lg:hidden transition-opacity"
+          aria-hidden="true"
         />
       )}
 
-      {/* Sidebar الرئيسية بنمط منصة فرسان القرآن */}
+      {/* ── حاوية الشريط الجانبي (ثابتة في سطح المكتب، منزلقة في الهاتف) ── */}
       <aside
-        id="app-sidebar"
         className={`
-          fixed top-0 right-0 h-full z-50 lg:z-40 flex flex-col shrink-0
-          bg-white text-gray-800
-          border-l border-[#e8e8e0]
-          transition-all duration-300 ease-in-out
-          lg:static lg:h-screen
+          fixed lg:static top-0 right-0 z-50 h-screen
+          bg-white border-l border-[#e8e8e0]
+          flex flex-col transition-all duration-300 ease-in-out shadow-xs
+          ${isSidebarCollapsed ? "lg:w-20" : "lg:w-64"}
+          w-72 max-w-[85vw]
           ${isMobileMenuOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"}
-          ${isSidebarCollapsed ? "w-[4.5rem]" : "w-72"}
         `}
-        aria-label="القائمة الجانبية للمنصة"
+        aria-label="الشريط الجانبي للتنقل"
+        dir="rtl"
       >
-        {/* ── الرأس: الشعار وعنوان المنصة (h-16 متطابق مع الهيدر) ── */}
-        <div
-          className={`flex items-center border-b border-[#e8e8e0] shrink-0 h-16
-            ${isSidebarCollapsed ? "justify-center p-3" : "justify-between px-4"}`}
-        >
-          {!isSidebarCollapsed && (
-            <Link
-              href="/"
-              onClick={() => setIsMobileMenuOpen(false)}
-              className="flex items-center gap-3 group min-w-0"
-            >
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#107a57] to-[#0a5c40] flex items-center justify-center text-white shadow-md shadow-[#107a57]/20 group-hover:scale-105 transition-transform shrink-0">
-                <BookOpen className="w-5 h-5 text-white" />
-              </div>
-              <div className="leading-tight min-w-0">
-                <p className="text-sm font-black text-gray-900 truncate">
+        {/* ── رأس الشريط الجانبي (مطابق لارتفاع الهيدر h-16 تماماً) ── */}
+        <div className="h-16 border-b border-[#e8e8e0] flex items-center justify-between px-4 shrink-0">
+          <Link
+            href="/"
+            className="flex items-center gap-2.5 min-w-0 group"
+            onClick={handleItemClick}
+          >
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#107a57] to-[#159a6e] flex items-center justify-center text-white shrink-0 shadow-sm group-hover:scale-105 transition-transform">
+              <GraduationCap className="w-5 h-5" />
+            </div>
+
+            {!isSidebarCollapsed && (
+              <div className="min-w-0 transition-opacity duration-200">
+                <span className="font-black text-sm text-gray-900 tracking-tight block truncate">
                   منصة جسور التعليمية
-                </p>
-                <p className="text-[10px] text-[#107a57] font-bold opacity-90 truncate">
-                  التعليم المتوسط • ولاية الوادي
-                </p>
+                </span>
+                <span className="text-[10px] text-gray-400 font-medium block truncate">
+                  ولاية الوادي
+                </span>
               </div>
-            </Link>
-          )}
+            )}
+          </Link>
 
-          {isSidebarCollapsed && (
-            <Link
-              href="/"
-              className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#107a57] to-[#0a5c40] flex items-center justify-center text-white shadow-md shrink-0"
-              title="منصة جسور التعليمية"
-            >
-              <BookOpen className="w-5 h-5 text-white" />
-            </Link>
-          )}
+          {/* زر طي / فتح الشريط للحواسيب */}
+          <button
+            onClick={toggleSidebar}
+            className="hidden lg:flex p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+            title={isSidebarCollapsed ? "توسيع الشريط" : "طي الشريط"}
+            aria-label={isSidebarCollapsed ? "توسيع الشريط" : "طي الشريط"}
+          >
+            {isSidebarCollapsed ? (
+              <PanelRightOpen className="w-5 h-5" />
+            ) : (
+              <PanelRightClose className="w-5 h-5" />
+            )}
+          </button>
 
-          {/* زر التوسيع/الطي للشاشات الكبيرة */}
-          {!isSidebarCollapsed && (
-            <button
-              onClick={toggleSidebar}
-              className="hidden lg:flex p-1.5 rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition"
-              title="طي الشريط الجانبي"
-              aria-label="طي الشريط الجانبي"
-            >
-              <PanelRightClose className="w-4 h-4" />
-            </button>
-          )}
-
-          {/* زر إغلاق القائمة في الهاتف */}
+          {/* زر إغلاق في الهاتف */}
           <button
             onClick={() => setIsMobileMenuOpen(false)}
-            className="lg:hidden p-1.5 rounded-xl text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition"
+            className="lg:hidden p-1.5 rounded-lg text-gray-500 hover:bg-gray-100"
             aria-label="إغلاق القائمة"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* زر الفتح عند الوضع المطوي */}
-        {isSidebarCollapsed && (
-          <div className="hidden lg:flex justify-center py-2 border-b border-[#e8e8e0]/60">
-            <button
-              onClick={toggleSidebar}
-              className="p-1.5 rounded-xl text-gray-400 hover:text-[#107a57] hover:bg-emerald-50 transition"
-              title="توسيع الشريط الجانبي"
-              aria-label="توسيع الشريط الجانبي"
-            >
-              <PanelRightOpen className="w-4 h-4 text-[#107a57]" />
-            </button>
+        {/* ── بطاقة سريعة للمستخدم المسجل ── */}
+        {user && !isSidebarCollapsed && (
+          <div className="p-3 mx-3 mt-3 rounded-2xl bg-gradient-to-br from-[#f2f8f5] to-[#e6f4ee] border border-[#d2ebe0] shrink-0">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-[#107a57] text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-2xs">
+                {user.fullName?.charAt(0) || "أ"}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-black text-gray-900 truncate">
+                  {user.fullName}
+                </p>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="text-[10px] text-[#107a57] font-bold">
+                    {user.role === "inspector"
+                      ? "مفتش مقاطعة"
+                      : user.role === "admin"
+                      ? "المشرف العام"
+                      : "أستاذ المادة"}
+                  </span>
+                  {user.code && (
+                    <span className="text-[9px] font-mono px-1.5 py-0.2 bg-white/80 rounded border border-[#c3e4d5] text-gray-600">
+                      {user.code}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
-        {/* ── شريط التنقل وروابط الأقسام ── */}
-        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-4">
+        {/* ── قائمة الروابط القابلة للتمرير ── */}
+        <div className="flex-1 overflow-y-auto px-3 py-4 space-y-6 custom-scrollbar">
           {categories.map((cat, idx) => (
-            <div key={idx} className="space-y-1">
+            <div key={idx} className="space-y-1.5">
+              {/* عنوان الفئة (يختفي عند الطي) */}
               {!isSidebarCollapsed && (
-                <div className="px-3 py-1 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                <h3 className="px-3 text-[11px] font-extrabold text-gray-400 uppercase tracking-wider">
                   {cat.title}
-                </div>
+                </h3>
               )}
 
-              {cat.items.map((item) => {
-                const Icon = item.icon;
-                const active = isActive(item.href);
+              {/* عناصر الفئة */}
+              <div className="space-y-1">
+                {cat.items.map((item) => {
+                  const Icon = item.icon;
+                  const isActive =
+                    item.href === "/"
+                      ? pathname === "/"
+                      : item.href === "/admin"
+                      ? pathname === "/admin"
+                      : pathname === item.href ||
+                        (item.href !== "/" && pathname.startsWith(item.href));
 
-                return (
-                  <div key={item.href} className="relative group">
+                  return (
                     <Link
+                      key={item.href}
                       href={item.href}
-                      onClick={() => setIsMobileMenuOpen(false)}
+                      onClick={handleItemClick}
                       onMouseEnter={() => setHoveredItem(item.href)}
                       onMouseLeave={() => setHoveredItem(null)}
-                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${
-                        active
-                          ? "bg-[#107a57] text-white shadow-sm shadow-[#107a57]/25 font-black"
-                          : "text-gray-600 hover:bg-gray-100/80 hover:text-gray-900"
-                      } ${isSidebarCollapsed ? "justify-center px-0" : ""}`}
+                      className={`
+                        group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold transition-all
+                        ${isSidebarCollapsed ? "justify-center" : ""}
+                        ${
+                          isActive
+                            ? "bg-[#e6f4ee] text-[#107a57] shadow-2xs font-black"
+                            : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                        }
+                      `}
                     >
-                      <Icon className={`w-4 h-4 shrink-0 ${active ? "text-white" : "text-gray-500 group-hover:text-gray-800"}`} />
+                      {/* خط جانبي خفيف للعنصر النشط */}
+                      {isActive && (
+                        <span className="absolute right-0 top-2 bottom-2 w-1 bg-[#107a57] rounded-l-full" />
+                      )}
 
+                      {/* أيقونة العنصر */}
+                      <Icon
+                        className={`w-5 h-5 shrink-0 transition-colors ${
+                          isActive
+                            ? "text-[#107a57]"
+                            : "text-gray-400 group-hover:text-gray-600"
+                        }`}
+                      />
+
+                      {/* نص الرابط والشارة */}
                       {!isSidebarCollapsed && (
-                        <div className="flex-1 flex items-center justify-between overflow-hidden">
+                        <div className="flex items-center justify-between min-w-0 flex-1">
                           <span className="truncate">{item.label}</span>
                           {item.badge && (
                             <span
-                              className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold shrink-0 ${
-                                active
-                                  ? "bg-white/20 text-white"
-                                  : item.badgeColor || "bg-gray-100 text-gray-600 border border-gray-200"
+                              className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 ${
+                                item.badgeColor ||
+                                "bg-gray-100 text-gray-600 border border-gray-200"
                               }`}
                             >
                               {item.badge}
@@ -364,60 +452,38 @@ export function DesktopSidebar() {
                           )}
                         </div>
                       )}
-                    </Link>
 
-                    {/* Tooltip flyout on collapsed */}
-                    {isSidebarCollapsed && hoveredItem === item.href && (
-                      <div className="absolute right-full mr-2 top-1/2 -translate-y-1/2 z-50 bg-[#1a1a2e] text-white text-xs px-2.5 py-1.5 rounded-xl shadow-xl border border-gray-700 whitespace-nowrap pointer-events-none flex items-center gap-1.5">
-                        <span>{item.label}</span>
-                        {item.badge && (
-                          <span className="text-[9px] text-amber-300 font-bold">({item.badge})</span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+                      {/* Tooltip عائم يظهر عند طي الشريط الجانبي في الحاسوب */}
+                      {isSidebarCollapsed && hoveredItem === item.href && (
+                        <div
+                          className="hidden lg:block absolute left-full mr-2 px-2.5 py-1.5 bg-gray-900 text-white text-xs font-bold rounded-lg whitespace-nowrap shadow-lg z-50 pointer-events-none"
+                          style={{ marginRight: "12px" }}
+                        >
+                          {item.label}
+                        </div>
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
             </div>
           ))}
-        </nav>
+        </div>
 
-        {/* ── أسفل الشريط: بطاقة حساب المستخدم ── */}
-        <div className="p-3 border-t border-[#e8e8e0] bg-[#fafaf7]">
-          {user ? (
-            <Link
-              href={getWorkspaceUrl()}
-              onClick={() => setIsMobileMenuOpen(false)}
-              className={`flex items-center gap-2.5 p-2 rounded-xl bg-white hover:bg-gray-50 border border-[#e8e8e0] text-xs transition shadow-2xs group ${
-                isSidebarCollapsed ? "justify-center p-1.5" : ""
-              }`}
-              title="الانتقال للمساحة التعليمية"
-            >
-              <div className="w-8 h-8 rounded-lg bg-[#e6f4ee] text-[#107a57] border border-[#107a57]/20 flex items-center justify-center font-black shrink-0">
-                {user.fullName.charAt(0) || "أ"}
-              </div>
-              {!isSidebarCollapsed && (
-                <div className="flex-1 min-w-0 text-right">
-                  <p className="font-black text-gray-900 text-xs truncate">{user.fullName}</p>
-                  <div className="flex items-center gap-1.5 text-[10px] text-gray-500 mt-0.5">
-                    <span className="font-mono text-[#107a57] font-bold">{user.code || "حساب معتمد"}</span>
-                    {user.districtId && <span>• المقاطعة {user.districtId}</span>}
-                  </div>
-                </div>
-              )}
-            </Link>
+        {/* ── تذييل الشريط الجانبي (نسخة المنصة وحالة النظام) ── */}
+        <div className="p-3 border-t border-[#e8e8e0] shrink-0 text-center">
+          {!isSidebarCollapsed ? (
+            <div className="flex items-center justify-between text-[11px] text-gray-400 px-1">
+              <span>منصة جسور v2.4</span>
+              <span className="inline-flex items-center gap-1 text-[#107a57] font-bold">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#107a57] animate-pulse" />
+                متصل
+              </span>
+            </div>
           ) : (
-            <Link
-              href="/login"
-              onClick={() => setIsMobileMenuOpen(false)}
-              className={`flex items-center gap-2 p-2.5 rounded-xl bg-[#e6f4ee] hover:bg-[#d5eee2] text-[#107a57] border border-[#107a57]/20 text-xs font-bold transition ${
-                isSidebarCollapsed ? "justify-center px-0" : ""
-              }`}
-              title="تسجيل دخول الأستاذ"
-            >
-              <LogIn className="w-4 h-4 shrink-0 text-[#107a57]" />
-              {!isSidebarCollapsed && <span>دخول الأستاذ</span>}
-            </Link>
+            <div className="flex justify-center" title="النظام متصل">
+              <span className="w-2 h-2 rounded-full bg-[#107a57]" />
+            </div>
           )}
         </div>
       </aside>

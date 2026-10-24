@@ -23,7 +23,11 @@ import {
   EyeOff,
   Save,
   Check,
-  HelpCircle,
+  RotateCcw,
+  Sparkle,
+  Zap,
+  Info,
+  GraduationCap,
 } from "lucide-react";
 import { LoginRequired } from "@/components/LoginRequired";
 import {
@@ -40,6 +44,7 @@ interface FeatureCardDef {
   group: "pedagogy" | "followup" | "inspection";
   forParentsToo: boolean;
   parentsDescription?: string;
+  badge?: string;
 }
 
 const FEATURE_DEFINITIONS: FeatureCardDef[] = [
@@ -47,108 +52,108 @@ const FEATURE_DEFINITIONS: FeatureCardDef[] = [
   {
     key: "boardLessons",
     label: "كراس القسم وصور السبورة",
-    description: "رفع وتوثيق صور السبورة اليومية، كراس الدروس، الأعمال الموجهة والملخصات.",
+    description: "توثيق صور السبورة اليومية، كراس الدروس، الأعمال الموجهة، والملخصات للتلاميذ.",
     icon: BookOpen,
     group: "pedagogy",
     forParentsToo: true,
-    parentsDescription: "يسمح للولي بتصفح كراس القسم وصور السبورة لمساعدة ابنه.",
+    parentsDescription: "يسمح للولي والغياب بمشاهدة ما كُتب على السبورة في كل حصة.",
   },
   {
     key: "students",
     label: "إدارة الأفواج والتلاميذ",
-    description: "إضافة الأفواج المخصصة (مثل 1م3، 2م5) وقائمة التلاميذ والترتيب الأبجدي.",
+    description: "إدارة أفواجك المسندة (1م1، 2م3...) وتدوين قوائم التلاميذ واستدعاءات الاستدراك.",
     icon: Users,
     group: "pedagogy",
     forParentsToo: false,
   },
   {
     key: "timetable",
-    label: "التوقيت الأسبوعي",
-    description: "جدول الحصص الأسبوعي، القاعات، وساعات استقبال الأولياء المعتمدة.",
+    label: "التوقيت الأسبوعي والحصص",
+    description: "جدول الحصص والتفويج الأسبوعي ومشاركة التوقيت المعتمد مع المفتشية والأولياء.",
     icon: Calendar,
     group: "pedagogy",
     forParentsToo: true,
-    parentsDescription: "يظهر للولي جدول الأستاذ لمعرفة أوقات الحصص ومواعيد الاستقبال.",
+    parentsDescription: "يساعد الولي على معرفة توقيت حصص المادة وساعات استقبال الأولياء.",
   },
   {
     key: "diary",
     label: "الدفتر اليومي (ماذا سأدرس غداً)",
-    description: "توثيق الحصص اليومية، التحضير لمحتوى الغد، مؤشرات الكفاءة وطباعة دفتر النصوص.",
+    description: "التحضير البيداغوجي المسبق لدروس الغد ومؤشرات الكفاءة وسجل دفتر النصوص.",
     icon: ClipboardList,
     group: "pedagogy",
     forParentsToo: true,
-    parentsDescription: "يسمح للولي بمعرفة المورد المعرفي المحضر لغد ومتابعته.",
+    parentsDescription: "يطلع الولي على عنوان الدرس القادم لتحفيز ابنه على التحضير المسبق.",
   },
   {
     key: "homework",
     label: "الواجبات المنزلية والحلول",
-    description: "إسناد التمارين والواجبات مع إمكانية جدولة نشر الحل النموذجي بعد انتهاء المهلة.",
-    icon: FileTextIcon,
+    description: "إسناد التمارين المنزلية مع تحديد مهلة الحل وبرمجة نشر الحل النموذجي تلقائياً.",
+    icon: BookOpen,
     group: "pedagogy",
     forParentsToo: true,
-    parentsDescription: "يمكن الولي من معرفة الواجبات المطلوبة وموعد تسليمها.",
+    parentsDescription: "تمكين الأولياء من متابعة حل الواجبات قبل انتهاء الأجل المحدد.",
   },
 
   // الشفافية والمتابعة والتحفيز
   {
     key: "continuousAssessment",
     label: "ميثاق التقويم المستمر (20/20)",
-    description: "نظام الشفافية التامة لتقويم كراس التلميذ، الواجبات، المستلزمات والمشاركة.",
+    description: "معايير التقويم الصفي الشفاف (كراس المحاولات، الأدوات، السلوك، والمشاركة الفعالة).",
     icon: Scale,
     group: "followup",
     forParentsToo: true,
-    parentsDescription: "يظهر للولي معايير تقويم ابنه للحصول على 20/20 بشفافية تامة.",
+    parentsDescription: "يعرف الولي بالضبط كيف تُحتسب علامة ابنه الصفيّة بكل أمانة ووضوح.",
   },
   {
     key: "honors",
     label: "لوحة الشرف وتكريم النوابغ",
-    description: "تكريم التلاميذ المتميزين في الفروض، المواظبة، أو الكراس الأنيق النموذجي.",
+    description: "تكريم التلاميذ المتفوقين وطباعة شهادات التقدير الرسمية والتحفيز المستمر.",
     icon: Trophy,
     group: "followup",
     forParentsToo: true,
-    parentsDescription: "تشجيع معنوي عام يراه أولياء التلاميذ المتفوقين لتحفيزهم.",
+    parentsDescription: "لوحة فخر عامة تظهر للتلميذ والولي لتشجيع التنافس الإيجابي الشريف.",
   },
   {
     key: "announcements",
     label: "شريط الإعلانات والتنبيهات",
-    description: "نشر التنبيهات المدرسية، مواعيد الفروض، أو أي إعلان عاجل.",
+    description: "نشر التنبيهات المدرسية العاجلة ومواعيد الفروض والأنشطة الخاصة بالمؤسسة.",
     icon: Megaphone,
     group: "followup",
     forParentsToo: true,
-    parentsDescription: "تنبيهات فورية تظهر في أعلى فضاء الأستاذ للأولياء.",
+    parentsDescription: "إشعارات فورية تظهر في أعلى فضاء الأستاذ للتلاميذ والأولياء.",
   },
   {
     key: "messages",
     label: "صندوق الرسائل والمقترحات",
-    description: "استقبال أسئلة وملاحظات الأولياء والتلاميذ مع الحفاظ على الخصوصية.",
+    description: "استقبال استفسارات ورسائل الأولياء والتلاميذ المشفرة مع الحفاظ على الخصوصية.",
     icon: MessageSquare,
     group: "followup",
     forParentsToo: true,
-    parentsDescription: "يمنح الولي وسيلة مراسلة مباشرة مع الأستاذ دون الحاجة للاتصال الهاتفي.",
+    parentsDescription: "قناة تواصل راقية ومباشرة مع الأستاذ دون إحراج أو إزعاج هاتفي.",
   },
   {
     key: "reception",
-    label: "بطاقة الاستقبال الرسمية",
-    description: "تحديد اليوم والساعة الرسمية لاستقبال أولياء التلاميذ داخل المؤسسة.",
+    label: "بطاقة استقبال الأولياء",
+    description: "تحديد اليوم والساعة الرسمية الأسبوعية لاستقبال أولياء التلاميذ بالمؤسسة.",
     icon: Users,
     group: "followup",
     forParentsToo: true,
-    parentsDescription: "توضح للولي بدقة متى يمكنه الحضور لمقابلة الأستاذ في المتوسطة.",
+    parentsDescription: "تنبيه الولي بموعد ومكان الاستقبال الرسمي المعتمد داخل المتوسطة.",
   },
   {
     key: "penalties",
     label: "سجل الخصومات والملاحظات",
-    description: "توثيق التنبيهات السلوكية أو خصم نقاط الإهمال مع بيان السبب والتاريخ.",
+    description: "توثيق التنبيهات الموجهة والملاحظات السلوكية مع بيان التاريخ والتفاصيل.",
     icon: FileWarning,
     group: "followup",
     forParentsToo: false,
   },
 
-  // الملتقى والتفتيش (اختياري بحسب رغبة الأستاذ)
+  // فضاء التفتيش والملتقى
   {
     key: "forum",
     label: "ملتقى الأساتذة البيداغوجي",
-    description: "فضاء نقاش وتبادل المذكرات والخبرات بين أساتذة المادة في ولاية الوادي.",
+    description: "فضاء التبادل المعرفي والمذكرات والاستشارات بين أساتذة المادة في ولاية الوادي.",
     icon: Sparkles,
     group: "inspection",
     forParentsToo: false,
@@ -156,35 +161,14 @@ const FEATURE_DEFINITIONS: FeatureCardDef[] = [
   {
     key: "inspectorSync",
     label: "فضاء التفتيش والمناشير الرسمية",
-    description: "الربط مع مفتش المقاطعة لتلقي المراسلات، الندوات، ومراجعة المذكرات البيداغوجية.",
+    description: "استقبال مناشير المفتشية، الندوات التكوينية، إيداع المذكرات، وسجل التوصيات.",
     icon: ShieldCheck,
     group: "inspection",
     forParentsToo: false,
   },
 ];
 
-function FileTextIcon(props: { className?: string }) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
-      <path d="M14 2v4a2 2 0 0 0 2 2h4" />
-      <path d="M10 9H8" />
-      <path d="M16 13H8" />
-      <path d="M16 17H8" />
-    </svg>
-  );
-}
+const LOCAL_STORAGE_FLAGS_KEY = "teacher_feature_flags_cache";
 
 export default function FeaturesCustomizationPage() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
@@ -196,26 +180,39 @@ export default function FeaturesCustomizationPage() {
   // التحقق من الجلسة
   useEffect(() => {
     fetch("/api/auth")
-      .then((res) => res.json())
+      .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        setAuthenticated(data.authenticated === true);
+        setAuthenticated(data?.authenticated === true);
       })
       .catch(() => setAuthenticated(false));
   }, []);
 
-  // تحميل الإعدادات الحالية
+  // تحميل الإعدادات الحالية من الكاش المحلي أولاً (0ms) ثم من السيرفر
   const loadFlags = useCallback(async () => {
+    // 1. القراءة من التخزين المحلي الفوري
     try {
-      setLoading(true);
+      const cached = localStorage.getItem(LOCAL_STORAGE_FLAGS_KEY);
+      if (cached) {
+        setFlags({ ...DEFAULT_FEATURE_FLAGS, ...JSON.parse(cached) });
+        setLoading(false);
+      }
+    } catch {}
+
+    // 2. المزامنة من السيرفر
+    try {
       const res = await fetch("/api/lessons");
-      if (!res.ok) throw new Error("تعذر تحميل الإعدادات");
-      const data: LessonsData = await res.json();
-      if (data.featureFlags) {
-        setFlags({ ...DEFAULT_FEATURE_FLAGS, ...data.featureFlags });
+      if (res.ok) {
+        const data: LessonsData = await res.json();
+        if (data.featureFlags) {
+          const merged = { ...DEFAULT_FEATURE_FLAGS, ...data.featureFlags };
+          setFlags(merged);
+          try {
+            localStorage.setItem(LOCAL_STORAGE_FLAGS_KEY, JSON.stringify(merged));
+          } catch {}
+        }
       }
     } catch (err: any) {
-      console.error(err);
-      setMessage({ type: "err", text: err.message || "حدث خطأ أثناء تحميل التفضيلات" });
+      console.error("loadFlags error:", err);
     } finally {
       setLoading(false);
     }
@@ -227,19 +224,35 @@ export default function FeaturesCustomizationPage() {
     }
   }, [authenticated, loadFlags]);
 
-  // حفظ التعديلات
+  // حفظ التعديلات بشكل لحظي ودون أي تعليق
   const handleSave = async (updatedFlags: TeacherFeatureFlags) => {
     setSaving(true);
     setFlags(updatedFlags);
+
+    // 1. تحديث الكاش المحلي وبث حدث التحديث الفوري لكافة مكونات التطبيق (0ms)
+    try {
+      localStorage.setItem(LOCAL_STORAGE_FLAGS_KEY, JSON.stringify(updatedFlags));
+      window.dispatchEvent(new CustomEvent("featureFlagsUpdated", { detail: updatedFlags }));
+    } catch {}
+
+    // 2. الحفظ على خادم وقاعدة البيانات
     try {
       const res = await fetch("/api/lessons", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ featureFlags: updatedFlags }),
       });
-      if (!res.ok) throw new Error("فشل حفظ التعديلات");
-      setMessage({ type: "ok", text: "تم تحديث تفضيلات الواجهة بنجاح ✨" });
-      setTimeout(() => setMessage(null), 3000);
+
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => null);
+        throw new Error(errJson?.error || "فشل حفظ التعديلات في الخادم");
+      }
+
+      setMessage({
+        type: "ok",
+        text: "تم تحديث التفضيلات بنجاح ✨ تظهر الصفحات المفعلة وتختفي الملغاة فوراً في شريطك الجانبي وفضاء الولي.",
+      });
+      setTimeout(() => setMessage(null), 3500);
     } catch (err: any) {
       console.error(err);
       setMessage({ type: "err", text: err.message || "حدث خطأ أثناء الحفظ" });
@@ -256,7 +269,7 @@ export default function FeaturesCustomizationPage() {
     handleSave(updated);
   };
 
-  const applyPreset = (preset: "all" | "minimal" | "no_inspector") => {
+  const applyPreset = (preset: "all" | "minimal" | "no_inspector" | "honors_focus") => {
     let updated: TeacherFeatureFlags;
     if (preset === "all") {
       updated = { ...DEFAULT_FEATURE_FLAGS };
@@ -267,7 +280,7 @@ export default function FeaturesCustomizationPage() {
         timetable: true,
         diary: true,
         homework: true,
-        continuousAssessment: true,
+        continuousAssessment: false,
         honors: false,
         reception: true,
         announcements: false,
@@ -276,12 +289,21 @@ export default function FeaturesCustomizationPage() {
         forum: false,
         inspectorSync: false,
       };
-    } else {
-      // وضع بدون متابعة تفتيش أو منتديات
+    } else if (preset === "no_inspector") {
       updated = {
         ...flags,
         inspectorSync: false,
         forum: false,
+      };
+    } else {
+      // نمط التكريم والتقويم
+      updated = {
+        ...flags,
+        boardLessons: true,
+        continuousAssessment: true,
+        honors: true,
+        announcements: true,
+        reception: true,
       };
     }
     handleSave(updated);
@@ -290,7 +312,7 @@ export default function FeaturesCustomizationPage() {
   if (authenticated === null) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center font-sans">
-        <Loader2 className="w-8 h-8 animate-spin text-[#107a57]" />
+        <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
       </div>
     );
   }
@@ -299,281 +321,363 @@ export default function FeaturesCustomizationPage() {
     return <LoginRequired next="/settings/features" title="تخصيص الواجهة والصفحات" />;
   }
 
-  return (
-    <div className="min-h-screen bg-[#fafaf7] py-6 sm:py-8 px-4 font-sans" dir="rtl">
-      <div className="max-w-5xl mx-auto space-y-6">
-        {/* شريط المسار والتنقل */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-xs font-bold text-gray-500">
-            <Link href="/admin" className="hover:text-gray-900 transition flex items-center gap-1">
-              <ArrowRight className="w-3.5 h-3.5" />
-              لوحة الأستاذ
-            </Link>
-            <span>/</span>
-            <Link href="/settings" className="hover:text-gray-900 transition">
-              الإعدادات
-            </Link>
-            <span>/</span>
-            <span className="text-gray-900">تخصيص الواجهة والصفحات</span>
-          </div>
+  // حساب عدد الميزات المفعلة
+  const enabledCount = Object.values(flags).filter((v) => v !== false).length;
 
+  return (
+    <div className="space-y-6 fade-up font-sans" dir="rtl">
+      {/* شريط المسار والتنقل */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-xs font-bold text-gray-500">
+          <Link href="/admin" className="hover:text-gray-900 transition flex items-center gap-1">
+            <ArrowRight className="w-3.5 h-3.5" />
+            لوحة الأستاذ
+          </Link>
+          <span>/</span>
+          <Link href="/settings" className="hover:text-gray-900 transition">
+            الإعدادات
+          </Link>
+          <span>/</span>
+          <span className="text-gray-900">تخصيص الواجهة والصفحات</span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {saving && (
+            <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-xl flex items-center gap-1.5 border border-emerald-200">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              جاري الحفظ...
+            </span>
+          )}
           <Link
             href="/settings"
-            className="px-3.5 py-1.5 rounded-xl border border-[#e8e8e0] bg-white text-xs font-bold text-gray-700 hover:bg-gray-50 transition shadow-2xs flex items-center gap-1.5"
+            className="px-3.5 py-1.5 rounded-xl border border-gray-200 bg-white text-xs font-bold text-gray-700 hover:bg-gray-50 transition shadow-2xs flex items-center gap-1.5"
           >
-            <span>إعدادات الحساب وكلمة المرور</span>
+            <span>إعدادات الحساب</span>
             <ArrowRight className="w-3.5 h-3.5 rotate-180" />
           </Link>
         </div>
+      </div>
 
-        {/* تنبيهات النجاح أو الخطأ */}
-        {message && (
-          <div
-            className={`p-3.5 rounded-2xl text-xs font-bold flex items-center gap-2 border animate-in fade-in duration-200 ${
-              message.type === "ok"
-                ? "bg-emerald-50 text-emerald-800 border-emerald-200"
-                : "bg-red-50 text-red-700 border-red-200"
-            }`}
-          >
+      {/* تنبيهات النجاح أو الخطأ */}
+      {message && (
+        <div
+          className={`p-4 rounded-2xl text-xs font-bold flex items-center justify-between border shadow-2xs animate-in fade-in duration-200 ${
+            message.type === "ok"
+              ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+              : "bg-red-50 text-red-700 border-red-200"
+          }`}
+        >
+          <div className="flex items-center gap-2.5">
             {message.type === "ok" ? (
-              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+              <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-600" />
             ) : (
-              <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+              <AlertCircle className="w-5 h-5 shrink-0 text-red-600" />
             )}
             <span>{message.text}</span>
           </div>
-        )}
+          <button onClick={() => setMessage(null)} className="text-gray-400 hover:text-gray-600 text-sm font-bold">
+            ✕
+          </button>
+        </div>
+      )}
 
-        {/* ترويسة الصفحة */}
-        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#e8e8e0] shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="space-y-1.5">
-            <div className="inline-flex items-center gap-2 bg-[#e6f4ee] text-[#107a57] border border-[#107a57]/20 px-3 py-0.5 rounded-full text-xs font-bold">
+      {/* ترويسة الصفحة والتحكم بالأنماط الجاهزة */}
+      <div className="bg-gradient-to-r from-slate-900 via-emerald-950 to-teal-900 text-white rounded-3xl p-6 sm:p-7 shadow-sm relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-80 h-80 bg-white/5 rounded-full blur-3xl pointer-events-none" />
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-2 bg-emerald-500/20 text-emerald-200 border border-emerald-400/30 px-3 py-0.5 rounded-full text-xs font-bold">
               <Sliders className="w-3.5 h-3.5" />
-              <span>تحكم كامل ومخصص لكل أستاذ</span>
+              <span>تحكم كامل ومخصص بحرية تامة</span>
             </div>
-            <h1 className="text-xl sm:text-2xl font-black text-gray-900">
-              تخصيص صفحات المنصة وما يظهر للولي
+            <h1 className="text-xl sm:text-2xl font-black text-white">
+              تخصيص صفحات المنصة وما يظهر للأولياء
             </h1>
-            <p className="text-xs text-gray-600 font-medium max-w-2xl">
-              أنت صاحب الفضاء: يمكنك إخفاء أي صفحة لا تحتاجها من شريطك الجانبي (مثل التفتيش أو المنتديات)، وتحديد ما إذا كانت كل ميزة متاحة لولي الأمر في فضاء الأستاذ الخاص بك.
+            <p className="text-xs text-emerald-100/90 font-medium max-w-2xl leading-relaxed">
+              اختر بحرية الصفحات التي تود تفعيلها في شريطك الجانبي، وأي ميزات ترغب بمشاركتها مع أولياء التلاميذ.
+              عند إلغاء تفعيل أي ميزة، تختفي فوراً من شريطك وقائمتك دون أي أخطاء.
             </p>
+            <div className="flex items-center gap-2 pt-1 text-xs text-emerald-200">
+              <span className="font-bold">الحالة الحالية:</span>
+              <span className="px-2 py-0.5 rounded-md bg-white/10 font-bold">
+                {enabledCount} ميزة مفعلة من أصل {FEATURE_DEFINITIONS.length}
+              </span>
+            </div>
           </div>
 
-          {/* أوضاع جاهزة سريعة */}
-          <div className="flex sm:flex-col gap-2 shrink-0">
-            <button
-              onClick={() => applyPreset("all")}
-              className="px-3 py-1.5 rounded-xl border border-[#e8e8e0] bg-[#fafaf7] hover:bg-white text-xs font-bold text-gray-800 transition text-right shadow-2xs cursor-pointer"
-            >
-              ⭐ تفعيل جميع الميزات
-            </button>
-            <button
-              onClick={() => applyPreset("no_inspector")}
-              className="px-3 py-1.5 rounded-xl border border-[#e8e8e0] bg-[#fafaf7] hover:bg-white text-xs font-bold text-gray-800 transition text-right shadow-2xs cursor-pointer"
-            >
-              🔒 إخفاء التفتيش والملتقى
-            </button>
-            <button
-              onClick={() => applyPreset("minimal")}
-              className="px-3 py-1.5 rounded-xl border border-[#e8e8e0] bg-[#fafaf7] hover:bg-white text-xs font-bold text-gray-800 transition text-right shadow-2xs cursor-pointer"
-            >
-              🎯 الوضع المركز (الدروس والتلاميذ فقط)
-            </button>
+          {/* أوضاع جاهزة سريعة بنقرة واحدة */}
+          <div className="bg-white/10 backdrop-blur-md p-3.5 rounded-2xl border border-white/10 space-y-2 shrink-0">
+            <span className="text-[11px] font-black text-emerald-200 block">⚡ أنماط جاهزة سريعة:</span>
+            <div className="grid grid-cols-2 gap-1.5 text-xs">
+              <button
+                type="button"
+                onClick={() => applyPreset("all")}
+                className="px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold transition text-right flex items-center gap-1.5"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                <span>تفعيل الكل</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => applyPreset("minimal")}
+                className="px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold transition text-right flex items-center gap-1.5"
+              >
+                <Zap className="w-3.5 h-3.5 text-emerald-300" />
+                <span>النمط المبسط</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => applyPreset("no_inspector")}
+                className="px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold transition text-right flex items-center gap-1.5 col-span-2"
+              >
+                <EyeOff className="w-3.5 h-3.5 text-blue-300" />
+                <span>استقلالية تامة (بدون فضاء التفتيش)</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ─── شبكة الميزات المنظمة ─── */}
+      <div className="space-y-6">
+        {/* قسم 1: الميدان التربوي والتعليمي */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between border-b border-gray-200 pb-2">
+            <div className="flex items-center gap-2 text-xs font-black text-gray-900">
+              <BookOpen className="w-4 h-4 text-emerald-600" />
+              <span>الميدان التربوي والتعليمي اليومي</span>
+            </div>
+            <span className="text-[11px] text-gray-400 font-bold">
+              {FEATURE_DEFINITIONS.filter((f) => f.group === "pedagogy" && flags[f.key] !== false).length} مفعلة
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+            {FEATURE_DEFINITIONS.filter((f) => f.group === "pedagogy").map((feat) => (
+              <FeatureCard
+                key={feat.key}
+                feat={feat}
+                isEnabled={flags[feat.key] !== false}
+                onToggle={() => toggleFeature(feat.key)}
+              />
+            ))}
           </div>
         </div>
 
-        {/* ─── شبكة الميزات ─── */}
-        <div className="space-y-6">
-          {/* قسم 1: الميدان التربوي والبيداغوجي */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 text-xs font-black text-gray-900 border-b border-[#e8e8e0] pb-2">
-              <BookOpen className="w-4 h-4 text-[#107a57]" />
-              <span>الميدان التربوي والتعليمي اليومي</span>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-              {FEATURE_DEFINITIONS.filter((f) => f.group === "pedagogy").map((feat) => {
-                const Icon = feat.icon;
-                const isEnabled = flags[feat.key] !== false;
-                return (
-                  <div
-                    key={feat.key}
-                    onClick={() => toggleFeature(feat.key)}
-                    className={`p-4 rounded-2xl border transition cursor-pointer flex items-start justify-between gap-3 ${
-                      isEnabled
-                        ? "bg-white border-[#107a57]/40 ring-1 ring-[#107a57]/20 shadow-xs"
-                        : "bg-[#fafaf7] border-[#e8e8e0] opacity-60 hover:opacity-100"
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div
-                        className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
-                          isEnabled
-                            ? "bg-[#e6f4ee] text-[#107a57] border-[#107a57]/20"
-                            : "bg-gray-100 text-gray-400 border-gray-200"
-                        }`}
-                      >
-                        <Icon className="w-5 h-5" />
-                      </div>
-
-                      <div className="space-y-1 text-right">
-                        <div className="flex items-center gap-2">
-                          <h4 className="text-xs font-black text-gray-900">{feat.label}</h4>
-                          {feat.forParentsToo && (
-                            <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.2 rounded-md">
-                              يظهر للولي
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-[11px] text-gray-600 leading-relaxed font-medium">
-                          {feat.description}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="shrink-0 pt-1">
-                      <div
-                        className={`w-11 h-6 rounded-full transition-colors relative flex items-center p-0.5 cursor-pointer ${
-                          isEnabled ? "bg-[#107a57]" : "bg-gray-300"
-                        }`}
-                      >
-                        <div
-                          className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform ${
-                            isEnabled ? "-translate-x-5" : "translate-x-0"
-                          }`}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* قسم 2: الشفافية والمتابعة وتواصل الأولياء */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 text-xs font-black text-gray-900 border-b border-[#e8e8e0] pb-2">
-              <Scale className="w-4 h-4 text-emerald-600" />
+        {/* قسم 2: الشفافية والمتابعة وتواصل الأولياء */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between border-b border-gray-200 pb-2">
+            <div className="flex items-center gap-2 text-xs font-black text-gray-900">
+              <Scale className="w-4 h-4 text-indigo-600" />
               <span>الشفافية، التقويم والمتابعة مع الأولياء</span>
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-              {FEATURE_DEFINITIONS.filter((f) => f.group === "followup").map((feat) => {
-                const Icon = feat.icon;
-                const isEnabled = flags[feat.key] !== false;
-                return (
-                  <div
-                    key={feat.key}
-                    onClick={() => toggleFeature(feat.key)}
-                    className={`p-4 rounded-2xl border transition cursor-pointer flex items-start justify-between gap-3 ${
-                      isEnabled
-                        ? "bg-white border-[#107a57]/40 ring-1 ring-[#107a57]/20 shadow-xs"
-                        : "bg-[#fafaf7] border-[#e8e8e0] opacity-60 hover:opacity-100"
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div
-                        className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
-                          isEnabled
-                            ? "bg-[#e6f4ee] text-[#107a57] border-[#107a57]/20"
-                            : "bg-gray-100 text-gray-400 border-gray-200"
-                        }`}
-                      >
-                        <Icon className="w-5 h-5" />
-                      </div>
-
-                      <div className="space-y-1 text-right">
-                        <div className="flex items-center gap-2">
-                          <h4 className="text-xs font-black text-gray-900">{feat.label}</h4>
-                          {feat.forParentsToo && (
-                            <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.2 rounded-md">
-                              يظهر للولي
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-[11px] text-gray-600 leading-relaxed font-medium">
-                          {feat.description}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="shrink-0 pt-1">
-                      <div
-                        className={`w-11 h-6 rounded-full transition-colors relative flex items-center p-0.5 cursor-pointer ${
-                          isEnabled ? "bg-[#107a57]" : "bg-gray-300"
-                        }`}
-                      >
-                        <div
-                          className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform ${
-                            isEnabled ? "-translate-x-5" : "translate-x-0"
-                          }`}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            <span className="text-[11px] text-gray-400 font-bold">
+              {FEATURE_DEFINITIONS.filter((f) => f.group === "followup" && flags[f.key] !== false).length} مفعلة
+            </span>
           </div>
 
-          {/* قسم 3: التفتيش والملتقى البيداغوجي */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 text-xs font-black text-gray-900 border-b border-[#e8e8e0] pb-2">
-              <ShieldCheck className="w-4 h-4 text-indigo-600" />
-              <span>فضاء المفتشية والملتقى الولائي (اختياري حسب رغبة الأستاذ)</span>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-              {FEATURE_DEFINITIONS.filter((f) => f.group === "inspection").map((feat) => {
-                const Icon = feat.icon;
-                const isEnabled = flags[feat.key] !== false;
-                return (
-                  <div
-                    key={feat.key}
-                    onClick={() => toggleFeature(feat.key)}
-                    className={`p-4 rounded-2xl border transition cursor-pointer flex items-start justify-between gap-3 ${
-                      isEnabled
-                        ? "bg-white border-[#107a57]/40 ring-1 ring-[#107a57]/20 shadow-xs"
-                        : "bg-[#fafaf7] border-[#e8e8e0] opacity-60 hover:opacity-100"
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div
-                        className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
-                          isEnabled
-                            ? "bg-[#e6f4ee] text-[#107a57] border-[#107a57]/20"
-                            : "bg-gray-100 text-gray-400 border-gray-200"
-                        }`}
-                      >
-                        <Icon className="w-5 h-5" />
-                      </div>
-
-                      <div className="space-y-1 text-right">
-                        <h4 className="text-xs font-black text-gray-900">{feat.label}</h4>
-                        <p className="text-[11px] text-gray-600 leading-relaxed font-medium">
-                          {feat.description}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="shrink-0 pt-1">
-                      <div
-                        className={`w-11 h-6 rounded-full transition-colors relative flex items-center p-0.5 cursor-pointer ${
-                          isEnabled ? "bg-[#107a57]" : "bg-gray-300"
-                        }`}
-                      >
-                        <div
-                          className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform ${
-                            isEnabled ? "-translate-x-5" : "translate-x-0"
-                          }`}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+            {FEATURE_DEFINITIONS.filter((f) => f.group === "followup").map((feat) => (
+              <FeatureCard
+                key={feat.key}
+                feat={feat}
+                isEnabled={flags[feat.key] !== false}
+                onToggle={() => toggleFeature(feat.key)}
+              />
+            ))}
           </div>
+        </div>
+
+        {/* قسم 3: فضاء التفتيش والملتقى */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between border-b border-gray-200 pb-2">
+            <div className="flex items-center gap-2 text-xs font-black text-gray-900">
+              <ShieldCheck className="w-4 h-4 text-blue-600" />
+              <span>فضاء المفتشية والملتقى التكويني</span>
+            </div>
+            <span className="text-[11px] text-gray-400 font-bold">
+              {FEATURE_DEFINITIONS.filter((f) => f.group === "inspection" && flags[f.key] !== false).length} مفعلة
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+            {FEATURE_DEFINITIONS.filter((f) => f.group === "inspection").map((feat) => (
+              <FeatureCard
+                key={feat.key}
+                feat={feat}
+                isEnabled={flags[feat.key] !== false}
+                onToggle={() => toggleFeature(feat.key)}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ─── معاينة حية لشكل القائمة الجانبية الحالية ─── */}
+      <div className="bg-white rounded-3xl p-5 sm:p-6 border border-gray-200 shadow-2xs space-y-3">
+        <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+          <div className="flex items-center gap-2">
+            <Eye className="w-4 h-4 text-emerald-600" />
+            <h3 className="font-bold text-slate-900 text-sm">
+              معاينة حية: ما سيظهر في شريطك الجانبي الآن وفق اختياراتك
+            </h3>
+          </div>
+          <span className="text-[11px] text-gray-400 font-bold">تحديث لحظي تلقائي (0ms)</span>
+        </div>
+
+        <div className="flex flex-wrap gap-2 pt-1">
+          <span className="px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-bold flex items-center gap-1.5 shadow-2xs">
+            <GraduationCap className="w-3.5 h-3.5 text-emerald-400" /> لوحة التحكم
+          </span>
+
+          {flags.boardLessons !== false && (
+            <span className="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold flex items-center gap-1.5">
+              <BookOpen className="w-3.5 h-3.5 text-emerald-600" /> كراس الدروس والسبورة
+            </span>
+          )}
+
+          {flags.students !== false && (
+            <span className="px-3 py-1.5 rounded-xl bg-blue-50 text-blue-800 border border-blue-200 text-xs font-bold flex items-center gap-1.5">
+              <Users className="w-3.5 h-3.5 text-blue-600" /> إدارة الأفواج
+            </span>
+          )}
+
+          {flags.timetable !== false && (
+            <span className="px-3 py-1.5 rounded-xl bg-purple-50 text-purple-800 border border-purple-200 text-xs font-bold flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5 text-purple-600" /> التوقيت الأسبوعي
+            </span>
+          )}
+
+          {flags.diary !== false && (
+            <span className="px-3 py-1.5 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 text-xs font-bold flex items-center gap-1.5">
+              <ClipboardList className="w-3.5 h-3.5 text-amber-600" /> الدفتر اليومي
+            </span>
+          )}
+
+          {flags.continuousAssessment !== false && (
+            <span className="px-3 py-1.5 rounded-xl bg-teal-50 text-teal-800 border border-teal-200 text-xs font-bold flex items-center gap-1.5">
+              <Scale className="w-3.5 h-3.5 text-teal-600" /> ميثاق التقويم
+            </span>
+          )}
+
+          {flags.honors !== false && (
+            <span className="px-3 py-1.5 rounded-xl bg-yellow-50 text-yellow-800 border border-yellow-200 text-xs font-bold flex items-center gap-1.5">
+              <Trophy className="w-3.5 h-3.5 text-yellow-600" /> لوحة الشرف
+            </span>
+          )}
+
+          {flags.penalties !== false && (
+            <span className="px-3 py-1.5 rounded-xl bg-rose-50 text-rose-800 border border-rose-200 text-xs font-bold flex items-center gap-1.5">
+              <FileWarning className="w-3.5 h-3.5 text-rose-600" /> سجل الخصومات
+            </span>
+          )}
+
+          {flags.announcements !== false && (
+            <span className="px-3 py-1.5 rounded-xl bg-orange-50 text-orange-800 border border-orange-200 text-xs font-bold flex items-center gap-1.5">
+              <Megaphone className="w-3.5 h-3.5 text-orange-600" /> شريط الإعلانات
+            </span>
+          )}
+
+          {flags.messages !== false && (
+            <span className="px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-800 border border-indigo-200 text-xs font-bold flex items-center gap-1.5">
+              <MessageSquare className="w-3.5 h-3.5 text-indigo-600" /> صندوق الرسائل
+            </span>
+          )}
+
+          {flags.reception !== false && (
+            <span className="px-3 py-1.5 rounded-xl bg-sky-50 text-sky-800 border border-sky-200 text-xs font-bold flex items-center gap-1.5">
+              <Users className="w-3.5 h-3.5 text-sky-600" /> استقبال الأولياء
+            </span>
+          )}
+
+          {flags.forum !== false && (
+            <span className="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-emerald-600" /> الملتقى البيداغوجي
+            </span>
+          )}
+
+          {flags.inspectorSync !== false && (
+            <span className="px-3 py-1.5 rounded-xl bg-blue-50 text-blue-800 border border-blue-200 text-xs font-bold flex items-center gap-1.5">
+              <ShieldCheck className="w-3.5 h-3.5 text-blue-600" /> فضاء التفتيش
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── بطاقة الميزة التفاعلية ───
+function FeatureCard({
+  feat,
+  isEnabled,
+  onToggle,
+}: {
+  feat: FeatureCardDef;
+  isEnabled: boolean;
+  onToggle: () => void;
+}) {
+  const Icon = feat.icon;
+
+  return (
+    <div
+      onClick={onToggle}
+      className={`p-4 rounded-2xl border transition-all duration-200 cursor-pointer flex items-start justify-between gap-3 select-none ${
+        isEnabled
+          ? "bg-white border-emerald-300 ring-2 ring-emerald-500/10 shadow-xs hover:border-emerald-400"
+          : "bg-gray-50/70 border-gray-200 opacity-60 hover:opacity-100 hover:bg-white"
+      }`}
+    >
+      <div className="flex items-start gap-3 min-w-0">
+        <div
+          className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border transition-colors ${
+            isEnabled
+              ? "bg-emerald-50 text-emerald-700 border-emerald-200 shadow-2xs"
+              : "bg-gray-100 text-gray-400 border-gray-200"
+          }`}
+        >
+          <Icon className="w-5 h-5" />
+        </div>
+
+        <div className="space-y-1 text-right min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h4 className={`text-xs font-black ${isEnabled ? "text-gray-900" : "text-gray-500"}`}>
+              {feat.label}
+            </h4>
+            {feat.forParentsToo && (
+              <span className="text-[9px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.2 rounded-md">
+                يظهر للولي
+              </span>
+            )}
+          </div>
+          <p className="text-[11px] text-gray-500 leading-relaxed font-medium">
+            {feat.description}
+          </p>
+        </div>
+      </div>
+
+      <div className="shrink-0 flex flex-col items-end gap-1.5 pt-0.5">
+        <span
+          className={`text-[10px] font-black px-2 py-0.5 rounded-full border transition-colors ${
+            isEnabled
+              ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+              : "bg-gray-200 text-gray-500 border-gray-300"
+          }`}
+        >
+          {isEnabled ? "مفعلة ✓" : "مخفية ✕"}
+        </span>
+
+        {/* سويتش التبديل المرئي */}
+        <div
+          className={`w-10 h-5.5 rounded-full transition-colors relative flex items-center p-0.5 ${
+            isEnabled ? "bg-emerald-600" : "bg-gray-300"
+          }`}
+        >
+          <div
+            className={`w-4.5 h-4.5 rounded-full bg-white shadow-sm transform transition-transform ${
+              isEnabled ? "translate-x-0" : "-translate-x-4.5"
+            }`}
+          />
         </div>
       </div>
     </div>

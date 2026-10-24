@@ -148,14 +148,22 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ success: true, timetable: data.timetable });
     }
 
-    // 2. حفظ قائمة التلاميذ أو الأفواج أو دفتر النصوص أو الكراريس المخصصة والتسميات
-    if (body.studentRoster !== undefined || body.customClasses !== undefined || body.diaryEntries !== undefined || body.customNotebooks !== undefined || body.boardNomenclature !== undefined) {
+    // 2. حفظ قائمة التلاميذ أو الأفواج أو دفتر النصوص أو الكراريس المخصصة والتسميات وتفضيلات الواجهة
+    if (
+      body.studentRoster !== undefined ||
+      body.customClasses !== undefined ||
+      body.diaryEntries !== undefined ||
+      body.customNotebooks !== undefined ||
+      body.boardNomenclature !== undefined ||
+      body.featureFlags !== undefined
+    ) {
       const data = await getLessonsData(ctx);
       if (body.studentRoster !== undefined) data.studentRoster = body.studentRoster;
       if (body.customClasses !== undefined) data.customClasses = body.customClasses;
       if (body.diaryEntries !== undefined) data.diaryEntries = body.diaryEntries;
       if (body.customNotebooks !== undefined) data.customNotebooks = body.customNotebooks;
       if (body.boardNomenclature !== undefined) data.boardNomenclature = body.boardNomenclature;
+      if (body.featureFlags !== undefined) data.featureFlags = body.featureFlags;
       await saveLessonsData(ctx, data);
       return NextResponse.json({
         success: true,
@@ -164,6 +172,7 @@ export async function PUT(req: NextRequest) {
         diaryEntries: data.diaryEntries,
         customNotebooks: data.customNotebooks,
         boardNomenclature: data.boardNomenclature,
+        featureFlags: data.featureFlags,
       });
     }
 

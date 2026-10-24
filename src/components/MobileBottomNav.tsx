@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -19,10 +19,43 @@ import {
   Heart,
 } from "lucide-react";
 import { useLayout } from "@/context/LayoutContext";
+import { TeacherFeatureFlags } from "@/lib/types";
 
 export function MobileBottomNav() {
   const pathname = usePathname() || "/";
   const { user } = useLayout();
+  const [featureFlags, setFeatureFlags] = useState<TeacherFeatureFlags | null>(null);
+
+  useEffect(() => {
+    // 1. قراءة فورية من الكاش
+    try {
+      const cached = localStorage.getItem("teacher_feature_flags_cache");
+      if (cached) setFeatureFlags(JSON.parse(cached));
+    } catch {}
+
+    // 2. الاستماع لتحديث التخصيصات
+    const handler = (e: any) => {
+      if (e?.detail) setFeatureFlags(e.detail);
+    };
+    window.addEventListener("featureFlagsUpdated", handler);
+
+    // 3. المزامنة مع الخادم
+    if (user && user.role === "teacher") {
+      fetch("/api/lessons")
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data?.featureFlags) {
+            setFeatureFlags(data.featureFlags);
+            try {
+              localStorage.setItem("teacher_feature_flags_cache", JSON.stringify(data.featureFlags));
+            } catch {}
+          }
+        })
+        .catch(() => {});
+    }
+
+    return () => window.removeEventListener("featureFlagsUpdated", handler);
+  }, [user]);
 
   let items = [
     { label: "الرئيسية", href: "/", icon: Sparkles },
@@ -33,17 +66,38 @@ export function MobileBottomNav() {
   ];
 
   if (user && user.role === "teacher") {
-    items = [
+    const flags = featureFlags || {};
+    const teacherNav: { label: string; href: string; icon: any }[] = [
       { label: "لوحتي", href: "/admin", icon: GraduationCap },
-      { label: "التلاميذ", href: "/admin/students", icon: Users },
-      { label: "السبورة", href: "/admin/board", icon: BookOpen },
-      { label: "التوقيت", href: "/admin/timetable", icon: Calendar },
-      { label: "الدفتر", href: "/admin/diary", icon: ClipboardList },
     ];
+
+    if (flags.students !== false) {
+      teacherNav.push({ label: "التلاميذ", href: "/admin/students", icon: Users });
+    }
+    if (flags.boardLessons !== false) {
+      teacherNav.push({ label: "السبورة", href: "/admin/board", icon: BookOpen });
+    }
+    if (flags.timetable !== false) {
+      teacherNav.push({ label: "التوقيت", href: "/admin/timetable", icon: Calendar });
+    }
+    if (flags.diary !== false) {
+      teacherNav.push({ label: "الدفتر", href: "/admin/diary", icon: ClipboardList });
+    }
+    if (flags.honors !== false && teacherNav.length < 5) {
+      teacherNav.push({ label: "الشرف", href: "/honor", icon: Trophy });
+    }
+    if (flags.inspectorSync !== false && teacherNav.length < 5) {
+      teacherNav.push({ label: "التفتيش", href: "/inspector", icon: ShieldCheck });
+    }
+    if (teacherNav.length < 5) {
+      teacherNav.push({ label: "التخصيص", href: "/settings/features", icon: Sliders });
+    }
+
+    items = teacherNav.slice(0, 5);
   } else if (user && user.role === "inspector") {
     items = [
       { label: "التفتيش", href: "/inspector", icon: ShieldCheck },
-      { label: "الندوات", href: "/inspector/circulars", icon: Calendar },
+      { label: "الندوات", href: "/inspector", icon: Calendar },
       { label: "الملتقى", href: "/forum", icon: Users },
       { label: "لوحة الشرف", href: "/honor", icon: Trophy },
       { label: "الإعدادات", href: "/settings", icon: Sliders },
