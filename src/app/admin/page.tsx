@@ -82,6 +82,7 @@ import {
   type AnonymousMessage,
   type MessageCategory,
   type StudentRosterItem,
+  type ReceptionInfo,
 } from "@/lib/types";
 
 export type TeacherSession = {
@@ -92,6 +93,7 @@ export type TeacherSession = {
   school_custom_name: string | null;
   levels_taught: number[] | null;
   subject?: string | null;
+  reception?: ReceptionInfo | null;
 };
 
 export default function AdminPage() {
@@ -2043,6 +2045,38 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
       ) : mainTab === "summons" ? (
         /* ==================== 2. تبويب أولياء أود استقبالهم ==================== */
         <div className="space-y-4">
+          {/* بطاقة ساعة استقبال وتشاور الأستاذ */}
+          <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-sky-50 rounded-2xl p-4 border border-emerald-200/90 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-start sm:items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                <Clock className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-xs font-black text-slate-900">ساعة استقبالك وتشاورك الأسبوعية للأولياء</h3>
+                  {profile.reception?.officialDay ? (
+                    <span className="text-[10px] bg-emerald-600 text-white font-bold px-2 py-0.5 rounded-full">معتمدة ومفعلة</span>
+                  ) : (
+                    <span className="text-[10px] bg-amber-100 text-amber-900 font-bold px-2 py-0.5 rounded-full">غير محددة بعد</span>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-600 font-medium mt-0.5">
+                  {profile.reception?.officialDay
+                    ? `كل يوم ${profile.reception.officialDay} (${profile.reception.officialTime || "خلال أوقات الدوام"}) — المكان: ${profile.reception.location || "قاعة الأساتذة"}`
+                    : "لم تقم بتحديد موعد استقبال رسمي بعد (لن تظهر أي ساعة في فضاء أوليائك لتفادي الزيارات المفاجئة)."}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setOnboardingOpen(true)}
+              className="text-xs font-black text-emerald-900 bg-white hover:bg-emerald-100 border border-emerald-300 px-3.5 py-2 rounded-xl transition shadow-2xs self-start sm:self-auto cursor-pointer flex items-center gap-1.5 shrink-0"
+            >
+              <Sliders className="w-3.5 h-3.5 text-emerald-700" />
+              <span>{profile.reception?.officialDay ? "تعديل موعد الاستقبال" : "تحديد ساعة الاستقبال 🗓️"}</span>
+            </button>
+          </div>
+
           <div className="space-y-4 lg:space-y-0 lg:grid lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-4 lg:items-start">
           {/* نموذج إضافة ولي تلميذ للاستقبال */}
           <form

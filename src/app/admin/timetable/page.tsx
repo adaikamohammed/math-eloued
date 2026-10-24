@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo, useCallback } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
   Calendar,
@@ -61,9 +62,11 @@ export default function TeacherTimetablePage() {
   const [selectedClass, setSelectedClass] = useState("");
   const [selectedRoom, setSelectedRoom] = useState("قاعة 01");
   const [editingSlotIndex, setEditingSlotIndex] = useState<number | null>(null);
+  const [mounted, setMounted] = useState(false);
 
   // التحقق من الجلسة
   useEffect(() => {
+    setMounted(true);
     fetch("/api/auth")
       .then((res) => res.json())
       .then((data) => {
@@ -71,6 +74,17 @@ export default function TeacherTimetablePage() {
       })
       .catch(() => setAuthenticated(false));
   }, []);
+
+  // قفل تمرير الصفحة أثناء فتح النافذة المنبثقة
+  useEffect(() => {
+    if (isSlotModalOpen) {
+      const orig = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = orig;
+      };
+    }
+  }, [isSlotModalOpen]);
 
   // تحميل البيانات
   const loadData = useCallback(async () => {
@@ -415,16 +429,16 @@ export default function TeacherTimetablePage() {
         </div>
 
         {/* ─── Modal تعيين الحصة ─── */}
-        {isSlotModalOpen && (
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full border border-[#e8e8e0] shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
-              <div className="flex items-center justify-between border-b border-[#e8e8e0] pb-3">
+        {mounted && isSlotModalOpen && createPortal(
+          <div className="fixed inset-0 z-[999999] bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150" dir="rtl">
+            <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full border border-slate-200 shadow-2xl space-y-5 my-auto max-h-[92vh] flex flex-col overflow-y-auto animate-in zoom-in-95 duration-150">
+              <div className="flex items-center justify-between border-b border-[#e8e8e0] pb-3 shrink-0">
                 <h3 className="text-base font-black text-gray-900">
                   {editingSlotIndex !== null ? "تعديل الحصة" : "إضافة حصة دراسية"}
                 </h3>
                 <button
                   onClick={() => setIsSlotModalOpen(false)}
-                  className="p-1 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                  className="p-1 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -498,7 +512,7 @@ export default function TeacherTimetablePage() {
                     <button
                       type="submit"
                       disabled={saving}
-                      className="btn-primary text-xs px-4 py-2 flex items-center gap-1.5"
+                      className="btn-primary text-xs px-4 py-2 flex items-center gap-1.5 cursor-pointer shadow-sm"
                     >
                       {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                       <span>حفظ</span>
@@ -507,7 +521,8 @@ export default function TeacherTimetablePage() {
                 </div>
               </form>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
       </div>
     </div>

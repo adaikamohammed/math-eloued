@@ -20,6 +20,7 @@ import {
   HelpCircle,
   School,
   X,
+  Calendar,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { TeacherSession } from "@/app/admin/page";
@@ -73,10 +74,13 @@ export function TeacherOnboardingModal({
   const [customClassInput, setCustomClassInput] = useState("");
 
   // الخطوة 3: ساعة الاستقبال
-  const [receptionDay, setReceptionDay] = useState("");
-  const [receptionTime, setReceptionTime] = useState("");
-  const [receptionLocation, setReceptionLocation] = useState("قاعة الأساتذة");
-  const [receptionGuidance, setReceptionGuidance] = useState("");
+  const [hasReceptionSchedule, setHasReceptionSchedule] = useState<boolean>(
+    Boolean(profile.reception?.officialDay)
+  );
+  const [receptionDay, setReceptionDay] = useState(profile.reception?.officialDay || "");
+  const [receptionTime, setReceptionTime] = useState(profile.reception?.officialTime || "");
+  const [receptionLocation, setReceptionLocation] = useState(profile.reception?.location || "قاعة الأساتذة");
+  const [receptionGuidance, setReceptionGuidance] = useState(profile.reception?.guidance || "");
 
   const [saving, setSaving] = useState(false);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
@@ -139,10 +143,12 @@ export function TeacherOnboardingModal({
     try {
       const sortedLevels = [...selectedLevels].sort();
       const cleanReception: ReceptionInfo = {};
-      if (receptionDay) cleanReception.officialDay = receptionDay;
-      if (receptionTime) cleanReception.officialTime = receptionTime;
-      if (receptionLocation) cleanReception.location = receptionLocation;
-      if (receptionGuidance) cleanReception.guidance = receptionGuidance;
+      if (hasReceptionSchedule && receptionDay) {
+        cleanReception.officialDay = receptionDay;
+        if (receptionTime) cleanReception.officialTime = receptionTime;
+        if (receptionLocation) cleanReception.location = receptionLocation;
+        if (receptionGuidance) cleanReception.guidance = receptionGuidance;
+      }
 
       // 1. تحديث جدول profiles في Supabase
       const { error: profileErr } = await supabase
@@ -416,168 +422,214 @@ export function TeacherOnboardingModal({
                 </p>
               </div>
 
-              {/* 1. اختيار اليوم بنقرة واحدة */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-black text-slate-800">
-                  1. يوم الاستقبال الأسبوعي:
-                </label>
-                <div className="grid grid-cols-5 gap-1.5">
-                  {SCHOOL_DAYS.map((d) => {
-                    const isSelected = receptionDay === d;
-                    return (
-                      <button
-                        key={d}
-                        type="button"
-                        onClick={() => setReceptionDay(isSelected ? "" : d)}
-                        className={`py-2 px-1 rounded-xl text-xs font-black border transition cursor-pointer text-center active:scale-95 ${
-                          isSelected
-                            ? "bg-emerald-600 text-white border-emerald-600 shadow-xs ring-2 ring-emerald-300"
-                            : "bg-white text-slate-700 border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/50"
-                        }`}
-                      >
-                        {d}
-                      </button>
-                    );
-                  })}
-                </div>
+              {/* خيار تحديد الموعد أو تأجيله */}
+              <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-xl text-xs font-black">
+                <button
+                  type="button"
+                  onClick={() => setHasReceptionSchedule(true)}
+                  className={`py-2 px-3 rounded-lg transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                    hasReceptionSchedule
+                      ? "bg-white text-emerald-950 shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  <Calendar className="w-3.5 h-3.5 text-emerald-700" />
+                  <span>🗓️ لدي ساعة استقبال محددة</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setHasReceptionSchedule(false);
+                    setReceptionDay("");
+                    setReceptionTime("");
+                  }}
+                  className={`py-2 px-3 rounded-lg transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                    !hasReceptionSchedule
+                      ? "bg-white text-emerald-950 shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  <Clock className="w-3.5 h-3.5 text-amber-600" />
+                  <span>⏳ لم تُحدد بعد من الإدارة</span>
+                </button>
               </div>
 
-              {/* 2. اختيار توقيت الاستقبال بنقرة واحدة */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="block text-xs font-black text-slate-800">
-                    2. توقيت الاستقبال (الساعة):
-                  </label>
-                  {receptionTime && (
-                    <span className="text-[11px] font-black text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200">
-                      المحدد: {receptionTime}
-                    </span>
-                  )}
+              {!hasReceptionSchedule ? (
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-center space-y-1.5">
+                  <div className="text-xl">⏳</div>
+                  <h4 className="text-xs font-black text-slate-800">
+                    تم تأجيل تحديد ساعة الاستقبال مؤقتاً
+                  </h4>
+                  <p className="text-[11px] text-slate-500 max-w-sm mx-auto leading-relaxed">
+                    لن تظهر أي ساعة استقبال في فضاء أوليائك حالياً. يمكنك تفعيلها وتحديدها بنقرة زر في أي وقت فور استلام جدولك الرسمي من الإدارة.
+                  </p>
                 </div>
-
-                {/* فترات الصباح */}
-                <div className="space-y-1">
-                  <span className="text-[11px] font-bold text-slate-500 block">فترة الصباح:</span>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-                    {RECEPTION_TIME_PRESETS.filter((p) => p.period === "صباحاً").map((preset) => {
-                      const isSelected = receptionTime === preset.label;
-                      return (
-                        <button
-                          key={preset.label}
-                          type="button"
-                          onClick={() => setReceptionTime(isSelected ? "" : preset.label)}
-                          className={`py-1.5 px-2 rounded-xl text-xs font-bold border transition cursor-pointer text-center flex items-center justify-center gap-1 active:scale-95 ${
-                            isSelected
-                              ? "bg-emerald-600 text-white border-emerald-600 shadow-xs"
-                              : "bg-white text-slate-700 border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/50"
-                          }`}
-                        >
-                          {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-white shrink-0" />}
-                          <span>{preset.label.replace("من ", "")}</span>
-                        </button>
-                      );
-                    })}
+              ) : (
+                <>
+                  {/* 1. اختيار اليوم بنقرة واحدة */}
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-black text-slate-800">
+                      1. يوم الاستقبال الأسبوعي:
+                    </label>
+                    <div className="grid grid-cols-5 gap-1.5">
+                      {SCHOOL_DAYS.map((d) => {
+                        const isSelected = receptionDay === d;
+                        return (
+                          <button
+                            key={d}
+                            type="button"
+                            onClick={() => setReceptionDay(isSelected ? "" : d)}
+                            className={`py-2 px-1 rounded-xl text-xs font-black border transition cursor-pointer text-center active:scale-95 ${
+                              isSelected
+                                ? "bg-emerald-600 text-white border-emerald-600 shadow-xs ring-2 ring-emerald-300"
+                                : "bg-white text-slate-700 border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/50"
+                            }`}
+                          >
+                            {d}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
 
-                {/* فترات المساء */}
-                <div className="space-y-1">
-                  <span className="text-[11px] font-bold text-slate-500 block">فترة المساء:</span>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    {RECEPTION_TIME_PRESETS.filter((p) => p.period === "مساءً").map((preset) => {
-                      const isSelected = receptionTime === preset.label;
-                      return (
-                        <button
-                          key={preset.label}
-                          type="button"
-                          onClick={() => setReceptionTime(isSelected ? "" : preset.label)}
-                          className={`py-1.5 px-2 rounded-xl text-xs font-bold border transition cursor-pointer text-center flex items-center justify-center gap-1 active:scale-95 ${
-                            isSelected
-                              ? "bg-emerald-600 text-white border-emerald-600 shadow-xs"
-                              : "bg-white text-slate-700 border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/50"
-                          }`}
-                        >
-                          {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-white shrink-0" />}
-                          <span>{preset.label.replace("من ", "")}</span>
-                        </button>
-                      );
-                    })}
+                  {/* 2. اختيار توقيت الاستقبال بنقرة واحدة */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-black text-slate-800">
+                        2. توقيت الاستقبال (الساعة):
+                      </label>
+                      {receptionTime && (
+                        <span className="text-[11px] font-black text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200">
+                          المحدد: {receptionTime}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* فترات الصباح */}
+                    <div className="space-y-1">
+                      <span className="text-[11px] font-bold text-slate-500 block">فترة الصباح:</span>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                        {RECEPTION_TIME_PRESETS.filter((p) => p.period === "صباحاً").map((preset) => {
+                          const isSelected = receptionTime === preset.label;
+                          return (
+                            <button
+                              key={preset.label}
+                              type="button"
+                              onClick={() => setReceptionTime(isSelected ? "" : preset.label)}
+                              className={`py-1.5 px-2 rounded-xl text-xs font-bold border transition cursor-pointer text-center flex items-center justify-center gap-1 active:scale-95 ${
+                                isSelected
+                                  ? "bg-emerald-600 text-white border-emerald-600 shadow-xs"
+                                  : "bg-white text-slate-700 border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/50"
+                              }`}
+                            >
+                              {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-white shrink-0" />}
+                              <span>{preset.label.replace("من ", "")}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* فترات المساء */}
+                    <div className="space-y-1">
+                      <span className="text-[11px] font-bold text-slate-500 block">فترة المساء:</span>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {RECEPTION_TIME_PRESETS.filter((p) => p.period === "مساءً").map((preset) => {
+                          const isSelected = receptionTime === preset.label;
+                          return (
+                            <button
+                              key={preset.label}
+                              type="button"
+                              onClick={() => setReceptionTime(isSelected ? "" : preset.label)}
+                              className={`py-1.5 px-2 rounded-xl text-xs font-bold border transition cursor-pointer text-center flex items-center justify-center gap-1 active:scale-95 ${
+                                isSelected
+                                  ? "bg-emerald-600 text-white border-emerald-600 shadow-xs"
+                                  : "bg-white text-slate-700 border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/50"
+                              }`}
+                            >
+                              {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-white shrink-0" />}
+                              <span>{preset.label.replace("من ", "")}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* كتابة توقيت مخصص إن رغب */}
+                    <input
+                      type="text"
+                      value={receptionTime}
+                      onChange={(e) => setReceptionTime(e.target.value)}
+                      placeholder="أو اكتب توقيتاً خاصاً (مثلاً: من 10:30 إلى 11:30)..."
+                      className="w-full py-1.5 px-3 rounded-xl border border-slate-200 bg-slate-50/60 text-xs focus:bg-white focus:ring-2 focus:ring-emerald-500"
+                    />
                   </div>
-                </div>
 
-                {/* كتابة توقيت مخصص إن رغب */}
-                <input
-                  type="text"
-                  value={receptionTime}
-                  onChange={(e) => setReceptionTime(e.target.value)}
-                  placeholder="أو اكتب توقيتاً خاصاً (مثلاً: من 10:30 إلى 11:30)..."
-                  className="w-full py-1.5 px-3 rounded-xl border border-slate-200 bg-slate-50/60 text-xs focus:bg-white focus:ring-2 focus:ring-emerald-500"
-                />
-              </div>
+                  {/* 3. مكان الاستقبال بنقرة واحدة */}
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-black text-slate-800">
+                      3. مكان الاستقبال المعتمد:
+                    </label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {RECEPTION_LOCATION_PRESETS.map((loc) => {
+                        const isSelected = receptionLocation === loc;
+                        return (
+                          <button
+                            key={loc}
+                            type="button"
+                            onClick={() => setReceptionLocation(loc)}
+                            className={`py-1.5 px-2.5 rounded-lg text-xs font-bold border transition cursor-pointer flex items-center gap-1 active:scale-95 ${
+                              isSelected
+                                ? "bg-emerald-600 text-white border-emerald-600 shadow-xs"
+                                : "bg-white text-slate-700 border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/50"
+                            }`}
+                          >
+                            {isSelected && <CheckCircle2 className="w-3.5 h-3.5" />}
+                            <span>{loc}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <input
+                      type="text"
+                      value={receptionLocation}
+                      onChange={(e) => setReceptionLocation(e.target.value)}
+                      placeholder="مكان آخر مخصص..."
+                      className="w-full py-1.5 px-3 rounded-xl border border-slate-200 bg-slate-50/60 text-xs focus:bg-white focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
 
-              {/* 3. مكان الاستقبال بنقرة واحدة */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-black text-slate-800">
-                  3. مكان الاستقبال المعتمد:
-                </label>
-                <div className="flex flex-wrap gap-1.5">
-                  {RECEPTION_LOCATION_PRESETS.map((loc) => {
-                    const isSelected = receptionLocation === loc;
-                    return (
-                      <button
-                        key={loc}
-                        type="button"
-                        onClick={() => setReceptionLocation(loc)}
-                        className={`py-1.5 px-2.5 rounded-lg text-xs font-bold border transition cursor-pointer flex items-center gap-1 active:scale-95 ${
-                          isSelected
-                            ? "bg-emerald-600 text-white border-emerald-600 shadow-xs"
-                            : "bg-white text-slate-700 border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/50"
-                        }`}
-                      >
-                        {isSelected && <CheckCircle2 className="w-3.5 h-3.5" />}
-                        <span>{loc}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-                <input
-                  type="text"
-                  value={receptionLocation}
-                  onChange={(e) => setReceptionLocation(e.target.value)}
-                  placeholder="مكان آخر مخصص..."
-                  className="w-full py-1.5 px-3 rounded-xl border border-slate-200 bg-slate-50/60 text-xs focus:bg-white focus:ring-2 focus:ring-emerald-500"
-                />
-              </div>
-
-              {/* 4. توجيه أو نصيحة للأولياء */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-black text-slate-800">
-                  4. توجيه أو نصيحة للأولياء عند الزيارة (اختياري):
-                </label>
-                <div className="flex flex-wrap gap-1 mb-1">
-                  {[
-                    "إحضار كراس التلميذ ودفتر المتابعة",
-                    "التنسيق المسبق مع مستشار التربية",
-                    "احترام وقت الاستقبال لتفادي تعطيل الحصص",
-                  ].map((presetText) => (
-                    <button
-                      key={presetText}
-                      type="button"
-                      onClick={() => setReceptionGuidance(presetText)}
-                      className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 hover:bg-emerald-100 text-slate-700 hover:text-emerald-900 border border-slate-200 transition cursor-pointer"
-                    >
-                      + {presetText}
-                    </button>
-                  ))}
-                </div>
-                <textarea
-                  value={receptionGuidance}
-                  onChange={(e) => setReceptionGuidance(e.target.value)}
-                  rows={2}
-                  placeholder="مثال: يُرجى إحضار كراس التلميذ وجدول متابعة الواجبات عند الحضور..."
-                  className="w-full py-2 px-3 rounded-xl border border-slate-200 bg-white text-xs focus:ring-2 focus:ring-emerald-500"
-                />
-              </div>
+                  {/* 4. توجيه أو نصيحة للأولياء */}
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-black text-slate-800">
+                      4. توجيه أو نصيحة للأولياء عند الزيارة (اختياري):
+                    </label>
+                    <div className="flex flex-wrap gap-1 mb-1">
+                      {[
+                        "إحضار كراس التلميذ ودفتر المتابعة",
+                        "التنسيق المسبق مع مستشار التربية",
+                        "احترام وقت الاستقبال لتفادي تعطيل الحصص",
+                      ].map((presetText) => (
+                        <button
+                          key={presetText}
+                          type="button"
+                          onClick={() => setReceptionGuidance(presetText)}
+                          className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 hover:bg-emerald-100 text-slate-700 hover:text-emerald-900 border border-slate-200 transition cursor-pointer"
+                        >
+                          + {presetText}
+                        </button>
+                      ))}
+                    </div>
+                    <textarea
+                      value={receptionGuidance}
+                      onChange={(e) => setReceptionGuidance(e.target.value)}
+                      rows={2}
+                      placeholder="مثال: يُرجى إحضار كراس التلميذ وجدول متابعة الواجبات عند الحضور..."
+                      className="w-full py-2 px-3 rounded-xl border border-slate-200 bg-white text-xs focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+                </>
+              )}
             </div>
           )}
 
@@ -742,7 +794,7 @@ export function TeacherOnboardingModal({
                 ) : (
                   <>
                     <CheckCircle2 className="w-3.5 h-3.5 ml-1" />
-                    <span>تأكيد وانطلاق</span>
+                    <span>حفظ والانتقال للخطوة 2: إضافة التلاميذ 👥</span>
                   </>
                 )}
               </button>

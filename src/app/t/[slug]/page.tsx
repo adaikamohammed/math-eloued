@@ -328,7 +328,7 @@ export default async function TeacherPublicSpace({ params, searchParams }: Teach
         <div className={`grid grid-cols-1 ${showReception && showMessages ? "sm:grid-cols-2" : ""} gap-2.5`}>
           {showReception && (
             <Link
-              href={`/announcement?teacher=${profile.id}${isValidLevel ? `&lvl=${requestedLevel}` : ""}`}
+              href={`/parents?teacher=${profile.id}${isValidLevel ? `&lvl=${requestedLevel}` : ""}`}
               className="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-sm hover:border-teal-300 transition flex items-center gap-3"
             >
               <span className="w-9 h-9 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center shrink-0">

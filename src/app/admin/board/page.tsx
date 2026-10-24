@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo, useCallback } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
   BookOpen,
@@ -84,6 +85,22 @@ export default function AdminBoardPage() {
 
   // إشعار سريع Toast
   const [toast, setToast] = useState<{ type: "ok" | "err"; msg: string } | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // قفل تمرير الصفحة أثناء فتح النافذة أو عارض الصور
+  useEffect(() => {
+    if (showModal || Boolean(lightboxImg)) {
+      const orig = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = orig;
+      };
+    }
+  }, [showModal, lightboxImg]);
 
   const showToast = (type: "ok" | "err", msg: string) => {
     setToast({ type, msg });
@@ -713,10 +730,10 @@ export default function AdminBoardPage() {
         </main>
 
         {/* ── نافذة إضافة / تعديل الدرس وصور السبورة ── */}
-        {showModal && (
-          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-            <div className="bg-white rounded-3xl max-w-xl w-full border border-[#e8e8e0] shadow-2xl overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-150">
-              <div className="p-5 border-b border-[#e8e8e0] flex items-center justify-between">
+        {mounted && showModal && createPortal(
+          <div className="fixed inset-0 z-[999999] bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150" dir="rtl">
+            <div className="bg-white rounded-3xl max-w-xl w-full border border-slate-200 shadow-2xl overflow-hidden my-auto max-h-[92vh] flex flex-col animate-in zoom-in-95 duration-150">
+              <div className="p-5 border-b border-[#e8e8e0] flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 rounded-xl bg-[#e6f4ee] text-[#107a57] flex items-center justify-center">
                     <Camera className="w-4 h-4" />
@@ -728,7 +745,7 @@ export default function AdminBoardPage() {
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center transition"
+                  className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center transition cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -952,20 +969,21 @@ export default function AdminBoardPage() {
                 </div>
               </form>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
 
         {/* ── عارض الصور بالحجم الكامل (Lightbox) ── */}
-        {lightboxImg && (
+        {mounted && lightboxImg && createPortal(
           <div
-            className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 cursor-zoom-out"
+            className="fixed inset-0 z-[999999] bg-black/95 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 cursor-zoom-out animate-in fade-in duration-150"
             onClick={() => setLightboxImg(null)}
           >
-            <div className="relative max-w-5xl max-h-[90vh] w-full h-full flex items-center justify-center">
+            <div className="relative max-w-5xl max-h-[92vh] w-full h-full flex items-center justify-center my-auto">
               <button
                 type="button"
                 onClick={() => setLightboxImg(null)}
-                className="absolute top-2 left-2 z-10 w-9 h-9 rounded-full bg-white/20 hover:bg-white/40 text-white flex items-center justify-center text-sm font-black transition"
+                className="absolute top-2 left-2 z-10 w-9 h-9 rounded-full bg-white/20 hover:bg-white/40 text-white flex items-center justify-center text-sm font-black transition cursor-pointer"
               >
                 ✕
               </button>
@@ -973,10 +991,11 @@ export default function AdminBoardPage() {
               <img
                 src={lightboxImg}
                 alt="معاينة السبورة"
-                className="max-w-full max-h-full object-contain rounded-xl shadow-2xl"
+                className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl"
               />
             </div>
-          </div>
+          </div>,
+          document.body
         )}
     </div>
   );
