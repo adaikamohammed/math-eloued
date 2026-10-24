@@ -385,14 +385,29 @@ export interface TimetableSlot {
   day: (typeof SCHOOL_DAYS)[number];
   start: string; // "08:00"
   end: string; // "09:00"
-  className: string; // "2م1"
-  room?: string; // "04"
+  className: string; // "1م1" أو "استقبال الأولياء" أو "استدراك"
+  subgroup?: "فوج 1" | "فوج 2" | "تناوب" | "القسم كامل" | string;
+  sessionType?: "lesson" | "td" | "remedial" | "reception";
+  room?: string; // "قاعة 04"
+  notes?: string;
+}
+
+export interface TimetableSettings {
+  orientation?: "days-as-rows" | "days-as-cols";
+  morningStart?: string; // "08:00"
+  morningSlotsCount?: number; // 4
+  breakStart?: string; // "12:00"
+  breakEnd?: string; // "13:00" أو "13:30"
+  afternoonStart?: string; // "13:00" أو "13:30"
+  afternoonSlotsCount?: number; // 3 أو 4
+  tuesdayAfternoonOff?: boolean; // مساء الثلاثاء راحة رسمية
 }
 
 export interface TeacherTimetable {
   teacher_id: string;
   slots: TimetableSlot[];
   image_path?: string | null;
+  settings?: TimetableSettings;
   updated_at?: string;
 }
 
