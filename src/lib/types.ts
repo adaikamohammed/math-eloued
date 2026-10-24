@@ -388,6 +388,7 @@ export interface TimetableSlot {
   className: string; // "1م1" أو "استقبال الأولياء" أو "استدراك" أو "فراغ"
   subgroup?: "فوج 1" | "فوج 2" | "كامل القسم" | "القسم كامل" | string;
   sessionType?: "lesson" | "td" | "remedial" | "reception" | "free";
+  weekRotation?: "all" | "week_a" | "week_b"; // دورية الأسبوع (كل أسبوع، أسبوع أ، أسبوع ب)
   room?: string; // "قاعة 04" (اختياري)
   remedialClasses?: string[]; // الأفواج المعنية بالاستدراك
   remedialStudents?: string[]; // أسماء التلاميذ المحددين للاستدراك
@@ -403,6 +404,13 @@ export interface TimetableSettings {
   afternoonStart?: string; // "13:00" أو "13:30"
   afternoonSlotsCount?: number; // 3 أو 4
   tuesdayAfternoonOff?: boolean; // مساء الثلاثاء راحة رسمية
+  colorMode?: "distinct" | "unified"; // نمط الألوان: مميز لكل فوج أو موحد
+  schoolName?: string; // اسم المتوسطة للطباعة
+  teacherName?: string; // اسم الأستاذ(ة) للطباعة
+  inspectorName?: string; // اسم السيد المفتش
+  principalName?: string; // اسم السيد المدير
+  wilayaName?: string; // اسم الولاية (مثل: الوادي)
+  subjectName?: string; // المادة (مثل: الرياضيات)
 }
 
 export interface TeacherTimetable {
