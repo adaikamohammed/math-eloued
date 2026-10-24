@@ -104,13 +104,6 @@ export function DesktopSidebar() {
       }
 
       const followupItems: NavItem[] = [];
-      if (flags.continuousAssessment !== false) {
-        followupItems.push({
-          label: "ميثاق التقويم (20/20)",
-          href: "/assessment",
-          icon: Scale,
-        });
-      }
       if (flags.honors !== false) {
         followupItems.push({
           label: "لوحة الشرف وتكريم النوابغ",
@@ -170,7 +163,6 @@ export function DesktopSidebar() {
           items: [
             { label: "لوحة المفتشية والمناشير", href: "/inspector", icon: ShieldCheck, badge: "رسمي" },
             { label: "الملتقى البيداغوجي", href: "/forum", icon: Users, badge: "نقاش" },
-            { label: "ميثاق التقويم (20/20)", href: "/assessment", icon: Scale },
           ],
         },
         {
@@ -193,13 +185,6 @@ export function DesktopSidebar() {
       {
         title: "الشفافية والتحفيز",
         items: [
-          {
-            label: "ميثاق التقويم (20/20)",
-            href: "/assessment",
-            icon: Scale,
-            badge: "شفافية ⚖️",
-            badgeColor: "bg-emerald-50 text-emerald-700 border border-emerald-200/80",
-          },
           { label: "لوحة الشرف وتكريم النوابغ", href: "/honor", icon: Trophy },
         ],
       },

@@ -9,6 +9,7 @@ import {
   Scale,
   Users,
   GraduationCap,
+  Trophy,
   ShieldCheck,
   User,
   BookOpen,
@@ -27,7 +28,7 @@ export function MobileBottomNav() {
     { label: "الرئيسية", href: "/", icon: Sparkles },
     { label: "بحث بكود", href: "/t/search", icon: Search },
     { label: "محفظتي", href: "/my-children", icon: Heart },
-    { label: "التقويم (20)", href: "/assessment", icon: Scale },
+    { label: "لوحة الشرف", href: "/honor", icon: Trophy },
     { label: "دخول الأستاذ", href: "/login", icon: GraduationCap },
   ];
 
@@ -44,7 +45,7 @@ export function MobileBottomNav() {
       { label: "التفتيش", href: "/inspector", icon: ShieldCheck },
       { label: "الندوات", href: "/inspector/circulars", icon: Calendar },
       { label: "الملتقى", href: "/forum", icon: Users },
-      { label: "التقويم", href: "/assessment", icon: Scale },
+      { label: "لوحة الشرف", href: "/honor", icon: Trophy },
       { label: "الإعدادات", href: "/settings", icon: Sliders },
     ];
   }
