@@ -27,7 +27,12 @@ export async function GET(
   // نتركهم ككوكبة واحدة متألقة
 
   return NextResponse.json(
-    { honors, customClasses: data.customClasses || [] },
+    {
+      honors,
+      customClasses: data.customClasses || [],
+      studentRoster: data.studentRoster || [],
+      evaluations: data.evaluations || [],
+    },
     {
       headers: {
         "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
@@ -47,14 +52,33 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
+    const data = await getLessonsData(ctx);
+    data.honors = data.honors || [];
+
+    if (Array.isArray(body.items)) {
+      const added: HonorStudent[] = [];
+      for (const item of body.items) {
+        if (!item.studentName?.trim() || !item.className?.trim()) continue;
+        const newHonor: HonorStudent = {
+          id: `honor_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+          studentName: String(item.studentName).trim(),
+          className: String(item.className).trim(),
+          notes: item.notes && String(item.notes).trim().length > 0 ? String(item.notes).trim() : undefined,
+          badge: item.badge && String(item.badge).trim().length > 0 ? String(item.badge).trim() : undefined,
+          createdAt: new Date().toISOString(),
+        };
+        data.honors.unshift(newHonor);
+        added.push(newHonor);
+      }
+      await saveLessonsData(ctx, data);
+      return NextResponse.json({ success: true, honors: added });
+    }
+
     const { studentName, className, notes, badge } = body;
 
     if (!studentName?.trim() || !className?.trim()) {
       return NextResponse.json({ error: "اسم التلميذ والقسم مطلوبان" }, { status: 400 });
     }
-
-    const data = await getLessonsData(ctx);
-    data.honors = data.honors || [];
 
     const newHonor: HonorStudent = {
       id: `honor_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
