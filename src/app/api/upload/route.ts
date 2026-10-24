@@ -4,7 +4,7 @@ import { requireTeacher } from "@/lib/auth";
 import { rateLimit } from "@/lib/rateLimit";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
-const MAX_FILE_BYTES = 10 * 1024 * 1024;
+const MAX_FILE_BYTES = 25 * 1024 * 1024;
 const MAX_FILES_PER_REQUEST = 20;
 import { LessonImage } from "@/lib/types";
 
@@ -33,7 +33,9 @@ export async function POST(req: NextRequest) {
     }
     for (const f of allFiles) {
       const pdfByName = f.name?.toLowerCase().endsWith(".pdf");
-      if (!ALLOWED_TYPES.includes(f.type) && !(pdfByName && (!f.type || f.type === "application/octet-stream"))) {
+      const name = (f.name || "").toLowerCase();
+      const isImg = f.type?.startsWith("image/") || /\.(jpe?g|png|webp|heic|heif|gif|bmp|jfif)$/i.test(name);
+      if (!isImg && !ALLOWED_TYPES.includes(f.type) && !(pdfByName && (!f.type || f.type === "application/octet-stream"))) {
         return NextResponse.json({ error: `نوع الملف غير مسموح: ${f.name} (صور JPG/PNG/WebP أو PDF فقط)` }, { status: 415 });
       }
       if (f.size > MAX_FILE_BYTES) {
