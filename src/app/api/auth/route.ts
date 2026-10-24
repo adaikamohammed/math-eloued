@@ -12,6 +12,7 @@ export async function GET() {
       authenticated: isTeacher,
       role: profile?.role ?? null,
       profile: isTeacher ? profile : null,
+      user: isTeacher ? profile : null,
     },
     { headers: { "Cache-Control": "no-store" } }
   );
