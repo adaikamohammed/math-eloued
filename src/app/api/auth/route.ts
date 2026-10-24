@@ -3,16 +3,16 @@ import { getSessionProfile } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-// حالة الجلسة الحالية (حساب Supabase): يستعملها فضاء الأستاذ للتحقق من الدخول
+// حالة الجلسة الحالية (حساب Supabase): يستعملها فضاء الأستاذ والمفتش للتحقق من الدخول
 export async function GET() {
   const { user, profile } = await getSessionProfile();
-  const isTeacher = Boolean(user && profile && (profile.role === "teacher" || profile.role === "admin"));
+  const isAuthenticated = Boolean(user && profile);
   return NextResponse.json(
     {
-      authenticated: isTeacher,
+      authenticated: isAuthenticated,
       role: profile?.role ?? null,
-      profile: isTeacher ? profile : null,
-      user: isTeacher ? profile : null,
+      profile: isAuthenticated ? profile : null,
+      user: isAuthenticated ? profile : null,
     },
     { headers: { "Cache-Control": "no-store" } }
   );
