@@ -133,6 +133,32 @@ export async function PUT(req: NextRequest) {
 
   try {
     const body = await req.json();
+        // 1. حفظ جدول التوقيت
+    if (body.timetable !== undefined) {
+      const data = await getLessonsData(ctx);
+      data.timetable = body.timetable;
+      if (body.customClasses && Array.isArray(body.customClasses)) {
+        data.customClasses = body.customClasses;
+      }
+      await saveLessonsData(ctx, data);
+      return NextResponse.json({ success: true, timetable: data.timetable });
+    }
+
+    // 2. حفظ قائمة التلاميذ أو الأفواج أو دفتر النصوص
+    if (body.studentRoster !== undefined || body.customClasses !== undefined || body.diaryEntries !== undefined) {
+      const data = await getLessonsData(ctx);
+      if (body.studentRoster !== undefined) data.studentRoster = body.studentRoster;
+      if (body.customClasses !== undefined) data.customClasses = body.customClasses;
+      if (body.diaryEntries !== undefined) data.diaryEntries = body.diaryEntries;
+      await saveLessonsData(ctx, data);
+      return NextResponse.json({
+        success: true,
+        studentRoster: data.studentRoster,
+        customClasses: data.customClasses,
+        diaryEntries: data.diaryEntries,
+      });
+    }
+
     const { id, title, number, field, section, notes, homeworkNotes, type, homeworkDueAt, solutionPublishAt } = body;
 
     if (!id) {

@@ -1,82 +1,84 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
   Calendar,
   Clock,
-  Building2,
+  BookOpen,
   Users,
-  Plus,
-  Pencil,
-  Trash2,
-  Printer,
-  Upload,
-  Image as ImageIcon,
   CheckCircle2,
   AlertCircle,
   Loader2,
+  Building2,
   ArrowRight,
   School,
-  X,
-  RotateCcw,
   Sliders,
-  Sparkles,
-  Coffee,
+  RotateCcw,
+  Printer,
+  X,
   Check,
-  Save,
-  HelpCircle,
+  Plus,
+  Trash2,
+  Edit2,
+  Sparkles,
+  Smartphone,
+  Eye,
 } from "lucide-react";
 import { LoginRequired } from "@/components/LoginRequired";
-import { PageExplainer } from "@/components/PageExplainer";
-import {
-  SCHOOL_DAYS,
-  TimetableSlot,
-  TimetableSettings,
-  TeacherTimetable,
-  LessonsData,
-} from "@/lib/types";
+import { TimetableSlot, TeacherTimetable, TimetableSettings, LessonsData } from "@/lib/types";
 
-const LOCAL_STORAGE_CLASSES_KEY = "last_active_classes";
+// مفاتيح التخزين المحلي لضمان المزامنة الفورية بدون تأخير
+const LOCAL_STORAGE_CLASSES_KEYS = ["last_active_classes", "math_custom_classes"];
 const LOCAL_STORAGE_TIMETABLE_KEY = "math_teacher_timetable_cache";
 
-// الإعدادات الافتراضية للتوقيت الجزائري
+// الأفواج الافتراضية للتعليم المتوسط (في حال لم يدخل الأستاذ أفواجه بعد)
+const DEFAULT_MIDDLE_SCHOOL_CLASSES = ["1م1", "1م2", "2م1", "4م3"];
+
+// أيام الأسبوع الدراسي في الجزائر (من الأحد إلى الخميس)
+const SCHOOL_DAYS = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس"] as const;
+
+// الإعدادات الزمنية الافتراضية
 const DEFAULT_SETTINGS: TimetableSettings = {
   orientation: "days-as-rows",
   morningStart: "08:00",
-  morningSlotsCount: 4, // 08-09, 09-10, 10-11, 11-12
+  morningSlotsCount: 4,
   breakStart: "12:00",
   breakEnd: "13:30",
   afternoonStart: "13:30",
-  afternoonSlotsCount: 3, // 13:30-14:30, 14:30-15:30, 15:30-16:30
+  afternoonSlotsCount: 3,
   tuesdayAfternoonOff: true,
 };
 
-interface TimeSlotItem {
+interface TimeSlotDef {
   start: string;
   end: string;
   label: string;
   period: "morning" | "afternoon";
 }
 
-// دالة مساعدة لتوليد فترات الساعات بحسب إعدادات المؤسسة
+// دالة حساب وتوليد الفترات الزمنية
 function generateTimeSlots(settings: TimetableSettings): {
-  morningSlots: TimeSlotItem[];
-  afternoonSlots: TimeSlotItem[];
-  allSlots: TimeSlotItem[];
+  morningSlots: TimeSlotDef[];
+  afternoonSlots: TimeSlotDef[];
+  allSlots: TimeSlotDef[];
 } {
-  const morningSlots: TimeSlotItem[] = [];
-  const afternoonSlots: TimeSlotItem[] = [];
+  const morningSlots: TimeSlotDef[] = [];
+  const afternoonSlots: TimeSlotDef[] = [];
 
-  // 1. فترات الصباح
-  const mStartHour = parseInt(settings.morningStart?.split(":")[0] || "8", 10);
+  // 1. الفترة الصباحية
+  const mStartParts = (settings.morningStart || "08:00").split(":");
+  const mStartHour = parseInt(mStartParts[0] || "8", 10);
+  const mStartMin = parseInt(mStartParts[1] || "0", 10);
   const mCount = settings.morningSlotsCount || 4;
+
   for (let i = 0; i < mCount; i++) {
     const sH = mStartHour + i;
     const eH = sH + 1;
-    const startStr = `${sH < 10 ? "0" : ""}${sH}:00`;
-    const endStr = `${eH < 10 ? "0" : ""}${eH}:00`;
+    const minStr = mStartMin === 0 ? "00" : `${mStartMin}`;
+    const startStr = `${sH < 10 ? "0" : ""}${sH}:${minStr}`;
+    const endStr = `${eH < 10 ? "0" : ""}${eH}:${minStr}`;
     morningSlots.push({
       start: startStr,
       end: endStr,
@@ -85,7 +87,7 @@ function generateTimeSlots(settings: TimetableSettings): {
     });
   }
 
-  // 2. فترات المساء
+  // 2. الفترة المسائية
   const aStartParts = (settings.afternoonStart || "13:30").split(":");
   const aStartHour = parseInt(aStartParts[0] || "13", 10);
   const aStartMin = parseInt(aStartParts[1] || "30", 10);
@@ -118,17 +120,26 @@ export default function TeacherTimetablePage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
-  const [customClasses, setCustomClasses] = useState<string[]>([]);
+  // الأفواج والجدول والإعدادات
+  const [customClasses, setCustomClasses] = useState<string[]>(DEFAULT_MIDDLE_SCHOOL_CLASSES);
   const [slots, setSlots] = useState<TimetableSlot[]>([]);
   const [settings, setSettings] = useState<TimetableSettings>(DEFAULT_SETTINGS);
   const [officialImagePath, setOfficialImagePath] = useState<string | null>(null);
+
+  // وضع التوزيع السريع (Stamp Mode): عند تفعيل فوج معين، أي نقرة على خانة فارغة تسند الفوج فوراً بضغطة واحدة!
+  const [quickStampClass, setQuickStampClass] = useState<string | null>(null);
+
+  // وضع التصفح على الهواتف والشاشات الصغيرة (اختيار يوم محدد أو عرض الكل)
+  const [mobileActiveDay, setMobileActiveDay] = useState<string>("all");
 
   // نافذة تعديل أو إضافة حصة
   const [isSlotModalOpen, setIsSlotModalOpen] = useState(false);
   const [selectedDay, setSelectedDay] = useState<(typeof SCHOOL_DAYS)[number]>("الأحد");
   const [selectedStart, setSelectedStart] = useState("08:00");
   const [selectedEnd, setSelectedEnd] = useState("09:00");
-  const [selectedClass, setSelectedClass] = useState("");
+  const [selectedClass, setSelectedClass] = useState("1م1");
+  const [newClassInput, setNewClassInput] = useState("");
+  const [showAddClassInput, setShowAddClassInput] = useState(false);
   const [selectedSessionType, setSelectedSessionType] = useState<"lesson" | "td" | "remedial" | "reception">("lesson");
   const [selectedSubgroup, setSelectedSubgroup] = useState<"فوج 1" | "فوج 2" | "تناوب">("فوج 1");
   const [selectedRoom, setSelectedRoom] = useState("قاعة 01");
@@ -151,10 +162,27 @@ export default function TeacherTimetablePage() {
 
     if (typeof window !== "undefined") {
       try {
-        const storedClasses = localStorage.getItem(LOCAL_STORAGE_CLASSES_KEY);
-        if (storedClasses) {
-          const parsed = JSON.parse(storedClasses);
-          if (Array.isArray(parsed) && parsed.length > 0) setCustomClasses(parsed);
+        // فحص كل مفاتيح الأفواج المحتملة
+        let loadedClasses: string[] = [];
+        for (const key of LOCAL_STORAGE_CLASSES_KEYS) {
+          const val = localStorage.getItem(key);
+          if (val) {
+            try {
+              const parsed = JSON.parse(val);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                loadedClasses = parsed;
+                break;
+              }
+            } catch {}
+          }
+        }
+
+        if (loadedClasses.length > 0) {
+          setCustomClasses(loadedClasses);
+          setSelectedClass(loadedClasses[0]);
+        } else {
+          setCustomClasses(DEFAULT_MIDDLE_SCHOOL_CLASSES);
+          setSelectedClass(DEFAULT_MIDDLE_SCHOOL_CLASSES[0]);
         }
 
         const storedTimetable = localStorage.getItem(LOCAL_STORAGE_TIMETABLE_KEY);
@@ -182,11 +210,33 @@ export default function TeacherTimetablePage() {
         setAuthenticated(authData?.authenticated === true);
 
         if (data) {
-          const teacherClasses =
-            Array.isArray(data.customClasses) && data.customClasses.length > 0
-              ? data.customClasses
-              : [];
-          setCustomClasses(teacherClasses);
+          // استخراج الأفواج إما من customClasses أو من studentRoster أو timetable
+          let candidateClasses: string[] = [];
+          if (Array.isArray(data.customClasses) && data.customClasses.length > 0) {
+            candidateClasses = data.customClasses;
+          } else if (Array.isArray(data.studentRoster) && data.studentRoster.length > 0) {
+            candidateClasses = Array.from(new Set(data.studentRoster.map((s) => s.className).filter(Boolean)));
+          } else if (data.timetable && Array.isArray(data.timetable.slots)) {
+            candidateClasses = Array.from(
+              new Set(
+                data.timetable.slots
+                  .map((s) => s.className)
+                  .filter((c) => c && c !== "استقبال الأولياء" && !c.includes("استدراك"))
+              )
+            );
+          }
+
+          if (candidateClasses.length > 0) {
+            setCustomClasses(candidateClasses);
+            setSelectedClass((prev) => (candidateClasses.includes(prev) ? prev : candidateClasses[0]));
+            if (typeof window !== "undefined") {
+              LOCAL_STORAGE_CLASSES_KEYS.forEach((k) => {
+                try {
+                  localStorage.setItem(k, JSON.stringify(candidateClasses));
+                } catch {}
+              });
+            }
+          }
 
           if (data.timetable && Array.isArray(data.timetable.slots)) {
             setSlots(data.timetable.slots);
@@ -228,7 +278,8 @@ export default function TeacherTimetablePage() {
   const persistTimetable = async (
     newSlots: TimetableSlot[],
     newSettings = settings,
-    imagePath = officialImagePath
+    imagePath = officialImagePath,
+    currentClasses = customClasses
   ) => {
     setSaving(true);
     const payload: TeacherTimetable = {
@@ -242,6 +293,11 @@ export default function TeacherTimetablePage() {
     if (typeof window !== "undefined") {
       try {
         localStorage.setItem(LOCAL_STORAGE_TIMETABLE_KEY, JSON.stringify(payload));
+        LOCAL_STORAGE_CLASSES_KEYS.forEach((k) => {
+          try {
+            localStorage.setItem(k, JSON.stringify(currentClasses));
+          } catch {}
+        });
       } catch {}
     }
 
@@ -251,9 +307,13 @@ export default function TeacherTimetablePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           timetable: payload,
+          customClasses: currentClasses,
         }),
       });
-      if (!res.ok) throw new Error("فشل حفظ التوقيت");
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => null);
+        throw new Error(errorData?.error || "فشل حفظ التوقيت");
+      }
       setMessage({ type: "ok", text: "تم تحديث جدول التوقيت الأسبوعي بنجاح 🗓️✨" });
       setTimeout(() => setMessage(null), 3000);
     } catch (err: any) {
@@ -264,13 +324,34 @@ export default function TeacherTimetablePage() {
     }
   };
 
-  // تبديل اتجاه الجدول (أفقي / رأسي)
+  // تبديل أو تعيين اتجاه الجدول (أفقي / رأسي)
+  const handleSetOrientation = (newOrientation: "days-as-rows" | "days-as-cols") => {
+    const updatedSettings: TimetableSettings = { ...settings, orientation: newOrientation };
+    setSettings(updatedSettings);
+    persistTimetable(slots, updatedSettings);
+  };
+
   const handleToggleOrientation = () => {
     const nextOrientation: "days-as-rows" | "days-as-cols" =
       settings.orientation === "days-as-cols" ? "days-as-rows" : "days-as-cols";
-    const updatedSettings: TimetableSettings = { ...settings, orientation: nextOrientation };
-    setSettings(updatedSettings);
-    persistTimetable(slots, updatedSettings);
+    handleSetOrientation(nextOrientation);
+  };
+
+  // إضافة فوج جديد مخصص على الفور من داخل الصفحة أو النافذة
+  const handleAddNewClass = (clsName: string) => {
+    const clean = clsName.trim();
+    if (!clean) return;
+    if (!customClasses.includes(clean)) {
+      const updated = [...customClasses, clean];
+      setCustomClasses(updated);
+      setSelectedClass(clean);
+      setNewClassInput("");
+      setShowAddClassInput(false);
+      persistTimetable(slots, settings, officialImagePath, updated);
+    } else {
+      setSelectedClass(clean);
+      setShowAddClassInput(false);
+    }
   };
 
   // فتح نافذة لحصة محددة في الشبكة
@@ -286,12 +367,19 @@ export default function TeacherTimetablePage() {
     if (existingIndex >= 0) {
       const existing = slots[existingIndex];
       setSelectedClass(existing.className);
-      setSelectedSessionType(existing.sessionType || (existing.className === "استقبال الأولياء" ? "reception" : existing.subgroup ? "td" : "lesson"));
+      setSelectedSessionType(
+        existing.sessionType ||
+          (existing.className === "استقبال الأولياء"
+            ? "reception"
+            : existing.subgroup
+            ? "td"
+            : "lesson")
+      );
       setSelectedSubgroup((existing.subgroup as "فوج 1" | "فوج 2" | "تناوب") || "فوج 1");
       setSelectedRoom(existing.room || "قاعة 01");
       setEditingSlotIndex(existingIndex);
     } else {
-      setSelectedClass(customClasses[0] || "");
+      setSelectedClass(quickStampClass || customClasses[0] || DEFAULT_MIDDLE_SCHOOL_CLASSES[0]);
       setSelectedSessionType("lesson");
       setSelectedSubgroup("فوج 1");
       setSelectedRoom("قاعة 01");
@@ -300,12 +388,48 @@ export default function TeacherTimetablePage() {
     setIsSlotModalOpen(true);
   };
 
+  // النقر على خانة في الجدول: إذا كان وضع التوزيع السريع مفعل للخانة الفارغة يتم إسنادها مباشرة بضغطة واحدة!
+  const handleCellClick = (day: (typeof SCHOOL_DAYS)[number], start: string, end: string) => {
+    const existingIndex = slots.findIndex(
+      (s) => s.day === day && s.start === start && s.end === end
+    );
+
+    // إذا كان وضع التوزيع السريع مفعلاً والخانة فارغة -> إسناد فوري بضغطة واحدة!
+    if (quickStampClass && existingIndex === -1) {
+      const newSlot: TimetableSlot = {
+        day,
+        start,
+        end,
+        className: quickStampClass,
+        sessionType: "lesson",
+        room: "قاعة 01",
+      };
+      const updated = [...slots, newSlot];
+      setSlots(updated);
+      persistTimetable(updated);
+      return;
+    }
+
+    // وإلا فتح النافذة التفاعلية
+    handleOpenCell(day, start, end);
+  };
+
+  // حذف سريع مباشر لحصة من الخانة دون فتح النافذة
+  const handleQuickDeleteSlot = (e: React.MouseEvent, day: string, start: string, end: string) => {
+    e.stopPropagation();
+    const updated = slots.filter(
+      (s) => !(s.day === day && s.start === start && s.end === end)
+    );
+    setSlots(updated);
+    persistTimetable(updated);
+  };
+
   // حفظ الحصة من النافذة
   const handleSaveSlot = async (e: React.FormEvent) => {
     e.preventDefault();
     let updated: TimetableSlot[];
 
-    let finalClassName = selectedClass;
+    let finalClassName = selectedClass || customClasses[0] || DEFAULT_MIDDLE_SCHOOL_CLASSES[0];
     if (selectedSessionType === "reception") {
       finalClassName = "استقبال الأولياء";
     } else if (selectedSessionType === "remedial") {
@@ -336,7 +460,7 @@ export default function TeacherTimetablePage() {
     await persistTimetable(updated);
   };
 
-  // حذف حصة
+  // حذف حصة من داخل النافذة
   const handleDeleteSlot = async () => {
     if (editingSlotIndex === null) return;
     const updated = slots.filter((_, idx) => idx !== editingSlotIndex);
@@ -425,6 +549,9 @@ export default function TeacherTimetablePage() {
       );
 
       if (matchedClass) {
+        if (!summary[matchedClass]) {
+          summary[matchedClass] = { total: 0, normal: 0, td: 0, remedial: 0 };
+        }
         summary[matchedClass].total++;
         if (s.sessionType === "td") summary[matchedClass].td++;
         else if (s.sessionType === "remedial") summary[matchedClass].remedial++;
@@ -449,8 +576,8 @@ export default function TeacherTimetablePage() {
   const isDaysAsCols = settings.orientation === "days-as-cols";
 
   return (
-    <div className="min-h-screen bg-[#fafaf7] py-5 sm:py-8 px-3 sm:px-6 font-sans" dir="rtl">
-      <div className="max-w-7xl mx-auto space-y-5">
+    <div className="min-h-screen bg-[#fafaf7] py-4 sm:py-8 px-2 sm:px-6 font-sans" dir="rtl">
+      <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
         {/* شريط المسار والتنقل والإجراءات الرئيسية */}
         <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
           <div className="flex items-center gap-2 text-xs font-bold text-gray-500">
@@ -463,18 +590,6 @@ export default function TeacherTimetablePage() {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            {/* زر تدوير الجدول (الأيام صفوف أو أعمدة) */}
-            <button
-              onClick={handleToggleOrientation}
-              className="px-3 py-1.5 rounded-xl border border-gray-300 bg-white text-xs font-black text-gray-800 hover:bg-gray-100 transition shadow-2xs flex items-center gap-1.5 cursor-pointer active:scale-95"
-              title="تبديل شكل الجدول: الأيام كصفوف أو كأعمدة"
-            >
-              <RotateCcw className="w-3.5 h-3.5 text-emerald-700" />
-              <span>
-                {isDaysAsCols ? "🔄 عرض الأيام كصفوف" : "🔄 تدوير: الأيام كأعمدة"}
-              </span>
-            </button>
-
             {/* زر ضبط مواقيت المؤسسة */}
             <button
               onClick={() => setIsSettingsModalOpen(true)}
@@ -498,23 +613,12 @@ export default function TeacherTimetablePage() {
               className="px-3.5 py-1.5 rounded-xl border border-emerald-300 bg-emerald-50 text-xs font-bold text-emerald-950 hover:bg-emerald-100 transition shadow-2xs flex items-center gap-1.5"
             >
               <Users className="w-3.5 h-3.5 text-emerald-700" />
-              <span>إدارة الأفواج والتلاميذ</span>
+              <span>قوائم التلاميذ</span>
             </Link>
           </div>
         </div>
 
-        {/* دليل الصفحة البيداغوجي */}
-        <div className="print:hidden">
-          <PageExplainer
-            pageId="timetable"
-            title="التوقيت الأسبوعي وتوزيع الأفواج"
-            teacherRoleExplanation="وزع ساعات أفواجه على أيام الأسبوع، وحدد حصص التفويج (ف1 / ف2)، وحصة الاستدراك، وساعة استقبال الأولياء مع إمكانية تدوير شكل الجدول وضبط مواقيت المؤسسة بدقة."
-            parentRoleExplanation="يطلع الولي على جدول حصص ابنه مع معرفة ساعة استقبال الأستاذ الرسمية بدقة."
-            inspectorExplanation="يعاين المفتش مطابقة النصاب الساعي الأسبوعي للأستاذ وتوزيع حصص التعلم وحصص الأعمال الموجهة والاستدراك."
-          />
-        </div>
-
-        {/* تنبيهات النجاح أو الخطأ */}
+        {/* رسائل التنبيه والنجاح */}
         {message && (
           <div
             className={`p-3.5 rounded-2xl text-xs font-bold flex items-center gap-2 border animate-in fade-in duration-200 print:hidden ${
@@ -533,7 +637,7 @@ export default function TeacherTimetablePage() {
         )}
 
         {/* ─── بطاقة ترويسة التوقيت والإحصائيات وتوزيع ساعات الأفواج ─── */}
-        <div className="bg-white rounded-3xl p-5 sm:p-6 border border-[#e8e8e0] shadow-sm space-y-4">
+        <div className="bg-white rounded-3xl p-4 sm:p-6 border border-[#e8e8e0] shadow-sm space-y-4">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[#e8e8e0] pb-4">
             <div className="space-y-1">
               <div className="inline-flex items-center gap-2 bg-emerald-50 text-emerald-900 border border-emerald-200 px-3 py-0.5 rounded-full text-xs font-black print:hidden">
@@ -544,7 +648,7 @@ export default function TeacherTimetablePage() {
                 جدول التوقيت الأسبوعي وتوزيع ساعات التدريس
               </h1>
               <p className="text-xs text-gray-500 font-medium">
-                انقر على أي خانة في الشبكة لتعيين أو تعديل الحصة. راحة مساء الثلاثاء واستراحة منتصف النهار موضحة بدقة.
+                وزّع ساعات التدريس على الأفواج مباشرة من الشبكة. انقر على أي خانة للتعديل أو استخدم أداة التوزيع السريع.
               </p>
             </div>
 
@@ -559,83 +663,363 @@ export default function TeacherTimetablePage() {
             </div>
           </div>
 
-          {/* لوحة توزيع الحصص على الأفواج المسندة */}
-          <div className="space-y-2">
+          {/* لوحة توزيع الحصص على الأفواج المسندة + أداة التوزيع السريع */}
+          <div className="space-y-2.5">
             <div className="flex items-center justify-between flex-wrap gap-2 text-xs font-bold text-gray-700">
               <span className="flex items-center gap-1.5">
                 <School className="w-4 h-4 text-emerald-700" />
-                <span>توزيع النصاب الساعي على الأفواج المسندة:</span>
+                <span>الأفواج المسندة والنصاب الساعي (انقر على أي فوج لتفعيل التوزيع السريع ⚡):</span>
               </span>
               <span className="text-[11px] text-gray-400">
                 (النصاب الرسمي: عادة 18 إلى 20 ساعة أسبوعياً)
               </span>
             </div>
 
-            <div className="flex flex-wrap gap-2 pt-0.5">
-              {customClasses.length === 0 ? (
-                <span className="text-xs text-amber-800 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-200">
-                  ⚠️ لم تقم بإضافة أفواجك بعد. انتقل إلى إدارة الأفواج لإضافتها.
-                </span>
-              ) : (
-                customClasses.map((cls) => {
-                  const stat = classHoursSummary.classesSummary[cls] || { total: 0, normal: 0, td: 0, remedial: 0 };
-                  return (
-                    <div
-                      key={cls}
-                      className="bg-[#fafaf7] border border-[#e8e8e0] rounded-xl px-3 py-1.5 text-xs flex items-center gap-2"
+            <div className="flex flex-wrap items-center gap-2 pt-0.5">
+              {customClasses.map((cls) => {
+                const stat = classHoursSummary.classesSummary[cls] || { total: 0, normal: 0, td: 0, remedial: 0 };
+                const isSelectedForStamp = quickStampClass === cls;
+                return (
+                  <button
+                    key={cls}
+                    type="button"
+                    onClick={() => setQuickStampClass(isSelectedForStamp ? null : cls)}
+                    className={`rounded-xl px-3.5 py-2 text-xs font-black transition cursor-pointer flex items-center gap-2 border ${
+                      isSelectedForStamp
+                        ? "bg-emerald-700 text-white border-emerald-700 shadow-md ring-2 ring-emerald-400 scale-105"
+                        : "bg-[#fafaf7] hover:bg-emerald-50 text-gray-900 border-[#e8e8e0] hover:border-emerald-300"
+                    }`}
+                    title={isSelectedForStamp ? "انقر لإلغاء وضع التوزيع السريع" : `تفعيل التوزيع السريع لفوج ${cls}`}
+                  >
+                    <span>فوج {cls}</span>
+                    <span
+                      className={`font-mono text-xs px-2 py-0.5 rounded-md ${
+                        isSelectedForStamp
+                          ? "bg-white text-emerald-800"
+                          : "bg-emerald-100 text-emerald-900"
+                      }`}
                     >
-                      <span className="font-black text-gray-900">فوج {cls}:</span>
-                      <span className="font-mono font-black text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                        {stat.total} سا
+                      {stat.total} سا
+                    </span>
+                    {stat.td > 0 && (
+                      <span className="text-[10px] font-bold text-purple-900 bg-purple-100 px-1.5 py-0.2 rounded border border-purple-200">
+                        {stat.td} تفويج
                       </span>
-                      {stat.td > 0 && (
-                        <span className="text-[10px] font-bold text-purple-900 bg-purple-50 px-1.5 py-0.2 rounded border border-purple-200">
-                          {stat.td} تفويج
-                        </span>
-                      )}
-                    </div>
-                  );
-                })
+                    )}
+                  </button>
+                );
+              })}
+
+              {/* زر إضافة فوج سريع */}
+              {!showAddClassInput ? (
+                <button
+                  type="button"
+                  onClick={() => setShowAddClassInput(true)}
+                  className="px-3 py-2 rounded-xl border border-dashed border-gray-300 text-xs font-bold text-gray-600 hover:text-emerald-700 hover:border-emerald-400 hover:bg-emerald-50/50 transition flex items-center gap-1 cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>إضافة فوج</span>
+                </button>
+              ) : (
+                <div className="flex items-center gap-1.5 bg-white p-1 rounded-xl border border-emerald-400 shadow-2xs">
+                  <input
+                    type="text"
+                    value={newClassInput}
+                    onChange={(e) => setNewClassInput(e.target.value)}
+                    placeholder="مثال: 3م2"
+                    className="w-20 px-2 py-1 text-xs border rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 font-bold"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleAddNewClass(newClassInput);
+                      if (e.key === "Escape") setShowAddClassInput(false);
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleAddNewClass(newClassInput)}
+                    className="px-2 py-1 bg-emerald-600 text-white text-xs font-bold rounded-lg hover:bg-emerald-700 cursor-pointer"
+                  >
+                    إضافة
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddClassInput(false)}
+                    className="p-1 text-gray-400 hover:text-gray-600 rounded-lg cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               )}
 
               {/* استقبال الأولياء */}
-              <div className="bg-sky-50 border border-sky-200 rounded-xl px-3 py-1.5 text-xs flex items-center gap-1.5 text-sky-950 font-bold">
+              <div className="bg-sky-50 border border-sky-200 rounded-xl px-3 py-1.5 text-xs flex items-center gap-1.5 text-sky-950 font-bold mr-auto">
                 <span>🤝 استقبال الأولياء:</span>
                 <span className="font-mono font-black text-sky-900">
                   {classHoursSummary.receptionCount} سا
                 </span>
               </div>
+            </div>
 
-              {/* استدراك */}
-              {slots.some((s) => s.sessionType === "remedial" || s.className.includes("استدراك")) && (
-                <div className="bg-orange-50 border border-orange-200 rounded-xl px-3 py-1.5 text-xs flex items-center gap-1.5 text-orange-950 font-bold">
-                  <span>🛠️ استدراك:</span>
-                  <span className="font-mono font-black text-orange-900">
-                    {slots.filter((s) => s.sessionType === "remedial" || s.className.includes("استدراك")).length} سا
+            {/* شريط وضع التوزيع السريع المنبثق عند تفعيله */}
+            {quickStampClass && (
+              <div className="bg-emerald-100/90 border border-emerald-300 text-emerald-950 px-4 py-2 rounded-2xl text-xs font-bold flex items-center justify-between gap-3 animate-in fade-in duration-150">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-emerald-700 animate-bounce" />
+                  <span>
+                    ⚡ وضع التوزيع السريع مفعل للفوج <strong>[{quickStampClass}]</strong>: انقر مباشرة على أي خانة فارغة في الجدول لإسنادها فوراً بضغطة واحدة!
                   </span>
                 </div>
-              )}
-            </div>
+                <button
+                  type="button"
+                  onClick={() => setQuickStampClass(null)}
+                  className="px-2.5 py-1 bg-white hover:bg-emerald-50 text-emerald-900 border border-emerald-300 rounded-lg text-xs font-black transition cursor-pointer shadow-2xs"
+                >
+                  ✕ إلغاء التوزيع السريع
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* ─── شبكة جدول التوقيت التفاعلي (Layout 1: الأيام صفوف | Layout 2: الأيام أعمدة) ─── */}
-        <div className="bg-white rounded-3xl border border-[#e8e8e0] shadow-sm overflow-hidden">
+        {/* ─── شريط التحكم البارز في تدوير شكل الجدول (أفقي / عمودي) ─── */}
+        <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-white p-3.5 sm:p-4 rounded-3xl border border-emerald-200/80 shadow-xs flex flex-wrap items-center justify-between gap-3 print:hidden">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-xs shrink-0">
+              <RotateCcw className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="text-xs sm:text-sm font-black text-gray-900 block">
+                شكل عرض وتدوير الجدول (الأيام صفوف ⮂ الأيام أعمدة):
+              </span>
+              <span className="text-[11px] text-gray-600 hidden sm:block">
+                اختر النمط المناسب لك ولمؤسستك بسهولة بضغطة واحدة
+              </span>
+            </div>
+          </div>
+
+          <div className="inline-flex p-1 bg-white rounded-2xl border border-gray-300 shadow-2xs">
+            <button
+              type="button"
+              onClick={() => handleSetOrientation("days-as-rows")}
+              className={`px-4 py-2 rounded-xl text-xs font-black transition flex items-center gap-2 cursor-pointer ${
+                !isDaysAsCols
+                  ? "bg-emerald-700 text-white shadow-sm ring-1 ring-emerald-500"
+                  : "text-gray-700 hover:text-gray-950 hover:bg-gray-100"
+              }`}
+            >
+              <span>▤ الأيام كصفوف (أفقي كلاسيكي)</span>
+              {!isDaysAsCols && <Check className="w-4 h-4" />}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleSetOrientation("days-as-cols")}
+              className={`px-4 py-2 rounded-xl text-xs font-black transition flex items-center gap-2 cursor-pointer ${
+                isDaysAsCols
+                  ? "bg-emerald-700 text-white shadow-sm ring-1 ring-emerald-500"
+                  : "text-gray-700 hover:text-gray-950 hover:bg-gray-100"
+              }`}
+            >
+              <span>▥ الأيام كأعمدة (عمودي)</span>
+              {isDaysAsCols && <Check className="w-4 h-4" />}
+            </button>
+          </div>
+        </div>
+
+        {/* ─── أشرطة مساعدة وتصفح الهواتف المحمولة والشاشات الصغيرة ─── */}
+        <div className="block md:hidden bg-white p-3 rounded-2xl border border-[#e8e8e0] shadow-xs space-y-2 print:hidden">
+          <div className="flex items-center justify-between text-xs font-bold text-gray-700">
+            <span className="flex items-center gap-1.5">
+              <Smartphone className="w-4 h-4 text-emerald-700" />
+              <span>تصفح الجدول على الهاتف:</span>
+            </span>
+            <span className="text-[10px] text-gray-400">انقر لعرض يوم محدد</span>
+          </div>
+
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+            <button
+              type="button"
+              onClick={() => setMobileActiveDay("all")}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition ${
+                mobileActiveDay === "all"
+                  ? "bg-gray-900 text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+            >
+              عرض الشبكة الكاملة
+            </button>
+            {SCHOOL_DAYS.map((d) => (
+              <button
+                key={d}
+                type="button"
+                onClick={() => setMobileActiveDay(d)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition ${
+                  mobileActiveDay === d
+                    ? "bg-emerald-700 text-white shadow-xs"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                {d}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* ─── وضع العرض المخصص للهاتف (عند اختيار يوم محدد) ─── */}
+        {mobileActiveDay !== "all" && (
+          <div className="block md:hidden space-y-3">
+            <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-2xl flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-emerald-700" />
+                <span className="font-black text-xs text-emerald-950">جدول يوم {mobileActiveDay}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMobileActiveDay("all")}
+                className="text-xs text-emerald-800 font-bold hover:underline"
+              >
+                العودة للشبكة
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              {allSlots.map((slotDef, idx) => {
+                const isBreak =
+                  idx === morningSlots.length &&
+                  settings.breakStart &&
+                  settings.breakEnd;
+                const isTueRest = isTuesdayAfternoonSlot(mobileActiveDay, slotDef.period);
+                const s = getSlotFor(mobileActiveDay as (typeof SCHOOL_DAYS)[number], slotDef.start, slotDef.end);
+
+                return (
+                  <div
+                    key={slotDef.start}
+                    className={`p-3.5 rounded-2xl border transition ${
+                      isBreak
+                        ? "bg-slate-200/90 border-slate-300 text-slate-800"
+                        : isTueRest
+                        ? "bg-slate-100 border-slate-300 text-slate-600"
+                        : s
+                        ? s.sessionType === "reception"
+                          ? "bg-sky-50 border-sky-300"
+                          : s.sessionType === "remedial"
+                          ? "bg-orange-50 border-orange-300"
+                          : s.sessionType === "td"
+                          ? "bg-purple-50 border-purple-300"
+                          : "bg-white border-emerald-300 shadow-xs"
+                        : "bg-white border-dashed border-gray-300"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="font-mono text-xs font-black text-gray-700 flex items-center gap-1">
+                        <Clock className="w-3.5 h-3.5 text-gray-400" />
+                        {slotDef.label}
+                      </span>
+                      <span className="text-[10px] text-gray-500 font-bold">
+                        {slotDef.period === "morning" ? "فترة صباحية" : "فترة مسائية"}
+                      </span>
+                    </div>
+
+                    {isTueRest ? (
+                      <div className="text-center py-2 text-xs font-black text-slate-600">
+                        ☕ راحة رسمية (مساء الثلاثاء)
+                      </div>
+                    ) : s ? (
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-black text-gray-900">
+                              {s.className}
+                            </span>
+                            {s.subgroup && (
+                              <span
+                                className={`text-[10px] font-black px-2 py-0.5 rounded-md ${
+                                  s.subgroup === "فوج 1"
+                                    ? "bg-purple-700 text-white"
+                                    : s.subgroup === "فوج 2"
+                                    ? "bg-amber-600 text-white"
+                                    : "bg-gray-900 text-white"
+                                }`}
+                              >
+                                {s.subgroup}
+                              </span>
+                            )}
+                            {s.sessionType === "remedial" && (
+                              <span className="text-[10px] font-black px-1.5 py-0.5 rounded-md bg-orange-600 text-white">
+                                استدراك
+                              </span>
+                            )}
+                            {s.sessionType === "reception" && (
+                              <span className="text-[10px] font-black px-1.5 py-0.5 rounded-md bg-sky-600 text-white">
+                                استقبال أولياء
+                              </span>
+                            )}
+                          </div>
+                          {s.room && (
+                            <span className="text-[11px] text-gray-500 font-medium block mt-0.5">
+                              📍 {s.room}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenCell(mobileActiveDay as (typeof SCHOOL_DAYS)[number], slotDef.start, slotDef.end)}
+                            className="p-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 cursor-pointer"
+                            title="تعديل"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => handleQuickDeleteSlot(e, mobileActiveDay, slotDef.start, slotDef.end)}
+                            className="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 cursor-pointer"
+                            title="حذف"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleCellClick(mobileActiveDay as (typeof SCHOOL_DAYS)[number], slotDef.start, slotDef.end)}
+                        className="w-full py-2.5 rounded-xl border border-dashed border-gray-300 text-xs font-bold text-gray-500 hover:text-emerald-700 hover:border-emerald-400 hover:bg-emerald-50/40 transition flex items-center justify-center gap-1 cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>إضافة حصة هنا</span>
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ─── شبكة جدول التوقيت التفاعلي (Desktop & Full Grid View) ─── */}
+        <div className={`bg-white rounded-3xl border border-[#e8e8e0] shadow-sm overflow-hidden ${mobileActiveDay !== "all" ? "hidden md:block" : "block"}`}>
           {loading && slots.length === 0 ? (
             <div className="p-12 text-center text-xs text-gray-500 space-y-2">
               <Loader2 className="w-6 h-6 animate-spin mx-auto text-emerald-700" />
               <p>جارٍ تحميل جدول التوقيت الأسبوعي...</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto relative scrollbar-thin">
+              {/* إشعار سحب الجدول للشاشات الصغيرة */}
+              <div className="md:hidden bg-amber-50 border-b border-amber-200 px-3 py-1 text-[11px] font-bold text-amber-900 text-center">
+                👉 يمكنك سحب الجدول أفقياً لتصفح بقية الساعات والأيام
+              </div>
+
               {/* ─────────────────────────────────────────────────────────────
                  الوضع 1: الأيام كصفوف والساعات كأعمدة (الوضع الكلاسيكي الشائع)
               ───────────────────────────────────────────────────────────── */}
               {!isDaysAsCols ? (
-                <table className="w-full border-collapse text-center min-w-[840px]">
+                <table className="w-full border-collapse text-center min-w-[900px]">
                   <thead>
                     <tr className="bg-[#fafaf7] border-b border-[#e8e8e0] text-[11px] font-black text-gray-700">
-                      <th className="py-3 px-3 w-28 border-l border-[#e8e8e0] bg-[#f0f0eb]">
+                      <th className="py-3 px-3 w-28 border-l border-[#e8e8e0] bg-[#f0f0eb] sticky right-0 z-20 shadow-xs">
                         اليوم / التوقيت
                       </th>
 
@@ -647,13 +1031,10 @@ export default function TeacherTimetablePage() {
                         </th>
                       ))}
 
-                      {/* عمود استراحة منتصف النهار باللون الرمادي كما طلب الأستاذ */}
-                      <th className="py-2.5 px-2 w-28 border-l border-[#e8e8e0] bg-slate-200/90 text-slate-700 font-black">
-                        <span className="block text-[11px] flex items-center justify-center gap-1">
-                          <Coffee className="w-3.5 h-3.5 text-slate-600" />
-                          <span>استراحة الغداء</span>
-                        </span>
-                        <span className="text-[10px] font-mono text-slate-600">
+                      {/* عمود استراحة منتصف النهار باللون الرمادي */}
+                      <th className="py-2.5 px-3 w-20 bg-slate-200 text-slate-700 border-l border-[#e8e8e0] font-black text-[11px]">
+                        <span className="block">استراحة</span>
+                        <span className="text-[10px] text-slate-500 font-mono">
                           {settings.breakStart} - {settings.breakEnd}
                         </span>
                       </th>
@@ -662,174 +1043,178 @@ export default function TeacherTimetablePage() {
                       {afternoonSlots.map((t) => (
                         <th key={t.start} className="py-2.5 px-2 border-l border-[#e8e8e0] last:border-l-0">
                           <span className="block font-black text-gray-900">{t.label}</span>
-                          <span className="text-[10px] text-teal-700 font-bold">الفترة المسائية</span>
+                          <span className="text-[10px] text-amber-700 font-bold">الفترة المسائية</span>
                         </th>
                       ))}
                     </tr>
                   </thead>
 
-                  <tbody className="divide-y divide-[#e8e8e0] text-xs">
-                    {SCHOOL_DAYS.map((day) => {
-                      return (
-                        <tr key={day} className="hover:bg-gray-50/40 transition">
-                          {/* اسم اليوم */}
-                          <td className="py-3 px-3 font-black text-gray-900 bg-[#fafaf7] border-l border-[#e8e8e0] text-xs">
-                            {day}
-                          </td>
+                  <tbody>
+                    {SCHOOL_DAYS.map((day) => (
+                      <tr key={day} className="border-b border-[#e8e8e0] hover:bg-slate-50/40 transition">
+                        {/* عمود اسم اليوم (ثابت في اليمين sticky عند التمرير الأفقي) */}
+                        <td className="py-4 px-3 font-black text-xs text-gray-900 bg-[#f7f7f2] border-l border-[#e8e8e0] sticky right-0 z-10 shadow-xs">
+                          {day}
+                        </td>
 
-                          {/* خانات الصباح */}
-                          {morningSlots.map((slotTime) => {
-                            const slot = getSlotFor(day, slotTime.start, slotTime.end);
+                        {/* خانات الصباح */}
+                        {morningSlots.map((t) => {
+                          const s = getSlotFor(day, t.start, t.end);
+                          return (
+                            <td
+                              key={t.start}
+                              onClick={() => handleCellClick(day, t.start, t.end)}
+                              className="p-1.5 border-l border-[#e8e8e0] align-middle h-20 transition cursor-pointer hover:bg-emerald-50/40 relative group"
+                            >
+                              {s ? (
+                                <SlotBadge slot={s} onDelete={(e) => handleQuickDeleteSlot(e, day, t.start, t.end)} />
+                              ) : (
+                                <EmptySlotHint quickStampClass={quickStampClass} />
+                              )}
+                            </td>
+                          );
+                        })}
+
+                        {/* خانة استراحة منتصف النهار بلون رمادي موحد */}
+                        <td className="bg-slate-200/90 text-slate-700 border-l border-slate-300 p-1 text-[11px] font-black select-none">
+                          <span className="block transform rotate-180 writing-mode-vertical text-[10px] text-slate-500 tracking-wider">
+                            استراحة
+                          </span>
+                        </td>
+
+                        {/* خانات المساء */}
+                        {afternoonSlots.map((t) => {
+                          const isTueRest = isTuesdayAfternoonSlot(day, "afternoon");
+                          const s = getSlotFor(day, t.start, t.end);
+
+                          if (isTueRest && !s) {
                             return (
                               <td
-                                key={slotTime.start}
-                                onClick={() => handleOpenCell(day, slotTime.start, slotTime.end)}
-                                className={`p-1.5 border-l border-[#e8e8e0] transition cursor-pointer relative group h-20 min-w-[105px] ${
-                                  slot ? "bg-emerald-50/40 hover:bg-emerald-100/60" : "hover:bg-gray-100/70"
-                                }`}
+                                key={t.start}
+                                onClick={() => handleCellClick(day, t.start, t.end)}
+                                className="p-1.5 border-l border-[#e8e8e0] last:border-l-0 align-middle h-20 bg-slate-100/90 text-slate-500 transition cursor-pointer hover:bg-slate-200/70"
+                                title="راحة رسمية (مساء الثلاثاء) - انقر لتعيين حصة استثنائية إن لزم الأمر"
                               >
-                                {renderSlotCellContent(slot)}
+                                <div className="text-[11px] font-bold text-slate-600 flex flex-col items-center justify-center gap-0.5">
+                                  <span>☕</span>
+                                  <span>راحة رسمية</span>
+                                </div>
                               </td>
                             );
-                          })}
+                          }
 
-                          {/* خلية استراحة منتصف النهار باللون الرمادي */}
-                          <td className="p-2 border-l border-[#e8e8e0] bg-slate-100 text-slate-500 font-bold text-[10px] select-none text-center">
-                            <span className="block text-slate-400">☕</span>
-                            <span className="text-[9px]">راحة</span>
-                          </td>
-
-                          {/* خانات المساء */}
-                          {afternoonSlots.map((slotTime) => {
-                            const isTueOff = isTuesdayAfternoonSlot(day, slotTime.period);
-                            const slot = getSlotFor(day, slotTime.start, slotTime.end);
-
-                            return (
-                              <td
-                                key={slotTime.start}
-                                onClick={() => handleOpenCell(day, slotTime.start, slotTime.end)}
-                                className={`p-1.5 border-l border-[#e8e8e0] last:border-l-0 transition cursor-pointer relative group h-20 min-w-[105px] ${
-                                  slot
-                                    ? "bg-emerald-50/40 hover:bg-emerald-100/60"
-                                    : isTueOff
-                                    ? "bg-slate-100/70 hover:bg-slate-200/60 text-slate-400"
-                                    : "hover:bg-gray-100/70"
-                                }`}
-                              >
-                                {slot ? (
-                                  renderSlotCellContent(slot)
-                                ) : isTueOff ? (
-                                  <div className="h-full flex flex-col items-center justify-center p-1 rounded-xl border border-dashed border-slate-300 text-center text-slate-400">
-                                    <Coffee className="w-3.5 h-3.5 text-slate-400 mb-0.5" />
-                                    <span className="text-[10px] font-bold">راحة رسمية</span>
-                                    <span className="text-[8px] text-slate-400">مساء الثلاثاء</span>
-                                  </div>
-                                ) : (
-                                  <div className="h-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
-                                    <Plus className="w-4 h-4 text-gray-300" />
-                                  </div>
-                                )}
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      );
-                    })}
+                          return (
+                            <td
+                              key={t.start}
+                              onClick={() => handleCellClick(day, t.start, t.end)}
+                              className="p-1.5 border-l border-[#e8e8e0] last:border-l-0 align-middle h-20 transition cursor-pointer hover:bg-emerald-50/40 relative group"
+                            >
+                              {s ? (
+                                <SlotBadge slot={s} onDelete={(e) => handleQuickDeleteSlot(e, day, t.start, t.end)} />
+                              ) : (
+                                <EmptySlotHint quickStampClass={quickStampClass} />
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               ) : (
                 /* ─────────────────────────────────────────────────────────────
-                   الوضع 2: الأيام كأعمدة والساعات كصفوف (تدوير الجدول حسب الرغبة)
+                   الوضع 2: الأيام كأعمدة والساعات كصفوف (تدوير الجدول)
                 ───────────────────────────────────────────────────────────── */
-                <table className="w-full border-collapse text-center min-w-[800px]">
+                <table className="w-full border-collapse text-center min-w-[900px]">
                   <thead>
                     <tr className="bg-[#fafaf7] border-b border-[#e8e8e0] text-[11px] font-black text-gray-700">
-                      <th className="py-3 px-3 w-32 border-l border-[#e8e8e0] bg-[#f0f0eb]">
+                      <th className="py-3 px-3 w-32 border-l border-[#e8e8e0] bg-[#f0f0eb] sticky right-0 z-20 shadow-xs">
                         التوقيت / اليوم
                       </th>
                       {SCHOOL_DAYS.map((day) => (
-                        <th key={day} className="py-3 px-3 border-l border-[#e8e8e0] last:border-l-0">
-                          <span className="text-xs font-black text-gray-900">{day}</span>
+                        <th key={day} className="py-2.5 px-3 border-l border-[#e8e8e0] last:border-l-0 font-black text-xs text-gray-900">
+                          {day}
                         </th>
                       ))}
                     </tr>
                   </thead>
 
-                  <tbody className="divide-y divide-[#e8e8e0] text-xs">
+                  <tbody>
                     {/* ساعات الصباح */}
-                    {morningSlots.map((slotTime) => (
-                      <tr key={slotTime.start} className="hover:bg-gray-50/40 transition">
-                        <td className="py-2 px-3 font-mono font-black text-gray-900 bg-[#fafaf7] border-l border-[#e8e8e0] text-xs">
-                          <div>{slotTime.label}</div>
-                          <span className="text-[9px] text-blue-700 font-bold block">صباحاً</span>
+                    {morningSlots.map((t) => (
+                      <tr key={t.start} className="border-b border-[#e8e8e0] hover:bg-slate-50/40 transition">
+                        <td className="py-3 px-2 bg-[#f7f7f2] border-l border-[#e8e8e0] font-mono text-xs font-black text-gray-800 sticky right-0 z-10 shadow-xs">
+                          <div>{t.label}</div>
+                          <span className="text-[10px] text-blue-700 font-sans font-bold">صباحاً</span>
                         </td>
 
                         {SCHOOL_DAYS.map((day) => {
-                          const slot = getSlotFor(day, slotTime.start, slotTime.end);
+                          const s = getSlotFor(day, t.start, t.end);
                           return (
                             <td
                               key={day}
-                              onClick={() => handleOpenCell(day, slotTime.start, slotTime.end)}
-                              className={`p-1.5 border-l border-[#e8e8e0] last:border-l-0 transition cursor-pointer relative group h-20 min-w-[110px] ${
-                                slot ? "bg-emerald-50/40 hover:bg-emerald-100/60" : "hover:bg-gray-100/70"
-                              }`}
+                              onClick={() => handleCellClick(day, t.start, t.end)}
+                              className="p-1.5 border-l border-[#e8e8e0] last:border-l-0 align-middle h-20 transition cursor-pointer hover:bg-emerald-50/40 relative group"
                             >
-                              {renderSlotCellContent(slot)}
+                              {s ? (
+                                <SlotBadge slot={s} onDelete={(e) => handleQuickDeleteSlot(e, day, t.start, t.end)} />
+                              ) : (
+                                <EmptySlotHint quickStampClass={quickStampClass} />
+                              )}
                             </td>
                           );
                         })}
                       </tr>
                     ))}
 
-                    {/* سطر استراحة منتصف النهار باللون الرمادي يمتد عبر كل الأيام */}
-                    <tr className="bg-slate-200/90 text-slate-700 font-black border-y-2 border-slate-300">
-                      <td className="py-2.5 px-3 border-l border-slate-300 text-xs font-mono">
+                    {/* صف استراحة منتصف النهار باللون الرمادي */}
+                    <tr className="bg-slate-200 border-y-2 border-slate-300">
+                      <td className="py-2 px-2 font-mono text-xs font-black text-slate-700 border-l border-slate-300 sticky right-0 z-10 bg-slate-200 shadow-xs">
                         {settings.breakStart} - {settings.breakEnd}
                       </td>
-                      <td colSpan={SCHOOL_DAYS.length} className="py-2.5 px-4 text-center">
-                        <div className="flex items-center justify-center gap-2 text-xs font-black text-slate-700">
-                          <Coffee className="w-4 h-4 text-slate-600" />
-                          <span>☕ استراحة منتصف النهار / الغداء ({settings.breakStart} - {settings.breakEnd})</span>
-                        </div>
+                      <td colSpan={SCHOOL_DAYS.length} className="py-2 text-center text-xs font-black text-slate-700 tracking-wider">
+                        🍱 استراحة منتصف النهار / وجبة الغداء
                       </td>
                     </tr>
 
                     {/* ساعات المساء */}
-                    {afternoonSlots.map((slotTime) => (
-                      <tr key={slotTime.start} className="hover:bg-gray-50/40 transition">
-                        <td className="py-2 px-3 font-mono font-black text-gray-900 bg-[#fafaf7] border-l border-[#e8e8e0] text-xs">
-                          <div>{slotTime.label}</div>
-                          <span className="text-[9px] text-teal-700 font-bold block">مساءً</span>
+                    {afternoonSlots.map((t) => (
+                      <tr key={t.start} className="border-b border-[#e8e8e0] hover:bg-slate-50/40 transition">
+                        <td className="py-3 px-2 bg-[#f7f7f2] border-l border-[#e8e8e0] font-mono text-xs font-black text-gray-800 sticky right-0 z-10 shadow-xs">
+                          <div>{t.label}</div>
+                          <span className="text-[10px] text-amber-700 font-sans font-bold">مساءً</span>
                         </td>
 
                         {SCHOOL_DAYS.map((day) => {
-                          const isTueOff = isTuesdayAfternoonSlot(day, slotTime.period);
-                          const slot = getSlotFor(day, slotTime.start, slotTime.end);
+                          const isTueRest = isTuesdayAfternoonSlot(day, "afternoon");
+                          const s = getSlotFor(day, t.start, t.end);
+
+                          if (isTueRest && !s) {
+                            return (
+                              <td
+                                key={day}
+                                onClick={() => handleCellClick(day, t.start, t.end)}
+                                className="p-1.5 border-l border-[#e8e8e0] last:border-l-0 align-middle h-20 bg-slate-100/90 text-slate-500 transition cursor-pointer hover:bg-slate-200/70"
+                                title="راحة رسمية (مساء الثلاثاء)"
+                              >
+                                <div className="text-[11px] font-bold text-slate-600 flex flex-col items-center justify-center gap-0.5">
+                                  <span>☕</span>
+                                  <span>راحة رسمية</span>
+                                </div>
+                              </td>
+                            );
+                          }
 
                           return (
                             <td
                               key={day}
-                              onClick={() => handleOpenCell(day, slotTime.start, slotTime.end)}
-                              className={`p-1.5 border-l border-[#e8e8e0] last:border-l-0 transition cursor-pointer relative group h-20 min-w-[110px] ${
-                                slot
-                                  ? "bg-emerald-50/40 hover:bg-emerald-100/60"
-                                  : isTueOff
-                                  ? "bg-slate-100/70 hover:bg-slate-200/60 text-slate-400"
-                                  : "hover:bg-gray-100/70"
-                              }`}
+                              onClick={() => handleCellClick(day, t.start, t.end)}
+                              className="p-1.5 border-l border-[#e8e8e0] last:border-l-0 align-middle h-20 transition cursor-pointer hover:bg-emerald-50/40 relative group"
                             >
-                              {slot ? (
-                                renderSlotCellContent(slot)
-                              ) : isTueOff ? (
-                                <div className="h-full flex flex-col items-center justify-center p-1 rounded-xl border border-dashed border-slate-300 text-center text-slate-400">
-                                  <Coffee className="w-3.5 h-3.5 text-slate-400 mb-0.5" />
-                                  <span className="text-[10px] font-bold">راحة رسمية</span>
-                                  <span className="text-[8px] text-slate-400">مساء الثلاثاء</span>
-                                </div>
+                              {s ? (
+                                <SlotBadge slot={s} onDelete={(e) => handleQuickDeleteSlot(e, day, t.start, t.end)} />
                               ) : (
-                                <div className="h-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
-                                  <Plus className="w-4 h-4 text-gray-300" />
-                                </div>
+                                <EmptySlotHint quickStampClass={quickStampClass} />
                               )}
                             </td>
                           );
@@ -843,57 +1228,49 @@ export default function TeacherTimetablePage() {
           )}
         </div>
 
-        {/* ─── قسم صورة التوقيت الرسمي المؤشر من الإدارة ─── */}
-        <div className="bg-white rounded-3xl p-5 sm:p-6 border border-[#e8e8e0] shadow-sm space-y-3 print:hidden">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-black text-gray-900 flex items-center gap-2">
-                <ImageIcon className="w-4 h-4 text-emerald-700" />
-                <span>النسخة الورقية للتوقيت المعتمد (اختياري)</span>
-              </h3>
-              <p className="text-[11px] text-gray-500">
-                يمكنك الاحتفاظ بصورة لجدول التوقيت الورقي المختوم من إدارة المؤسسة.
-              </p>
+        {/* ─── دليل الألوان والمفاتيح البيداغوجية ─── */}
+        <div className="bg-white rounded-3xl p-4 sm:p-5 border border-[#e8e8e0] shadow-xs print:hidden space-y-2">
+          <span className="text-xs font-black text-gray-800 block">دليل الألوان والرموز البيداغوجية:</span>
+          <div className="flex flex-wrap items-center gap-3 sm:gap-6 text-xs text-gray-600">
+            <div className="flex items-center gap-1.5">
+              <span className="w-3.5 h-3.5 rounded bg-emerald-600 inline-block shadow-2xs" />
+              <span>درس قسم كامل</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-3.5 h-3.5 rounded bg-purple-700 inline-block shadow-2xs" />
+              <span>أعمال موجهة (فوج 1)</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-3.5 h-3.5 rounded bg-amber-600 inline-block shadow-2xs" />
+              <span>أعمال موجهة (فوج 2)</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-3.5 h-3.5 rounded bg-orange-500 inline-block shadow-2xs" />
+              <span>حصة استدراك</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-3.5 h-3.5 rounded bg-sky-500 inline-block shadow-2xs" />
+              <span>ساعة استقبال الأولياء</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-3.5 h-3.5 rounded bg-slate-300 inline-block shadow-2xs" />
+              <span>استراحة منتصف النهار / راحة الثلاثاء</span>
             </div>
           </div>
-
-          {officialImagePath ? (
-            <div className="p-3 bg-[#fafaf7] rounded-2xl border border-[#e8e8e0] text-center space-y-2">
-              <img
-                src={officialImagePath}
-                alt="التوقيت الأسبوعي الرسمي"
-                className="max-h-60 mx-auto rounded-xl border border-[#e8e8e0] shadow-sm"
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  setOfficialImagePath(null);
-                  persistTimetable(slots, settings, null);
-                }}
-                className="text-xs font-bold text-red-600 hover:underline cursor-pointer"
-              >
-                حذف الصورة
-              </button>
-            </div>
-          ) : (
-            <div className="p-3 bg-[#fafaf7] rounded-2xl border border-dashed border-gray-300 text-center text-xs text-gray-500">
-              جدول التوقيت التفاعلي أعلاه متكامل تماماً ويغنيك عن الورقي، ويدعم الطباعة الرسمية بضغطة زر واحدة.
-            </div>
-          )}
         </div>
 
-        {/* ─── Modal تعيين وتعديل الحصة الدراسية ─── */}
+        {/* ─── Modal إضافة أو تعديل حصة تفاعلي وسهل ─── */}
         {mounted && isSlotModalOpen && createPortal(
           <div className="fixed inset-0 z-[999999] bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150" dir="rtl">
-            <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-md w-full border border-slate-200 shadow-2xl space-y-4 my-auto max-h-[92vh] flex flex-col overflow-y-auto animate-in zoom-in-95 duration-150">
+            <div className="bg-white rounded-3xl p-5 sm:p-7 max-w-lg w-full border border-slate-200 shadow-2xl space-y-4 my-auto max-h-[92vh] flex flex-col overflow-y-auto animate-in zoom-in-95 duration-150">
               <div className="flex items-center justify-between border-b border-[#e8e8e0] pb-3 shrink-0">
                 <div>
                   <h3 className="text-base font-black text-gray-900">
-                    {editingSlotIndex !== null ? "تعديل الحصة الدراسية" : "إضافة حصة إلى جدول التوقيت"}
+                    {editingSlotIndex !== null ? "تعديل بيانات الحصة" : "إضافة حصة إلى جدول التوقيت"}
                   </h3>
-                  <span className="text-[11px] text-emerald-800 font-bold">
-                    {selectedDay} • {selectedStart} إلى {selectedEnd}
-                  </span>
+                  <p className="text-xs text-emerald-800 font-bold mt-0.5">
+                    {selectedDay} • من {selectedStart} إلى {selectedEnd}
+                  </p>
                 </div>
                 <button
                   onClick={() => setIsSlotModalOpen(false)}
@@ -903,24 +1280,24 @@ export default function TeacherTimetablePage() {
                 </button>
               </div>
 
-              <form onSubmit={handleSaveSlot} className="space-y-4 overflow-y-auto flex-1 pr-0.5">
-                {/* 1. اختيار نوع النشاط / الحصة */}
+              <form onSubmit={handleSaveSlot} className="space-y-4 flex-1">
+                {/* 1. نوع الحصة البيداغوجية */}
                 <div className="space-y-1.5">
                   <label className="block text-xs font-black text-gray-800">
                     طبيعة الحصة البيداغوجية <span className="text-red-500">*</span>:
                   </label>
-                  <div className="grid grid-cols-2 gap-2 text-xs font-black">
+                  <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
                       onClick={() => setSelectedSessionType("lesson")}
                       className={`p-2.5 rounded-xl border text-right transition cursor-pointer ${
                         selectedSessionType === "lesson"
-                          ? "bg-emerald-50 border-emerald-500 text-emerald-950 ring-2 ring-emerald-500/20 shadow-2xs"
+                          ? "bg-emerald-50 border-emerald-500 text-emerald-950 ring-2 ring-emerald-500/20 shadow-2xs font-bold"
                           : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
                       }`}
                     >
                       <div className="flex items-center gap-1.5">
-                        <School className="w-3.5 h-3.5 text-emerald-700" />
+                        <span>🏛️</span>
                         <span>حصة قسم كامل</span>
                       </div>
                       <span className="text-[10px] text-gray-500 font-normal block mt-0.5">درس لجميع تلاميذ الفوج</span>
@@ -931,12 +1308,12 @@ export default function TeacherTimetablePage() {
                       onClick={() => setSelectedSessionType("td")}
                       className={`p-2.5 rounded-xl border text-right transition cursor-pointer ${
                         selectedSessionType === "td"
-                          ? "bg-purple-50 border-purple-500 text-purple-950 ring-2 ring-purple-500/20 shadow-2xs"
+                          ? "bg-purple-50 border-purple-500 text-purple-950 ring-2 ring-purple-500/20 shadow-2xs font-bold"
                           : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
                       }`}
                     >
                       <div className="flex items-center gap-1.5">
-                        <Users className="w-3.5 h-3.5 text-purple-700" />
+                        <span>👥</span>
                         <span>حصة تفويج (TD)</span>
                       </div>
                       <span className="text-[10px] text-gray-500 font-normal block mt-0.5">أعمال موجهة (فوج 1 أو 2)</span>
@@ -947,7 +1324,7 @@ export default function TeacherTimetablePage() {
                       onClick={() => setSelectedSessionType("remedial")}
                       className={`p-2.5 rounded-xl border text-right transition cursor-pointer ${
                         selectedSessionType === "remedial"
-                          ? "bg-orange-50 border-orange-500 text-orange-950 ring-2 ring-orange-500/20 shadow-2xs"
+                          ? "bg-orange-50 border-orange-500 text-orange-950 ring-2 ring-orange-500/20 shadow-2xs font-bold"
                           : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
                       }`}
                     >
@@ -963,7 +1340,7 @@ export default function TeacherTimetablePage() {
                       onClick={() => setSelectedSessionType("reception")}
                       className={`p-2.5 rounded-xl border text-right transition cursor-pointer ${
                         selectedSessionType === "reception"
-                          ? "bg-sky-50 border-sky-500 text-sky-950 ring-2 ring-sky-500/20 shadow-2xs"
+                          ? "bg-sky-50 border-sky-500 text-sky-950 ring-2 ring-sky-500/20 shadow-2xs font-bold"
                           : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
                       }`}
                     >
@@ -976,28 +1353,63 @@ export default function TeacherTimetablePage() {
                   </div>
                 </div>
 
-                {/* 2. اختيار الفوج التربوي (إذا لم تكن استقبال أولياء) */}
-                {selectedSessionType !== "reception" && (
+                {/* 2. اختيار الفوج التربوي المباشر (بأزرار واضحة بضغطة واحدة) */}
+                {selectedSessionType !== "reception" ? (
                   <div className="space-y-1.5">
-                    <label className="block text-xs font-black text-gray-800">
-                      الفوج التربوي المعني <span className="text-red-500">*</span>:
-                    </label>
-                    <select
-                      value={selectedClass}
-                      onChange={(e) => setSelectedClass(e.target.value)}
-                      required
-                      className="w-full px-3 py-2 rounded-xl bg-[#fafaf7] border border-[#e8e8e0] text-xs font-bold text-gray-900 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57]"
-                    >
-                      {customClasses.length === 0 ? (
-                        <option value="">-- يرجى إضافة فوج في إدارة الأفواج --</option>
-                      ) : (
-                        customClasses.map((c) => (
-                          <option key={c} value={c}>
-                            فوج {c}
-                          </option>
-                        ))
-                      )}
-                    </select>
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-black text-gray-800">
+                        الفوج التربوي المعني <span className="text-red-500">*</span>:
+                      </label>
+                      <span className="text-[11px] text-emerald-800 font-bold">
+                        الفوج المختار حالياً: [{selectedClass || "غير محدد"}]
+                      </span>
+                    </div>
+
+                    {/* شبكة أزرار الأفواج بضغطة واحدة مباشرة */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {customClasses.map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => setSelectedClass(c)}
+                          className={`py-2.5 px-2 rounded-xl border text-xs font-black transition cursor-pointer text-center ${
+                            selectedClass === c
+                              ? "bg-emerald-700 text-white border-emerald-700 shadow-md ring-2 ring-emerald-300"
+                              : "bg-white text-gray-800 border-gray-200 hover:bg-emerald-50 hover:border-emerald-300"
+                          }`}
+                        >
+                          فوج {c}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* إمكانية إضافة فوج جديد فوراً إذا لم يكن موجوداً */}
+                    <div className="pt-1 flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={newClassInput}
+                        onChange={(e) => setNewClassInput(e.target.value)}
+                        placeholder="فوج آخر؟ مثال: 3م1"
+                        className="px-3 py-1.5 rounded-xl border border-gray-300 text-xs w-36 font-bold focus:outline-none focus:border-emerald-600"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleAddNewClass(newClassInput);
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleAddNewClass(newClassInput)}
+                        className="px-3 py-1.5 bg-gray-100 hover:bg-emerald-50 hover:text-emerald-800 text-gray-700 text-xs font-bold rounded-xl border border-gray-200 transition cursor-pointer"
+                      >
+                        + إضافة واعتماد الفوج
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-3 rounded-2xl bg-sky-50 border border-sky-200 text-xs text-sky-950 font-bold">
+                    🤝 هذه الحصة مخصصة لاستقبال أولياء التلاميذ والرد على استفساراتهم التربوية.
                   </div>
                 )}
 
@@ -1047,21 +1459,37 @@ export default function TeacherTimetablePage() {
                   </div>
                 )}
 
-                {/* 4. القاعة أو المخبر */}
+                {/* 4. القاعة أو المخبر مع اقتراحات سريعة */}
                 <div className="space-y-1.5">
                   <label className="block text-xs font-black text-gray-800">
-                    القاعة / المخبر (اختياري):
+                    القاعة / المخبر:
                   </label>
+                  <div className="flex items-center gap-1.5 flex-wrap pb-1">
+                    {["قاعة 01", "قاعة 02", "قاعة 03", "مخبر 01", "مخبر الإعلام الآلي"].map((rm) => (
+                      <button
+                        key={rm}
+                        type="button"
+                        onClick={() => setSelectedRoom(rm)}
+                        className={`px-2 py-0.5 rounded-lg text-[11px] font-bold border transition cursor-pointer ${
+                          selectedRoom === rm
+                            ? "bg-gray-800 text-white border-gray-800"
+                            : "bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100"
+                        }`}
+                      >
+                        {rm}
+                      </button>
+                    ))}
+                  </div>
                   <input
                     type="text"
                     value={selectedRoom}
                     onChange={(e) => setSelectedRoom(e.target.value)}
-                    placeholder="مثال: قاعة 04 أو مخبر 02"
+                    placeholder="أو اكتب رقم القاعة يدوياً"
                     className="w-full px-3 py-2 rounded-xl bg-[#fafaf7] border border-[#e8e8e0] text-xs text-gray-900 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57]"
                   />
                 </div>
 
-                <div className="flex items-center justify-between pt-2 border-t border-[#e8e8e0] shrink-0">
+                <div className="flex items-center justify-between pt-3 border-t border-[#e8e8e0] shrink-0">
                   {editingSlotIndex !== null ? (
                     <button
                       type="button"
@@ -1085,7 +1513,7 @@ export default function TeacherTimetablePage() {
                     <button
                       type="submit"
                       disabled={saving}
-                      className="btn-primary text-xs px-5 py-2 flex items-center gap-1.5 cursor-pointer shadow-md font-black"
+                      className="btn-primary text-xs px-6 py-2 flex items-center gap-1.5 cursor-pointer shadow-md font-black"
                     >
                       {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                       <span>تثبيت الحصة</span>
@@ -1101,7 +1529,7 @@ export default function TeacherTimetablePage() {
         {/* ─── Modal ضبط مواقيت الحصص والاستراحة ─── */}
         {mounted && isSettingsModalOpen && createPortal(
           <div className="fixed inset-0 z-[999999] bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150" dir="rtl">
-            <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full border border-slate-200 shadow-2xl space-y-5 my-auto max-h-[92vh] flex flex-col overflow-y-auto animate-in zoom-in-95 duration-150">
+            <div className="bg-white rounded-3xl p-5 sm:p-7 max-w-lg w-full border border-slate-200 shadow-2xl space-y-4 my-auto max-h-[92vh] flex flex-col overflow-y-auto animate-in zoom-in-95 duration-150">
               <div className="flex items-center justify-between border-b border-[#e8e8e0] pb-3 shrink-0">
                 <div>
                   <h3 className="text-base font-black text-gray-900">
@@ -1154,7 +1582,7 @@ export default function TeacherTimetablePage() {
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-black text-gray-900">النظام الوطني 2 (استراحة ساعة تامة)</span>
+                        <span className="text-xs font-black text-gray-900">النظام الوطني الشائع 2 (استراحة ساعة واحدة)</span>
                         {presetType === "national_2" && <Check className="w-4 h-4 text-emerald-700" />}
                       </div>
                       <span className="text-[11px] text-gray-500 block mt-0.5">
@@ -1167,35 +1595,132 @@ export default function TeacherTimetablePage() {
                       onClick={() => handleApplyPreset("south_eloued")}
                       className={`w-full p-3 rounded-2xl border text-right transition cursor-pointer ${
                         presetType === "south_eloued"
-                          ? "bg-emerald-50 border-emerald-500 ring-2 ring-emerald-500/20"
+                          ? "bg-amber-50 border-amber-500 ring-2 ring-amber-500/20"
                           : "bg-white border-gray-200 hover:bg-gray-50"
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-black text-gray-900">توقيت ولايات الجنوب (الوادي، بسكرة... - استراحة ساعتين)</span>
-                        {presetType === "south_eloued" && <Check className="w-4 h-4 text-emerald-700" />}
+                        <span className="text-xs font-black text-amber-950">نظام ولايات الجنوب والوادي (استراحة ساعتان)</span>
+                        {presetType === "south_eloued" && <Check className="w-4 h-4 text-amber-700" />}
                       </div>
                       <span className="text-[11px] text-gray-500 block mt-0.5">
-                        الصباح: 08:00 - 12:00 | استراحة الغداء: 12:00 - 14:00 | المساء: 14:00 - 17:00
+                        الصباح: 08:00 - 12:00 | استراحة الغداء: 12:00 - 14:00 (لتفادي الحرارة) | المساء: 14:00 - 17:00
                       </span>
                     </button>
                   </div>
                 </div>
 
-                {/* خيار راحة مساء الثلاثاء */}
-                <div className="p-3 rounded-2xl bg-amber-50/70 border border-amber-200 flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <span className="text-xs font-black text-amber-950 block">راحة مساء الثلاثاء (تنسيق بيداغوجي رسمي):</span>
-                    <span className="text-[11px] text-amber-800/90 block">تمييز خانات بعد الظهر ليوم الثلاثاء تلقائياً كراحة أسبوعية</span>
+                {/* الضبط اليدوي المفصل */}
+                <div className="border-t border-[#e8e8e0] pt-4 space-y-3">
+                  <span className="text-xs font-black text-gray-800 block">تعديل التوقيت بدقة يدوياً:</span>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-gray-600 mb-1">بداية الصباح:</label>
+                      <input
+                        type="time"
+                        value={settings.morningStart}
+                        onChange={(e) => {
+                          setPresetType("custom");
+                          setSettings({ ...settings, morningStart: e.target.value });
+                        }}
+                        className="w-full px-2.5 py-1.5 rounded-xl border border-gray-300 text-xs font-mono font-bold"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-gray-600 mb-1">عدد حصص الصباح:</label>
+                      <select
+                        value={settings.morningSlotsCount}
+                        onChange={(e) => {
+                          setPresetType("custom");
+                          setSettings({ ...settings, morningSlotsCount: Number(e.target.value) });
+                        }}
+                        className="w-full px-2.5 py-1.5 rounded-xl border border-gray-300 text-xs font-bold"
+                      >
+                        <option value={3}>3 حصص (حتى 11:00)</option>
+                        <option value={4}>4 حصص (حتى 12:00)</option>
+                        <option value={5}>5 حصص (حتى 13:00)</option>
+                      </select>
+                    </div>
                   </div>
-                  <input
-                    type="checkbox"
-                    checked={settings.tuesdayAfternoonOff !== false}
-                    onChange={(e) =>
-                      setSettings((prev) => ({ ...prev, tuesdayAfternoonOff: e.target.checked }))
-                    }
-                    className="w-4 h-4 text-emerald-700 rounded border-gray-300 focus:ring-emerald-700 cursor-pointer"
-                  />
+
+                  <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-200">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">بداية الاستراحة:</label>
+                      <input
+                        type="time"
+                        value={settings.breakStart}
+                        onChange={(e) => {
+                          setPresetType("custom");
+                          setSettings({ ...settings, breakStart: e.target.value });
+                        }}
+                        className="w-full px-2.5 py-1.5 rounded-xl border border-slate-300 text-xs font-mono font-bold"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">نهاية الاستراحة:</label>
+                      <input
+                        type="time"
+                        value={settings.breakEnd}
+                        onChange={(e) => {
+                          setPresetType("custom");
+                          setSettings({
+                            ...settings,
+                            breakEnd: e.target.value,
+                            afternoonStart: e.target.value,
+                          });
+                        }}
+                        className="w-full px-2.5 py-1.5 rounded-xl border border-slate-300 text-xs font-mono font-bold"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-gray-600 mb-1">بداية المساء:</label>
+                      <input
+                        type="time"
+                        value={settings.afternoonStart}
+                        onChange={(e) => {
+                          setPresetType("custom");
+                          setSettings({ ...settings, afternoonStart: e.target.value });
+                        }}
+                        className="w-full px-2.5 py-1.5 rounded-xl border border-gray-300 text-xs font-mono font-bold"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-gray-600 mb-1">عدد حصص المساء:</label>
+                      <select
+                        value={settings.afternoonSlotsCount}
+                        onChange={(e) => {
+                          setPresetType("custom");
+                          setSettings({ ...settings, afternoonSlotsCount: Number(e.target.value) });
+                        }}
+                        className="w-full px-2.5 py-1.5 rounded-xl border border-gray-300 text-xs font-bold"
+                      >
+                        <option value={2}>حصتان (ساعتان)</option>
+                        <option value={3}>3 حصص (3 ساعات)</option>
+                        <option value={4}>4 حصص (4 ساعات)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="pt-2">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={settings.tuesdayAfternoonOff}
+                        onChange={(e) => setSettings({ ...settings, tuesdayAfternoonOff: e.target.checked })}
+                        className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500"
+                      />
+                      <span className="text-xs font-bold text-gray-800">
+                        تظليل مساء الثلاثاء كراحة رسمية (معتمد في المنشورات الوزارية)
+                      </span>
+                    </label>
+                  </div>
                 </div>
               </div>
 
@@ -1203,7 +1728,7 @@ export default function TeacherTimetablePage() {
                 <button
                   type="button"
                   onClick={() => setIsSettingsModalOpen(false)}
-                  className="px-4 py-2 rounded-xl border border-gray-300 text-xs font-bold text-gray-700 hover:bg-gray-100 cursor-pointer"
+                  className="px-4 py-2 rounded-xl border border-[#e8e8e0] text-xs font-bold text-gray-600 hover:bg-gray-100 cursor-pointer"
                 >
                   إلغاء
                 </button>
@@ -1211,10 +1736,10 @@ export default function TeacherTimetablePage() {
                   type="button"
                   onClick={handleSaveSettings}
                   disabled={saving}
-                  className="btn-primary text-xs px-5 py-2 flex items-center gap-1.5 shadow-md font-black cursor-pointer"
+                  className="btn-primary text-xs px-5 py-2 flex items-center gap-1.5 cursor-pointer shadow-md font-black"
                 >
-                  <Save className="w-3.5 h-3.5" />
-                  <span>تطبيق وحفظ المواقيت</span>
+                  {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  <span>حفظ واعتماد التوقيت</span>
                 </button>
               </div>
             </div>
@@ -1226,65 +1751,91 @@ export default function TeacherTimetablePage() {
   );
 }
 
-// دالة مساعدة لتصيير محتوى خلية الحصة في شبكة التوقيت
-function renderSlotCellContent(slot?: TimetableSlot) {
-  if (!slot) return null;
-
-  const isTD = slot.sessionType === "td" || Boolean(slot.subgroup);
+// عنصر عرض الحصة في الخانة
+function SlotBadge({
+  slot,
+  onDelete,
+}: {
+  slot: TimetableSlot;
+  onDelete: (e: React.MouseEvent) => void;
+}) {
   const isReception = slot.sessionType === "reception" || slot.className === "استقبال الأولياء";
   const isRemedial = slot.sessionType === "remedial" || slot.className.includes("استدراك");
+  const isTD = slot.sessionType === "td" || !!slot.subgroup;
+
+  let bgClass = "bg-emerald-50 border-emerald-300 text-emerald-950";
+  if (isReception) bgClass = "bg-sky-50 border-sky-300 text-sky-950";
+  else if (isRemedial) bgClass = "bg-orange-50 border-orange-300 text-orange-950";
+  else if (isTD) bgClass = "bg-purple-50 border-purple-300 text-purple-950";
 
   return (
-    <div className="h-full flex flex-col justify-between text-right p-1.5 rounded-xl bg-white border border-[#e8e8e0] shadow-xs hover:border-emerald-400 transition">
-      <div className="space-y-1">
-        <div className="flex items-start justify-between gap-1">
-          {/* شارة النشاط بالألوان المعتمدة */}
-          {isReception ? (
-            <span className="text-[11px] font-black bg-sky-50 text-sky-900 border border-sky-300 px-1.5 py-0.5 rounded-md inline-flex items-center gap-1">
-              <span>🤝</span>
-              <span>استقبال الأولياء</span>
-            </span>
-          ) : isRemedial ? (
-            <span className="text-[11px] font-black bg-orange-50 text-orange-950 border border-orange-300 px-1.5 py-0.5 rounded-md inline-flex items-center gap-1">
-              <span>🛠️</span>
-              <span>{slot.className}</span>
-            </span>
-          ) : isTD ? (
-            <div className="flex items-center gap-1 flex-wrap">
-              <span className="font-black text-xs text-gray-900">
-                {slot.className}
-              </span>
-              <span
-                className={`text-[10px] font-black px-1.5 py-0.2 rounded border ${
-                  slot.subgroup === "فوج 2"
-                    ? "bg-amber-50 text-amber-950 border-amber-300"
-                    : slot.subgroup === "تناوب"
-                    ? "bg-gray-100 text-gray-800 border-gray-300"
-                    : "bg-purple-50 text-purple-950 border-purple-300"
-                }`}
-              >
-                {slot.subgroup === "فوج 2" ? "👥 ف2" : slot.subgroup === "تناوب" ? "🔄 تناوب" : "👥 ف1"}
-              </span>
-            </div>
-          ) : (
-            <span className="font-black text-xs text-emerald-900 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
-              {slot.className}
-            </span>
-          )}
-
-          {/* القاعة */}
-          {slot.room && (
-            <span className="text-[9px] text-gray-500 font-mono bg-gray-50 px-1 py-0.5 rounded border border-gray-200 shrink-0">
-              {slot.room}
-            </span>
-          )}
-        </div>
+    <div
+      className={`w-full h-full min-h-[58px] p-1.5 rounded-xl border ${bgClass} shadow-2xs flex flex-col justify-between text-right relative group/badge transition hover:scale-[1.02]`}
+    >
+      <div className="flex items-start justify-between gap-1">
+        <span className="font-black text-xs leading-tight line-clamp-1">
+          {slot.className}
+        </span>
+        {/* زر مسح فوري بلمسة واحدة */}
+        <button
+          type="button"
+          onClick={onDelete}
+          className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-red-100 text-red-600 transition cursor-pointer shrink-0"
+          title="مسح الحصة"
+        >
+          <X className="w-3 h-3" />
+        </button>
       </div>
 
-      <div className="flex items-center justify-between text-[9px] text-gray-400 font-mono pt-1">
-        <span>{slot.start} - {slot.end}</span>
-        <Pencil className="w-2.5 h-2.5 text-gray-400 opacity-0 group-hover:opacity-100 transition" />
+      <div className="flex items-center justify-between gap-1 mt-1">
+        {slot.subgroup && (
+          <span
+            className={`text-[9px] font-black px-1.5 py-0.2 rounded ${
+              slot.subgroup === "فوج 1"
+                ? "bg-purple-700 text-white"
+                : slot.subgroup === "فوج 2"
+                ? "bg-amber-600 text-white"
+                : "bg-gray-900 text-white"
+            }`}
+          >
+            {slot.subgroup}
+          </span>
+        )}
+
+        {isRemedial && (
+          <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-orange-600 text-white">
+            استدراك
+          </span>
+        )}
+
+        {isReception && (
+          <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-sky-600 text-white">
+            استقبال
+          </span>
+        )}
+
+        {slot.room && (
+          <span className="text-[10px] text-gray-500 font-medium truncate mr-auto">
+            {slot.room}
+          </span>
+        )}
       </div>
+    </div>
+  );
+}
+
+// عنصر تلميح الخانة الفارغة
+function EmptySlotHint({ quickStampClass }: { quickStampClass: string | null }) {
+  if (quickStampClass) {
+    return (
+      <div className="w-full h-full min-h-[54px] rounded-xl border border-dashed border-emerald-300 bg-emerald-50/30 flex items-center justify-center text-[11px] font-black text-emerald-800 transition hover:bg-emerald-100/60">
+        <span>+ إسناد {quickStampClass}</span>
+      </div>
+    );
+  }
+  return (
+    <div className="w-full h-full min-h-[54px] rounded-xl border border-dashed border-transparent hover:border-gray-300 hover:bg-gray-50/60 flex items-center justify-center text-[10px] text-gray-300 hover:text-gray-500 transition">
+      <span>+ إضافة</span>
     </div>
   );
 }
