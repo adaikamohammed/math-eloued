@@ -27,6 +27,8 @@ import {
   type InspectionVisitRecord,
 } from "./shared";
 import type { UserProfile } from "@/lib/types";
+import { PrintModal } from "@/components/print/PrintModal";
+import { InspectionVisitPrintDoc } from "@/components/print/InspectionVisitPrintDoc";
 
 const inputCls =
   "w-full py-2 px-3 rounded-xl border border-slate-200 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500";
@@ -45,6 +47,7 @@ export function VisitsTab({
   const [showAddForm, setShowAddForm] = useState(false);
   const [query, setQuery] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
+  const [selectedVisitForPrint, setSelectedVisitForPrint] = useState<InspectionVisitRecord | null>(null);
 
   // بيانات استمارة تسجيل زيارة جديدة
   const [selectedTeacherId, setSelectedTeacherId] = useState("");
@@ -398,9 +401,9 @@ export function VisitsTab({
                       </span>
                     )}
                     <button
-                      onClick={() => window.print()}
+                      onClick={() => setSelectedVisitForPrint(v)}
                       className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50"
-                      title="طباعة بطاقة الزيارة"
+                      title="طباعة بطاقة الزيارة الرسمية A4"
                     >
                       <Printer className="w-4 h-4" />
                     </button>
@@ -438,6 +441,21 @@ export function VisitsTab({
           })}
         </div>
       )}
+
+      {/* ── نافذة معاينة وطباعة بطاقة زيارة التفتيش A4 ── */}
+      <PrintModal
+        isOpen={Boolean(selectedVisitForPrint)}
+        onClose={() => setSelectedVisitForPrint(null)}
+        documentTitle="تقرير وبطاقة زيارة التفتيش والتوجيه التربوي"
+      >
+        {selectedVisitForPrint && (
+          <InspectionVisitPrintDoc
+            visit={selectedVisitForPrint}
+            districtName={`المقاطعة التفتيشية ${districtId}`}
+            inspectorName={inspector.full_name || "مفتش التعليم المتوسط"}
+          />
+        )}
+      </PrintModal>
     </div>
   );
 }

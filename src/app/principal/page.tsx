@@ -38,6 +38,9 @@ import {
   UserProfile,
   Lesson,
 } from "@/lib/types";
+import { PrintModal } from "@/components/print/PrintModal";
+import { ExamSchedulePrintDoc } from "@/components/print/ExamSchedulePrintDoc";
+import { ParentReceptionPrintDoc } from "@/components/print/ParentReceptionPrintDoc";
 
 type PrincipalTab = "teachers" | "exams" | "visas" | "reception" | "honors";
 
@@ -49,6 +52,7 @@ export default function PrincipalPortalPage() {
   const [exams, setExams] = useState<SchoolExamItem[]>([]);
   const [visas, setVisas] = useState<PrincipalVisaRecord[]>([]);
   const [loadingData, setLoadingData] = useState(true);
+  const [printDoc, setPrintDoc] = useState<"exams" | "reception" | null>(null);
 
   // الفلاتر والبحث
   const [subjectFilter, setSubjectFilter] = useState<string>("all");
@@ -268,7 +272,7 @@ export default function PrincipalPortalPage() {
             {/* أزرار الإجراءات السريعة */}
             <div className="flex items-center gap-2.5 w-full sm:w-auto">
               <button
-                onClick={() => window.print()}
+                onClick={() => setPrintDoc("exams")}
                 className="btn-secondary text-xs py-2 px-3.5 flex items-center gap-1.5 shadow-2xs w-full sm:w-auto justify-center"
               >
                 <Printer className="w-4 h-4 text-gray-600" />
@@ -582,7 +586,7 @@ export default function PrincipalPortalPage() {
 
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => window.print()}
+                  onClick={() => setPrintDoc("exams")}
                   className="btn-secondary text-xs py-1.5 px-3 flex items-center gap-1.5"
                 >
                   <Printer className="w-3.5 h-3.5" />
@@ -761,7 +765,7 @@ export default function PrincipalPortalPage() {
               </div>
 
               <button
-                onClick={() => window.print()}
+                onClick={() => setPrintDoc("reception")}
                 className="btn-primary text-xs py-2 px-4 flex items-center gap-1.5 shadow-sm"
               >
                 <Printer className="w-4 h-4" />
@@ -1037,6 +1041,29 @@ export default function PrincipalPortalPage() {
           </div>
         </div>
       )}
+
+      {/* ── نافذة المعاينة والطباعة الإدارية الرسمية A4 ── */}
+      <PrintModal
+        isOpen={Boolean(printDoc)}
+        onClose={() => setPrintDoc(null)}
+        documentTitle={
+          printDoc === "exams"
+            ? "رزنامة الفروض المحروسة الرسمية للمتوسطة"
+            : "دليل استقبال أولياء التلاميذ الموحد"
+        }
+      >
+        {printDoc === "exams" && (
+          <ExamSchedulePrintDoc
+            schoolName={schoolName}
+            semester={examSemesterFilter}
+            exams={filteredExams}
+            levelFilter={examLevelFilter || undefined}
+          />
+        )}
+        {printDoc === "reception" && (
+          <ParentReceptionPrintDoc schoolName={schoolName} teachers={teachers} />
+        )}
+      </PrintModal>
     </div>
   );
 }

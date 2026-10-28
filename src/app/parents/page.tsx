@@ -29,13 +29,17 @@ import {
   AlertCircle,
   Loader2,
   HelpCircle,
+  Printer,
 } from "lucide-react";
 import { Loading } from "@/components/ui";
+import { PrintModal } from "@/components/print/PrintModal";
+import { ParentSummonsPrintDoc } from "@/components/print/ParentSummonsPrintDoc";
 
 export default function ParentsPage() {
   const teacherId = useTeacherId();
   const teacherInfo = useTeacherInfo(teacherId);
   const [teacherProfile, setTeacherProfile] = useState<UserProfile | null>(null);
+  const [selectedSummonsForPrint, setSelectedSummonsForPrint] = useState<ParentSummons | null>(null);
 
   // هل المستخدم الحالي هو الأستاذ صاحب الحساب؟
   const [isOwner, setIsOwner] = useState(false);
@@ -467,9 +471,19 @@ export default function ParentsPage() {
                   </p>
                 </div>
 
-                <p className="text-[10px] text-emerald-700 font-medium">
-                  🔒 تم فتح هذه البطاقة حصرياً بالرمز السري الممنوح لكم.
-                </p>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-emerald-100">
+                  <p className="text-[10px] text-emerald-700 font-medium">
+                    🔒 تم فتح هذه البطاقة حصرياً بالرمز السري الممنوح لكم.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSummonsForPrint(parentResult)}
+                    className="btn-primary text-xs py-1.5 px-3 flex items-center gap-1.5 shadow-2xs self-start sm:self-auto"
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    <span>طباعة الاستدعاء الرسمي A4</span>
+                  </button>
+                </div>
               </div>
             ) : rateLimitMessage ? (
               <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-center space-y-1.5">
@@ -643,6 +657,15 @@ export default function ParentsPage() {
 
                     <button
                       type="button"
+                      onClick={() => setSelectedSummonsForPrint(item)}
+                      className="p-1.5 rounded-xl border border-slate-200 text-slate-600 hover:text-emerald-700 hover:bg-emerald-50 transition cursor-pointer"
+                      title="طباعة الاستدعاء الرسمي A4"
+                    >
+                      <Printer className="w-3.5 h-3.5" />
+                    </button>
+
+                    <button
+                      type="button"
                       onClick={() => handleDeleteSummons(item.id, item.studentName)}
                       className="p-1.5 rounded-xl border border-slate-200 text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
                       title="حذف الاستدعاء"
@@ -667,6 +690,24 @@ export default function ParentsPage() {
           وفقاً لأحكام القانون رقم 15-12 المتعلق بحماية الطفل والقانون رقم 18-07 المتعلق بحماية المعطيات ذات الطابع الشخصي، تُعامل كافة الملاحظات والتوجيهات بيداغوجياً بسرية تامة لخدمة مصلحة التلميذ الفضلى وبناء جسور التعاون بين الأسرة والمدرسة.
         </p>
       </div>
+
+      {/* ── نافذة معاينة وطباعة الاستدعاء الرسمي A4 ── */}
+      <PrintModal
+        isOpen={Boolean(selectedSummonsForPrint)}
+        onClose={() => setSelectedSummonsForPrint(null)}
+        documentTitle="استدعاء وإشعار ولي أمر تلميذ رسمي"
+      >
+        {selectedSummonsForPrint && (
+          <ParentSummonsPrintDoc
+            summons={selectedSummonsForPrint}
+            teacherName={teacherProfile?.full_name || teacherInfo?.full_name || "أستاذ المادة"}
+            subjectName={teacherProfile?.subject ? "الرياضيات" : "الرياضيات"}
+            schoolName={teacherProfile?.school_custom_name || "متوسطة ولاية الوادي"}
+            receptionDay={reception?.officialDay || "الأحد"}
+            receptionTime={reception?.officialTime || "صباحاً"}
+          />
+        )}
+      </PrintModal>
     </div>
   );
 }

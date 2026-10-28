@@ -40,7 +40,11 @@ import {
   type InspectionSession,
   type InspectionRecord,
   type StudentRosterItem,
+  type StudentEvaluation,
 } from "@/lib/types";
+
+import { PrintModal } from "@/components/print/PrintModal";
+import { EvaluationRosterPrintDoc } from "@/components/print/EvaluationRosterPrintDoc";
 
 export default function FastEvaluationPage() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
@@ -79,6 +83,7 @@ function EvaluationDashboard({ onLogout }: { onLogout: () => void }) {
   const [activeTab, setActiveTab] = useState<"sessions" | "averages" | "roster">("sessions");
   const [selectedClass, setSelectedClass] = useState<string>("");
   const [teacherClasses, setTeacherClasses] = useState<string[]>([]);
+  const [showEvalPrintModal, setShowEvalPrintModal] = useState(false);
 
   useEffect(() => {
     fetch("/api/lessons")
@@ -1387,7 +1392,7 @@ function EvaluationDashboard({ onLogout }: { onLogout: () => void }) {
 
             <button
               type="button"
-              onClick={() => window.print()}
+              onClick={() => setShowEvalPrintModal(true)}
               className="py-1 px-2.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 text-[11px] font-bold flex items-center gap-1 transition"
             >
               <Printer className="w-3.5 h-3.5" />
@@ -1820,6 +1825,47 @@ function EvaluationDashboard({ onLogout }: { onLogout: () => void }) {
           </div>
         </div>
       )}
+
+      {/* ── نافذة المعاينة والطباعة الرسمية لكشف التقويم المستمر A4 ── */}
+      <PrintModal
+        isOpen={showEvalPrintModal}
+        onClose={() => setShowEvalPrintModal(false)}
+        documentTitle={`كشف تفريغ علامات التقويم المستمر — ${selectedClass}`}
+      >
+        <EvaluationRosterPrintDoc
+          className={selectedClass}
+          groupName={selectedGroup}
+          evaluations={currentStudentsList.map((st, idx) => {
+            const studentScores = [];
+            for (const s of sessions) {
+              const rec = s.records?.[st.studentName];
+              if (rec && typeof rec.score === 'number') studentScores.push(rec.score);
+            }
+            const avg =
+              studentScores.length > 0
+                ? Number((studentScores.reduce((a, b) => a + b, 0) / studentScores.length).toFixed(1))
+                : 15;
+
+            const lastS = sessions.length > 0 ? sessions[sessions.length - 1] : null;
+            const r = lastS?.records?.[st.studentName];
+
+            return {
+              id: `eval_print_${idx}`,
+              studentName: st.studentName,
+              className: selectedClass,
+              groupName: selectedGroup,
+              notebookScore: r ? Math.min(5, Math.round((r.lessonsDone / (lastS?.totalLessons || 8)) * 5)) : 4,
+              homeworkScore: r ? Math.min(5, Math.round((r.homeworksDone / (lastS?.totalHomeworks || 8)) * 5)) : 4,
+              toolsScore: r?.behaviorScore ?? 4,
+              activityScore: r?.activityScore ?? 4,
+              totalScore: avg,
+              rating: avg >= 16 ? 'excellent' : avg >= 14 ? 'very_good' : avg >= 12 ? 'good' : avg >= 10 ? 'medium' : 'weak',
+              ratingColor: avg >= 14 ? 'emerald' : avg >= 10 ? 'amber' : 'rose',
+              updatedAt: new Date().toISOString(),
+            };
+          })}
+        />
+      </PrintModal>
     </div>
   );
 }

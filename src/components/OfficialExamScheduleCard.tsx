@@ -13,6 +13,8 @@ import {
   ChevronUp,
 } from "lucide-react";
 import { SchoolExamItem, PrincipalVisaRecord } from "@/lib/types";
+import { PrintModal } from "@/components/print/PrintModal";
+import { ExamSchedulePrintDoc } from "@/components/print/ExamSchedulePrintDoc";
 
 interface Props {
   schoolName?: string | null;
@@ -25,6 +27,7 @@ export function OfficialExamScheduleCard({ schoolName, teacherId, subjectId }: P
   const [visas, setVisas] = useState<PrincipalVisaRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [isExpanded, setIsExpanded] = useState(true);
+  const [showPrintModal, setShowPrintModal] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -113,7 +116,7 @@ export function OfficialExamScheduleCard({ schoolName, teacherId, subjectId }: P
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => window.print()}
+              onClick={() => setShowPrintModal(true)}
               className="hidden sm:inline-flex items-center gap-1 text-[11px] font-bold text-gray-700 bg-white hover:bg-gray-50 border border-gray-200 px-2.5 py-1.5 rounded-xl transition shadow-2xs"
             >
               <Printer className="w-3.5 h-3.5 text-gray-500" />
@@ -188,6 +191,19 @@ export function OfficialExamScheduleCard({ schoolName, teacherId, subjectId }: P
           </div>
         )}
       </div>
+
+      {/* ── نافذة المعاينة والطباعة الرسمية A4 ── */}
+      <PrintModal
+        isOpen={showPrintModal}
+        onClose={() => setShowPrintModal(false)}
+        documentTitle="رزنامة الفروض المحروسة الرسمية للمؤسسة"
+      >
+        <ExamSchedulePrintDoc
+          schoolName={schoolName || "متوسطة ولاية الوادي"}
+          semester={1}
+          exams={exams}
+        />
+      </PrintModal>
     </div>
   );
 }
