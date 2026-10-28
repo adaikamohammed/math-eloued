@@ -61,16 +61,18 @@ export function teacherFeedItems(teacher: FeedTeacher, data: Record<string, unkn
     });
   }
   for (const s of arr<ParentSummons>(data.summons)) {
+    // حماية الخصوصية ومنع الوصم: لا يُعرض التوجيه في خلاصة المحفظة إلا إذا تطابق حصراً مع اسم الابن المسجل
+    if (!nameMatches(s.studentName, teacher.childName)) continue;
     items.push({
       ...base,
       key: `s-${teacher.id}-${s.id}`,
       kind: "summons",
-      title: `استدعاء ولي التلميذ(ة) ${s.studentName} — ${s.className}`,
+      title: `توجيه خاص بولي التلميذ(ة) ${s.studentName} — ${s.className}`,
       body: s.notes,
       createdAt: s.createdAt,
       href: `/parents?teacher=${t}`,
       urgent: s.isUrgent,
-      mentionsChild: nameMatches(s.studentName, teacher.childName),
+      mentionsChild: true,
     });
   }
   for (const l of arr<Lesson>(data.lessons)) {

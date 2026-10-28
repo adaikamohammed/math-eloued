@@ -1,7 +1,7 @@
 "use client";
 
-import { Suspense, useEffect, useState, useTransition } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import {
@@ -14,35 +14,25 @@ import {
   Loader2,
   AlertCircle,
   CheckCircle2,
-  ArrowLeft,
   ArrowRight,
-  KeyRound,
   ShieldCheck,
   BookOpen,
   Sparkles,
+  Heart,
 } from "lucide-react";
 import { MIDDLE_SCHOOL_SUBJECTS } from "@/lib/types";
 
-// مفتاح الدعوة السري الافتراضي للأساتذة
-const VALID_INVITE_KEYS = ["asateza-2026", "eloued-teachers", "bahi-ali-2026"];
-
 const DISTRICTS = [
-  { id: 1, name: "المقاطعة 1" },
-  { id: 2, name: "المقاطعة 2" },
-  { id: 3, name: "المقاطعة 3" },
-  { id: 4, name: "المقاطعة 4" },
-  { id: 5, name: "المقاطعة 5" },
-  { id: 0, name: "غير محدد" },
+  { id: 1, name: "المقاطعة 1 — الوادي 1" },
+  { id: 2, name: "المقاطعة 2 — الوادي 2" },
+  { id: 3, name: "المقاطعة 3 — قمار" },
+  { id: 4, name: "المقاطعة 4 — الرقيبة" },
+  { id: 5, name: "المقاطعة 5 — الدبيلة والمقرن" },
+  { id: 0, name: "مقاطعة أخرى / ولاية أخرى" },
 ];
 
 function JoinTeacherForm() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-
-  // فحص مفتاح الدعوة من الرابط (?key=... أو ?invite=...)
-  const keyFromUrl = searchParams.get("key") || searchParams.get("invite") || "";
-  const [inviteKeyInput, setInviteKeyInput] = useState(keyFromUrl);
-  const [isAuthorized, setIsAuthorized] = useState(false);
 
   // حقول بيانات الأستاذ
   const [fullName, setFullName] = useState("");
@@ -55,25 +45,6 @@ function JoinTeacherForm() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [registeredCode, setRegisteredCode] = useState<string | null>(null);
-
-  // التحقق التلقائي عند فتح الرابط بمفتاح الدعوة
-  useEffect(() => {
-    const key = (keyFromUrl || "").trim().toLowerCase();
-    if (VALID_INVITE_KEYS.some((k) => k.toLowerCase() === key)) {
-      setIsAuthorized(true);
-    }
-  }, [keyFromUrl]);
-
-  const handleVerifyKey = (e: React.FormEvent) => {
-    e.preventDefault();
-    const clean = inviteKeyInput.trim().toLowerCase();
-    if (VALID_INVITE_KEYS.some((k) => k.toLowerCase() === clean)) {
-      setIsAuthorized(true);
-      setErrorMsg("");
-    } else {
-      setErrorMsg("رمز الدعوة غير صحيح. يرجى مراجعة إدارة المؤسسة للحصول على الرمز الصحيح.");
-    }
-  };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -99,7 +70,7 @@ function JoinTeacherForm() {
       const cleanSlug = `prof-${Math.random().toString(36).substring(2, 8)}`;
       const cleanEmail = email.trim().toLowerCase();
 
-      // 2. استدعاء دالة التسجيل الفوري المباشر (تنشئ الحساب مفعل فوراً بدون رسائل وبدون قيود Rate Limit)
+      // 2. استدعاء دالة التسجيل الفوري المباشر (تنشئ الحساب وتفعله فوراً)
       const { data: rpcRes, error: rpcErr } = await supabase.rpc("register_teacher_instant", {
         p_email: cleanEmail,
         p_password: password,
@@ -144,13 +115,9 @@ function JoinTeacherForm() {
       const raw = String(err?.message || "");
 
       if (raw.includes("rate limit") || raw.includes("over_email_send_rate_limit")) {
-        setErrorMsg(
-          "تم تجاوز الحد التجريبي لإرسال الرسائل في خادم Supabase. يرجى تشغيل استعلام instant_teacher_registration.sql المحدث في SQL Editor للتسجيل الفوري بدون رسائل."
-        );
+        setErrorMsg("تم تجاوز الحد التجريبي لإرسال الرسائل. يرجى المحاولة بعد قليل.");
       } else if (raw.includes("already registered") || raw.includes("مسجل مسبقاً")) {
-        setErrorMsg(
-          "هذا البريد مسجل مسبقاً في المنصة. إذا كان هذا حسابك، يمكنك التوجه لصفحة تسجيل الدخول مباشرة."
-        );
+        setErrorMsg("هذا البريد مسجل مسبقاً في المنصة. إذا كان هذا حسابك، يمكنك التوجه لصفحة تسجيل الدخول.");
       } else {
         setErrorMsg(raw || "حدث خطأ أثناء إنشاء الحساب، يرجى المحاولة مجدداً");
       }
@@ -158,75 +125,7 @@ function JoinTeacherForm() {
     }
   };
 
-  // ─── الشاشة الأولى: بوابة الحماية في حال الدخول بدون مفتاح دعوة ───
-  if (!isAuthorized) {
-    return (
-      <div className="min-h-[80vh] flex items-center justify-center py-10 px-4 font-sans" dir="rtl">
-        <div className="max-w-md w-full bg-white rounded-3xl p-6 sm:p-8 border border-[#e8e8e0] shadow-xl text-center space-y-6">
-          <div className="w-16 h-16 rounded-2xl bg-[#e6f4ee] text-[#107a57] border border-[#107a57]/20 flex items-center justify-center mx-auto shadow-sm">
-            <KeyRound className="w-8 h-8" />
-          </div>
-
-          <div className="space-y-2">
-            <span className="text-xs font-black text-[#107a57] bg-[#e6f4ee] px-3 py-1 rounded-full border border-[#107a57]/20">
-              فضاء خاص بالأسرة التربوية
-            </span>
-            <h1 className="text-xl sm:text-2xl font-black text-gray-900">
-              تسجيل الأساتذة بدعوة خاصة
-            </h1>
-            <p className="text-xs text-gray-600 leading-relaxed font-medium">
-              إنشاء حساب أستاذ في المنصة مخصص حصرياً للأساتذة عبر رابط دعوة رسمي ترسلها إدارة المؤسسة أو المفتشية البيداغوجية.
-            </p>
-          </div>
-
-          {errorMsg && (
-            <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 flex items-center gap-2 text-right">
-              <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
-              <span>{errorMsg}</span>
-            </div>
-          )}
-
-          {/* حقل إدخال رمز الدعوة يدوياً لمن يملك الرمز */}
-          <form onSubmit={handleVerifyKey} className="space-y-3 pt-2 text-right">
-            <label className="block text-xs font-bold text-gray-700">
-              أدخل رمز الدعوة المرسل إليك:
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={inviteKeyInput}
-                onChange={(e) => setInviteKeyInput(e.target.value)}
-                placeholder="مثال: asateza-2026"
-                className="flex-1 px-3.5 py-2.5 rounded-xl bg-[#fafaf7] border border-[#e8e8e0] text-xs font-mono text-gray-900 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57]"
-              />
-              <button
-                type="submit"
-                className="btn-primary text-xs px-4 py-2.5 shrink-0"
-              >
-                تفعيل
-              </button>
-            </div>
-          </form>
-
-          {/* رابط تسجيل الدخول لمن لديه حساب */}
-          <div className="pt-4 border-t border-[#e8e8e0] space-y-2">
-            <p className="text-xs text-gray-500 font-medium">
-              هل لديك حساب مسجل بالفعل؟
-            </p>
-            <Link
-              href="/login"
-              className="inline-flex items-center gap-2 text-xs font-bold text-[#107a57] hover:underline"
-            >
-              <ShieldCheck className="w-4 h-4" />
-              <span>تسجيل الدخول إلى حسابك</span>
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ─── الشاشة الثانية: نجاح التسجيل الفوري ───
+  // ── شاشة نجاح التسجيل الفوري ──
   if (registeredCode) {
     return (
       <div className="min-h-[80vh] flex items-center justify-center py-10 px-4 font-sans" dir="rtl">
@@ -242,7 +141,7 @@ function JoinTeacherForm() {
             <h1 className="text-2xl font-black text-gray-900">
               أهلاً بك أستاذنا الفاضل في المنصة!
             </h1>
-            <p className="text-xs text-gray-600 leading-relaxed">
+            <p className="text-xs text-gray-600 leading-relaxed font-medium">
               تم إنشاء مساحتك التعليمية بنجاح واعتماد كودك الخاص:
             </p>
           </div>
@@ -253,11 +152,11 @@ function JoinTeacherForm() {
               {registeredCode}
             </p>
             <p className="text-[11px] text-gray-500">
-              (امنح هذا الكود لأولياء تلاميذك ليدخلوا إلى فضاء دروسك مباشرة)
+              (امنح هذا الكود لأولياء وتلاميذ أفواجك ليدخلوا إلى فضاء دروسك مباشرة)
             </p>
           </div>
 
-          <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
+          <div className="flex items-center justify-center gap-2 text-xs text-gray-500 font-bold">
             <Loader2 className="w-4 h-4 animate-spin text-[#107a57]" />
             <span>جارٍ نقلك تلقائياً إلى لوحة التحكم...</span>
           </div>
@@ -266,7 +165,7 @@ function JoinTeacherForm() {
     );
   }
 
-  // ─── الشاشة الثالثة: استمارة التسجيل السريعة والفورية ───
+  // ── استمارة التسجيل الفورية المفتوحة لجميع الأساتذة ──
   return (
     <div className="min-h-screen bg-[#fafaf7] py-6 sm:py-10 px-4 font-sans" dir="rtl">
       <div className="max-w-2xl mx-auto space-y-4">
@@ -278,190 +177,195 @@ function JoinTeacherForm() {
             <ArrowRight className="w-3.5 h-3.5" />
             <span>العودة للرئيسية</span>
           </Link>
-          <span className="text-[11px] font-mono text-[#107a57] bg-[#e6f4ee] px-2.5 py-1 rounded-lg border border-[#107a57]/20 font-bold">
-            رابط دعوة معتمد 🔒
+          <span className="text-[11px] text-[#107a57] bg-[#e6f4ee] px-3 py-1 rounded-full border border-[#107a57]/20 font-black flex items-center gap-1">
+            <Heart className="w-3 h-3 text-[#107a57]" />
+            <span>صدقة جارية • متاح لجميع الأساتذة</span>
           </span>
         </div>
 
         <div className="bg-white rounded-3xl p-6 sm:p-10 border border-[#e8e8e0] shadow-xl space-y-6">
-        {/* رأس الاستمارة */}
-        <div className="border-b border-[#e8e8e0] pb-5 space-y-2">
-          <div className="inline-flex items-center gap-2 bg-[#e6f4ee] text-[#107a57] border border-[#107a57]/20 px-3 py-1 rounded-full text-xs font-bold">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>دعوة رسمية معتمدة • تسجيل فوري ومباشر</span>
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-gray-900">
-            إنشاء حساب الأستاذ
-          </h1>
-          <p className="text-xs sm:text-sm text-gray-600 font-medium">
-            سجّل بياناتك لتفعيل فضاء كراس القسم، السبورات اليومية، وميثاق التقويم (20/20).
-          </p>
-        </div>
-
-        {errorMsg && (
-          <div className="p-3.5 rounded-2xl bg-red-50 border border-red-200 text-xs text-red-700 flex items-center gap-2.5">
-            <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
-            <span>{errorMsg}</span>
-          </div>
-        )}
-
-        <form onSubmit={handleRegister} className="space-y-5">
-          {/* الاسم واللقب */}
-          <div className="space-y-1.5">
-            <label className="block text-xs font-black text-gray-800">
-              الاسم واللقب الكامل <span className="text-red-500">*</span>
-            </label>
-            <div className="relative">
-              <input
-                type="text"
-                required
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                placeholder="مثال: أ. محمد بلحاج أو أ. عبد الرحيم"
-                className="w-full pl-3 pr-10 py-2.5 rounded-xl bg-[#fafaf7] border border-[#e8e8e0] text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57] transition"
-              />
-              <User className="w-4 h-4 text-gray-400 absolute right-3 top-3 pointer-events-none" />
+          {/* رأس الاستمارة */}
+          <div className="border-b border-[#e8e8e0] pb-5 space-y-2">
+            <div className="inline-flex items-center gap-2 bg-[#e6f4ee] text-[#107a57] border border-[#107a57]/20 px-3 py-1 rounded-full text-xs font-bold">
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>تسجيل فوري ومباشر لأساتذة التعليم المتوسط</span>
             </div>
+            <h1 className="text-2xl sm:text-3xl font-black text-gray-900">
+              إنشاء حساب أستاذ جديد
+            </h1>
+            <p className="text-xs sm:text-sm text-gray-600 font-medium leading-relaxed">
+              سجّل بياناتك خلال دقيقة واحدة لتفعيل فضاء كراس القسم، السبورات اليومية، الدفتر اليومي وميثاق التقويم.
+            </p>
           </div>
 
-          {/* مادة التدريس */}
-          <div className="space-y-1.5">
-            <label className="block text-xs font-black text-gray-800">
-              المادة التعليمية التي تدرّسها <span className="text-red-500">*</span>
-            </label>
-            <div className="relative">
-              <select
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                className="w-full pl-3 pr-10 py-2.5 rounded-xl bg-[#fafaf7] border border-[#e8e8e0] text-xs text-gray-900 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57] transition appearance-none font-bold"
-              >
-                {MIDDLE_SCHOOL_SUBJECTS.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.icon} {s.name}
-                  </option>
-                ))}
-              </select>
-              <BookOpen className="w-4 h-4 text-gray-400 absolute right-3 top-3 pointer-events-none" />
+          {errorMsg && (
+            <div className="p-3.5 rounded-2xl bg-red-50 border border-red-200 text-xs text-red-700 flex items-center gap-2.5">
+              <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+              <span>{errorMsg}</span>
             </div>
-          </div>
+          )}
 
-          {/* المؤسسة التعليمية والمقاطعة */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <form onSubmit={handleRegister} className="space-y-5">
+            {/* الاسم واللقب */}
             <div className="space-y-1.5">
               <label className="block text-xs font-black text-gray-800">
-                المتوسطة / المؤسسة <span className="text-red-500">*</span>
+                الاسم واللقب الكامل <span className="text-red-500">*</span>
               </label>
               <div className="relative">
                 <input
                   type="text"
                   required
-                  value={middleSchoolName}
-                  onChange={(e) => setMiddleSchoolName(e.target.value)}
-                  placeholder="مثال: متوسطة الأمير عبد القادر"
-                  className="w-full pl-3 pr-10 py-2.5 rounded-xl bg-[#fafaf7] border border-[#e8e8e0] text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57] transition"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="مثال: أ. محمد بلحاج أو أ. عبد الرحيم"
+                  className="w-full pl-3 pr-10 py-2.5 rounded-xl bg-[#fafaf7] border border-[#e8e8e0] text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57] transition font-bold"
                 />
-                <Building2 className="w-4 h-4 text-gray-400 absolute right-3 top-3 pointer-events-none" />
+                <User className="w-4 h-4 text-gray-400 absolute right-3 top-3 pointer-events-none" />
               </div>
             </div>
 
+            {/* مادة التدريس */}
             <div className="space-y-1.5">
               <label className="block text-xs font-black text-gray-800">
-                المقاطعة التفتيشية <span className="text-red-500">*</span>
+                المادة التعليمية التي تدرّسها <span className="text-red-500">*</span>
               </label>
               <div className="relative">
                 <select
-                  value={districtId}
-                  onChange={(e) => setDistrictId(e.target.value)}
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
                   className="w-full pl-3 pr-10 py-2.5 rounded-xl bg-[#fafaf7] border border-[#e8e8e0] text-xs text-gray-900 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57] transition appearance-none font-bold"
                 >
-                  {DISTRICTS.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.name}
+                  {MIDDLE_SCHOOL_SUBJECTS.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.icon} {s.name}
                     </option>
                   ))}
                 </select>
-                <MapPin className="w-4 h-4 text-gray-400 absolute right-3 top-3 pointer-events-none" />
-              </div>
-            </div>
-          </div>
-
-          {/* البريد الإلكتروني وكلمة المرور */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-            <div className="space-y-1.5">
-              <label className="block text-xs font-black text-gray-800">
-                البريد الإلكتروني <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@example.com"
-                  className="w-full pl-3 pr-10 py-2.5 rounded-xl bg-[#fafaf7] border border-[#e8e8e0] text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57] transition font-mono"
-                />
-                <Mail className="w-4 h-4 text-gray-400 absolute right-3 top-3 pointer-events-none" />
+                <BookOpen className="w-4 h-4 text-gray-400 absolute right-3 top-3 pointer-events-none" />
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <label className="block text-xs font-black text-gray-800">
-                كلمة المرور <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="لا تقل عن 6 خانات..."
-                  className="w-full pl-3 pr-10 py-2.5 rounded-xl bg-[#fafaf7] border border-[#e8e8e0] text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57] transition"
-                />
-                <Lock className="w-4 h-4 text-gray-400 absolute right-3 top-3 pointer-events-none" />
+            {/* المؤسسة التعليمية والمقاطعة */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="block text-xs font-black text-gray-800">
+                  المقاطعة التفتيشية <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <select
+                    value={districtId}
+                    onChange={(e) => setDistrictId(e.target.value)}
+                    className="w-full pl-3 pr-10 py-2.5 rounded-xl bg-[#fafaf7] border border-[#e8e8e0] text-xs text-gray-900 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57] transition appearance-none font-bold"
+                  >
+                    {DISTRICTS.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name}
+                      </option>
+                    ))}
+                  </select>
+                  <MapPin className="w-4 h-4 text-gray-400 absolute right-3 top-3 pointer-events-none" />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-xs font-black text-gray-800">
+                  اسم المتوسطة <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    required
+                    value={middleSchoolName}
+                    onChange={(e) => setMiddleSchoolName(e.target.value)}
+                    placeholder="مثال: متوسطة الشيخ إبراهيم بن عامر"
+                    className="w-full pl-3 pr-10 py-2.5 rounded-xl bg-[#fafaf7] border border-[#e8e8e0] text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57] transition font-bold"
+                  />
+                  <Building2 className="w-4 h-4 text-gray-400 absolute right-3 top-3 pointer-events-none" />
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* زر التأكيد */}
-          <div className="pt-3">
-            <button
-              type="submit"
-              disabled={loading}
-              className="btn-primary w-full py-3.5 text-xs sm:text-sm font-black justify-center shadow-md active:scale-98 transition-all"
+            {/* البريد الإلكتروني وكلمة المرور */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="block text-xs font-black text-gray-800">
+                  البريد الإلكتروني <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="name@example.com"
+                    dir="ltr"
+                    className="w-full pl-3 pr-10 py-2.5 rounded-xl bg-[#fafaf7] border border-[#e8e8e0] text-xs font-mono text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57] transition text-right"
+                  />
+                  <Mail className="w-4 h-4 text-gray-400 absolute right-3 top-3 pointer-events-none" />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-xs font-black text-gray-800">
+                  كلمة المرور <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="password"
+                    required
+                    minLength={6}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="6 أحرف أو أرقام على الأقل"
+                    dir="ltr"
+                    className="w-full pl-3 pr-10 py-2.5 rounded-xl bg-[#fafaf7] border border-[#e8e8e0] text-xs font-mono text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57] transition text-right"
+                  />
+                  <Lock className="w-4 h-4 text-gray-400 absolute right-3 top-3 pointer-events-none" />
+                </div>
+              </div>
+            </div>
+
+            {/* زر إنشاء الحساب */}
+            <div className="pt-2 space-y-3">
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full btn-primary py-3 rounded-xl text-xs sm:text-sm font-black flex items-center justify-center gap-2 shadow-md cursor-pointer disabled:opacity-50"
+              >
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <GraduationCap className="w-4 h-4" />}
+                <span>إنشاء وتفعيل حساب الأستاذ فوراً</span>
+              </button>
+
+              <p className="text-[11px] text-gray-500 text-center leading-relaxed font-medium">
+                بتسجيلك في المنصة، فإنك توافق على{" "}
+                <Link href="/privacy" className="text-[#107a57] underline font-bold hover:text-[#0b543c]">
+                  سياسة الخصوصية وحماية المعطيات
+                </Link>{" "}
+                وفقاً للتشريعات الجزائرية.
+              </p>
+            </div>
+          </form>
+
+          {/* رابط تسجيل الدخول للمسجلين مسبقاً */}
+          <div className="pt-4 border-t border-[#e8e8e0] flex items-center justify-between text-xs text-gray-600 font-medium">
+            <span>هل لديك حساب أستاذ مسجل من قبل؟</span>
+            <Link
+              href="/login"
+              className="inline-flex items-center gap-1.5 font-black text-[#107a57] hover:underline"
             >
-              {loading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>جارٍ إنشاء الحساب وتوليد الكود...</span>
-                </>
-              ) : (
-                <>
-                  <GraduationCap className="w-5 h-5" />
-                  <span>تأكيد الحساب والانضمام الفوري</span>
-                </>
-              )}
-            </button>
+              <ShieldCheck className="w-4 h-4" />
+              <span>تسجيل الدخول</span>
+            </Link>
           </div>
-
-          <p className="text-[11px] text-gray-500 text-center">
-            بالتسجيل، أنت تلتزم بالأمانة البيداغوجية والمسؤولية عن المحتوى التعليمي المنشور لتلاميذك.
-          </p>
-        </form>
+        </div>
       </div>
     </div>
-  </div>
   );
 }
 
 export default function JoinTeacherPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-          <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
-        </div>
-      }
-    >
+    <Suspense fallback={<div className="p-8 text-center text-xs text-gray-500">جارٍ التحميل...</div>}>
       <JoinTeacherForm />
     </Suspense>
   );

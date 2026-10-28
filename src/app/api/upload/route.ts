@@ -2,11 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getLessonsData, updateLessonsData, uploadImageFile } from "@/lib/storage";
 import { requireTeacher } from "@/lib/auth";
 import { rateLimit } from "@/lib/rateLimit";
-
-const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
-const MAX_FILE_BYTES = 25 * 1024 * 1024;
-const MAX_FILES_PER_REQUEST = 20;
 import { LessonImage } from "@/lib/types";
+
+const MAX_FILE_BYTES = 25 * 1024 * 1024; // 25 ميغابايت لدعم صور الهواتف عالية الدقة ومستندات PDF
+const MAX_FILES_PER_REQUEST = 20;
 
 export async function POST(req: NextRequest) {
   const ctx = await requireTeacher();
@@ -31,15 +30,39 @@ export async function POST(req: NextRequest) {
     if (allFiles.length > MAX_FILES_PER_REQUEST) {
       return NextResponse.json({ error: `الحد الأقصى ${MAX_FILES_PER_REQUEST} ملفاً في المرة الواحدة` }, { status: 400 });
     }
+
     for (const f of allFiles) {
-      const pdfByName = f.name?.toLowerCase().endsWith(".pdf");
       const name = (f.name || "").toLowerCase();
-      const isImg = f.type?.startsWith("image/") || /\.(jpe?g|png|webp|heic|heif|gif|bmp|jfif)$/i.test(name);
-      if (!isImg && !ALLOWED_TYPES.includes(f.type) && !(pdfByName && (!f.type || f.type === "application/octet-stream"))) {
-        return NextResponse.json({ error: `نوع الملف غير مسموح: ${f.name} (صور JPG/PNG/WebP أو PDF فقط)` }, { status: 415 });
+      const mime = (f.type || "").toLowerCase();
+
+      // حظر ملفات SVG نهائياً لمنع أي ثغرات برمجية خبيثة (Stored XSS)
+      if (mime.includes("svg") || name.endsWith(".svg")) {
+        return NextResponse.json(
+          { error: `ملفات SVG غير مسموح بها لأسباب أمنية. يرجى رفع صور JPG أو PNG أو مستندات PDF` },
+          { status: 415 }
+        );
       }
+
+      // دعم جميع صيغ كاميرا الهواتف الذكية (Android و iPhone: JPG, PNG, WebP, HEIC, HEIF) ومستندات PDF
+      const isAllowedImage =
+        /\.(jpe?g|png|webp|heic|heif|jfif)$/i.test(name) ||
+        mime.startsWith("image/jpeg") ||
+        mime.startsWith("image/png") ||
+        mime.startsWith("image/webp") ||
+        mime.startsWith("image/heic") ||
+        mime.startsWith("image/heif");
+
+      const isPdf = name.endsWith(".pdf") || mime === "application/pdf";
+
+      if (!isAllowedImage && !isPdf) {
+        return NextResponse.json(
+          { error: `نوع الملف غير مدعوم: ${f.name} (يُسمح برفع صور كاميرا الهاتف JPG/PNG/WebP/HEIC أو ملفات PDF)` },
+          { status: 415 }
+        );
+      }
+
       if (f.size > MAX_FILE_BYTES) {
-        return NextResponse.json({ error: `الملف ${f.name} يتجاوز 10 ميغابايت` }, { status: 413 });
+        return NextResponse.json({ error: `الملف ${f.name} يتجاوز الحد الأقصى (25 ميغابايت)` }, { status: 413 });
       }
     }
 
@@ -91,8 +114,8 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // الرفع يستغرق ثواني: نعيد قراءة البيانات الآن ونحفظ مع إعادة المحاولة كي لا نمحو تعديلاً حدث أثناءه
-    const savedLesson = await updateLessonsData(ctx, (fresh) => {
+    // حفظ الصور مع دعم المحاولة المتكررة لمنع تضارب الكتابة
+    await updateLessonsData(ctx, (fresh) => {
       const target = fresh.lessons.find((l) => l.id === lessonId);
       if (!target) throw new Error("الدرس غير موجود");
       if (isHomework) {
@@ -106,14 +129,12 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({
+      success: true,
       images: newImages,
-      image: newImages[0],
-      lesson: savedLesson,
-      isHomework,
-      count: newImages.length,
+      uploadedCount: newImages.length,
     });
   } catch (err: any) {
     console.error("Upload error:", err);
-    return NextResponse.json({ error: err.message || "فشل رفع الملفات" }, { status: 500 });
+    return NextResponse.json({ error: err?.message || "حدث خطأ أثناء رفع الملفات" }, { status: 500 });
   }
 }

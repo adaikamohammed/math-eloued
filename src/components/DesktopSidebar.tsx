@@ -471,15 +471,22 @@ export function DesktopSidebar() {
         </div>
 
         {/* ── تذييل الشريط الجانبي (نسخة المنصة وحالة النظام) ── */}
-        <div className="p-3 border-t border-[#e8e8e0] shrink-0 text-center">
+        <div className="p-3 border-t border-[#e8e8e0] shrink-0 text-center space-y-1">
           {!isSidebarCollapsed ? (
-            <div className="flex items-center justify-between text-[11px] text-gray-400 px-1">
-              <span>منصة جسور v2.4</span>
-              <span className="inline-flex items-center gap-1 text-[#107a57] font-bold">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#107a57] animate-pulse" />
-                متصل
-              </span>
-            </div>
+            <>
+              <div className="flex items-center justify-between text-[11px] text-gray-400 px-1">
+                <span>منصة جسور v2.4</span>
+                <span className="inline-flex items-center gap-1 text-[#107a57] font-bold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#107a57] animate-pulse" />
+                  متصل
+                </span>
+              </div>
+              <div className="text-[10px] text-gray-400 text-center pt-0.5">
+                <Link href="/privacy" className="hover:text-gray-600 transition underline">
+                  الخصوصية والتشريع الجزائري
+                </Link>
+              </div>
+            </>
           ) : (
             <div className="flex justify-center" title="النظام متصل">
               <span className="w-2 h-2 rounded-full bg-[#107a57]" />

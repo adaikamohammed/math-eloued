@@ -62,6 +62,7 @@ export type ParentSummons = {
   id: string;
   studentName: string; // اسم التلميذ
   className: string; // الفوج : مثلاً "1م3"
+  accessCode?: string; // الرمز السري الخاص بالولي/التلميذ للاطلاع الشخصي (4 أرقام لمنع التشهير)
   notes?: string; // ملاحظة وتوجيه الأستاذ لولي الأمر
   isUrgent?: boolean; // توقيت إضافي: الأحد صباحاً
   createdAt: string;

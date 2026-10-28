@@ -98,6 +98,10 @@ const PAGE_INFO: Record<string, { title: string; subtitle: string }> = {
     title: "الرسائل والتواصل",
     subtitle: "قنوات التواصل المباشر بين الأساتذة والأولياء",
   },
+  "/privacy": {
+    title: "سياسة الخصوصية وحماية المعطيات",
+    subtitle: "الامتثال للقانون الجزائري 18-07 وحماية بيانات الأطفال 15-12",
+  },
 };
 
 function getPageInfo(pathname: string): { title: string; subtitle: string } {
