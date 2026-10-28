@@ -26,6 +26,7 @@ import {
   FileWarning,
   Megaphone,
   MessageSquare,
+  Building2,
 } from "lucide-react";
 import { useLayout } from "@/context/LayoutContext";
 import { supabase } from "@/lib/supabase";
@@ -253,6 +254,26 @@ export function DesktopSidebar() {
       ];
     }
 
+    // ─── 2.5 إذا كان المستخدم مدير متوسطة / ناظر ───
+    if (user && user.role === "principal") {
+      return [
+        {
+          title: "إدارة المؤسسة التعليمية",
+          items: [
+            { label: "لوحة قيادة المتوسطة", href: "/principal", icon: Building2, badge: "إدارة" },
+            { label: "جدول الفروض الرسمي", href: "/principal?tab=exams", icon: Calendar, badge: "رسمي" },
+            { label: "سجل التأشيرات الإدارية", href: "/principal?tab=visas", icon: ShieldCheck },
+            { label: "دليل الاستقبال الموحد", href: "/principal?tab=reception", icon: Users },
+            { label: "الملتقى البيداغوجي", href: "/forum", icon: Sparkles },
+          ],
+        },
+        {
+          title: "إدارة الحساب",
+          items: [{ label: "الإعدادات", href: "/settings", icon: Settings }],
+        },
+      ];
+    }
+
     // ─── 3. الوضع العام للزوار والأولياء ───
     return [
       {
@@ -375,6 +396,8 @@ export function DesktopSidebar() {
                   <span className="text-[10px] text-[#107a57] font-bold">
                     {user.role === "inspector"
                       ? "مفتش مقاطعة"
+                      : user.role === "principal"
+                      ? "مدير المتوسطة"
                       : user.role === "admin"
                       ? "المشرف العام"
                       : "أستاذ المادة"}

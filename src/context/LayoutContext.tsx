@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 
-export type UserRole = "teacher" | "inspector" | "admin" | null;
+export type UserRole = "teacher" | "inspector" | "admin" | "principal" | null;
 
 export interface UserSessionInfo {
   id: string;
@@ -13,6 +13,7 @@ export interface UserSessionInfo {
   slug?: string;
   districtId?: number;
   schoolName?: string;
+  middleSchoolId?: string;
 }
 
 interface LayoutContextValue {
@@ -76,7 +77,7 @@ export function LayoutProvider({ children }: { children: React.ReactNode }) {
 
       const { data: profile } = await supabase
         .from("profiles")
-        .select("id, full_name, role, teacher_code, slug, district_id, school_custom_name")
+        .select("id, full_name, role, teacher_code, slug, district_id, school_custom_name, middle_school_id")
         .eq("id", session.user.id)
         .maybeSingle();
 
@@ -89,6 +90,7 @@ export function LayoutProvider({ children }: { children: React.ReactNode }) {
           slug: profile.slug || undefined,
           districtId: profile.district_id || undefined,
           schoolName: profile.school_custom_name || undefined,
+          middleSchoolId: profile.middle_school_id || undefined,
         });
       } else {
         setUser(null);

@@ -170,6 +170,7 @@ export function GlobalNavbar() {
   const getWorkspaceUrl = () => {
     if (!user) return "/login";
     if (user.role === "inspector") return "/inspector";
+    if (user.role === "principal") return "/principal";
     if (user.role === "admin") return "/super-admin";
     return "/admin";
   };
@@ -177,6 +178,7 @@ export function GlobalNavbar() {
   const getWorkspaceLabel = () => {
     if (!user) return "دخول الأستاذ";
     if (user.role === "inspector") return "فضاء التفتيش";
+    if (user.role === "principal") return "فضاء إدارة المؤسسة";
     if (user.role === "admin") return "المشرف العام";
     return "لوحة الأستاذ";
   };

@@ -40,7 +40,7 @@ export async function getSessionProfile() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, role, full_name, district_id, slug, teacher_code, school_custom_name, levels_taught, is_verified")
+    .select("id, role, full_name, district_id, slug, teacher_code, school_custom_name, middle_school_id, levels_taught, is_verified")
     .eq("id", user.id)
     .single();
   return { supabase, user, profile };

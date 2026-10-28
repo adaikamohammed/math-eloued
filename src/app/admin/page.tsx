@@ -9,6 +9,7 @@ import { PedagogyAlerts } from "@/components/PedagogyAlerts";
 import { ParentShareModal } from "@/components/ParentShareModal";
 import { TeacherOnboardingModal } from "@/components/TeacherOnboardingModal";
 import { TeacherSetupChecklist } from "@/components/TeacherSetupChecklist";
+import { OfficialExamScheduleCard } from "@/components/OfficialExamScheduleCard";
 import { BOARD_IMAGE_OPTIONS } from "@/lib/compress";
 import {
   Plus,
@@ -1306,6 +1307,13 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
           onOpenOnboarding={() => setOnboardingOpen(true)}
           onOpenShareModal={() => setShareModalOpen(true)}
           onOpenAddLesson={() => setMainTab("lessons")}
+        />
+
+        {/* بطاقة جدول الفروض الرسمي المعتمد من الإدارة وتأشيرة المدير */}
+        <OfficialExamScheduleCard
+          schoolName={profile?.school_custom_name}
+          teacherId={profile?.id}
+          subjectId={profile?.subject}
         />
 
         {/* بطاقة رموز فضاء الأولياء المباشرة لكل مستوى */}

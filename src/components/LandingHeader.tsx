@@ -11,6 +11,7 @@ export function LandingHeader() {
   const getWorkspaceUrl = () => {
     if (!user) return "/login";
     if (user.role === "inspector") return "/inspector";
+    if (user.role === "principal") return "/principal";
     if (user.role === "admin") return "/super-admin";
     return "/admin";
   };

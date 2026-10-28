@@ -17,6 +17,7 @@ import {
   ClipboardList,
   Sliders,
   Heart,
+  Building2,
 } from "lucide-react";
 import { useLayout } from "@/context/LayoutContext";
 import { TeacherFeatureFlags } from "@/lib/types";
@@ -100,6 +101,14 @@ export function MobileBottomNav() {
       { label: "الندوات", href: "/inspector", icon: Calendar },
       { label: "الملتقى", href: "/forum", icon: Users },
       { label: "لوحة الشرف", href: "/honor", icon: Trophy },
+      { label: "الإعدادات", href: "/settings", icon: Sliders },
+    ];
+  } else if (user && user.role === "principal") {
+    items = [
+      { label: "المتوسطة", href: "/principal", icon: Building2 },
+      { label: "الفروض", href: "/principal?tab=exams", icon: Calendar },
+      { label: "التأشيرات", href: "/principal?tab=visas", icon: ShieldCheck },
+      { label: "الاستقبال", href: "/principal?tab=reception", icon: Users },
       { label: "الإعدادات", href: "/settings", icon: Sliders },
     ];
   }

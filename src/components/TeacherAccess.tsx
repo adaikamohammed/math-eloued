@@ -60,16 +60,16 @@ export function TeacherAccess() {
             {!isAuthenticated ? (
               <div className="space-y-3">
                 <p className="text-xs text-slate-600 leading-relaxed font-medium">
-                  {role === "inspector" || role === "admin"
+                  {role === "inspector" || role === "principal" || role === "admin"
                     ? "أنت مسجل بحساب إشرافي. انتقل إلى لوحتك:"
                     : "سجّل الدخول بحسابك على المنصة للوصول إلى أدوات الأستاذ:"}
                 </p>
                 <Link
-                  href={role === "inspector" ? "/inspector" : role === "admin" ? "/super-admin" : "/login"}
+                  href={role === "inspector" ? "/inspector" : role === "principal" ? "/principal" : role === "admin" ? "/super-admin" : "/login"}
                   onClick={() => setIsOpen(false)}
                   className="block w-full text-center py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs transition shadow-sm"
                 >
-                  {role === "inspector" ? "لوحة المفتش" : role === "admin" ? "لوحة المشرف العام" : "تسجيل الدخول"}
+                  {role === "inspector" ? "لوحة المفتش" : role === "principal" ? "فضاء إدارة المؤسسة" : role === "admin" ? "لوحة المشرف العام" : "تسجيل الدخول"}
                 </Link>
               </div>
             ) : (

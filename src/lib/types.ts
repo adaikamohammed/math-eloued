@@ -305,7 +305,41 @@ export interface MiddleSchool {
   commune: string;
 }
 
-export type UserRole = "teacher" | "inspector" | "admin";
+export type UserRole = "teacher" | "inspector" | "admin" | "principal";
+
+// بطاقة الفرض الرسمي المعتمد من طرف إدارة المتوسطة (يلتزم به الأساتذة)
+export interface SchoolExamItem {
+  id: string;
+  middleSchoolId?: string;
+  level: 1 | 2 | 3 | 4; // 1م، 2م، 3م، 4م
+  semester: 1 | 2 | 3;
+  subjectId: string;
+  subjectName: string;
+  examTitle: string; // مثال: الفرض الأول المحروس
+  date: string; // YYYY-MM-DD
+  dayName: string; // الأحد، الإثنين...
+  timeSlot: string; // 08:00 - 09:00
+  room?: string; // قاعة 01
+  notes?: string; // تعليمات الإدارة للأساتذة والتلاميذ
+  isPublished: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+// التأشيرة الإدارية للسيد مدير المتوسطة / الناظر على كراس القسم أو الدفتر اليومي
+export interface PrincipalVisaRecord {
+  id: string;
+  teacherId: string;
+  teacherName?: string;
+  principalId?: string;
+  principalName?: string;
+  middleSchoolId?: string;
+  visaDate: string; // YYYY-MM-DD
+  visaType: "cahier_textes" | "cahier_journalier" | "general";
+  feedbackNote?: string; // ملاحظات وتوجيهات السيد المدير/الناظر
+  status: "approved" | "needs_attention";
+  createdAt: string;
+}
 
 // بطاقة الاستقبال الرسمية للأستاذ (يعدلها من صفحة الإعدادات)
 export interface ReceptionInfo {
