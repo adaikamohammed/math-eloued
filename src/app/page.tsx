@@ -34,7 +34,7 @@ export default function WilayaHomePage() {
             {/* الشارة الرسمية لمديرية التربية */}
             <div className="inline-flex items-center gap-2 bg-[#e6f4ee] border border-[#107a57]/20 px-3.5 py-1.5 rounded-full text-[#107a57] text-xs font-black shadow-2xs">
               <span className="w-2 h-2 rounded-full bg-[#107a57] animate-pulse" />
-              <span>مديرية التربية لولاية الوادي • التعليم المتوسط</span>
+              <span>الجمهورية الجزائرية الديمقراطية الشعبية • منظومة قِبَاب الجزائر</span>
             </div>
 
             {/* العنوان الموجه لولي الأمر والتلميذ */}
@@ -144,13 +144,18 @@ export default function WilayaHomePage() {
       </main>
 
       {/* ─── التذييل الرسمي للمنصة ─── */}
-      <footer className="bg-white border-t border-[#e8e8e0] py-6 text-center text-xs text-gray-500 font-medium space-y-1">
-        <p className="font-bold text-gray-800">
-          منصة جسور التعليمية — المنصة الرقمية الموحدة للتعليم المتوسط • ولاية الوادي
+      <footer className="bg-white border-t border-[#e8e8e0] py-8 text-center text-xs text-gray-500 font-medium space-y-2">
+        <p className="font-black text-gray-900 text-sm">
+          منظومة قِبَاب الجزائر للتربية والتعليم — Qibab El Djazair
         </p>
-        <p className="text-[11px] text-gray-400">
-          الجمهورية الجزائرية الديمقراطية الشعبية • مديرية التربية لولاية الوادي
+        <p className="text-[11px] text-gray-500">
+          المنصة الوطنية للتربية والتعليم والتسيير البيداغوجي • مهد الانطلاق: ولاية الوادي (الجزائر)
         </p>
+        <div className="pt-2 border-t border-gray-100 max-w-md mx-auto">
+          <p className="text-[11px] text-emerald-800 font-bold bg-emerald-50/80 py-1.5 px-4 rounded-full border border-emerald-200/60 inline-block shadow-2xs">
+            🕊️ هذا العمل وقفٌ تعليمي وعلمٌ يُنتفع به، صدقة جارية عن روح الفقيد فارس، رحمه الله وأسكنه فسيح جناته
+          </p>
+        </div>
       </footer>
     </div>
   );

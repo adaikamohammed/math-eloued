@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
     const backupPayload = {
       exportVersion: "1.0.0",
       exportedAt: new Date().toISOString(),
-      platform: "منصة جسور التعليمية — فضاء الأستاذ، الولي، والتلميذ",
+      platform: "منظومة قِبَاب الجزائر للتربية والتعليم — Qibab El Djazair",
       teacher: {
         id: ctx.teacherId,
         email: ctx.email || user?.email || "",

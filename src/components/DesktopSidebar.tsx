@@ -348,10 +348,10 @@ export function DesktopSidebar() {
             {!isSidebarCollapsed && (
               <div className="min-w-0 transition-opacity duration-200">
                 <span className="font-black text-sm text-gray-900 tracking-tight block truncate">
-                  منصة جسور التعليمية
+                  قِبَاب الجزائر
                 </span>
-                <span className="text-[10px] text-gray-400 font-medium block truncate">
-                  ولاية الوادي
+                <span className="text-[10px] text-emerald-700 font-bold block truncate">
+                  المنظومة الوطنية للتربية والتعليم
                 </span>
               </div>
             )}
@@ -526,7 +526,7 @@ export function DesktopSidebar() {
           {!isSidebarCollapsed ? (
             <>
               <div className="flex items-center justify-between text-[11px] text-gray-400 px-1">
-                <span>منصة جسور v2.4</span>
+                <span>قِبَاب الجزائر v2.5</span>
                 <span className="inline-flex items-center gap-1 text-[#107a57] font-bold">
                   <span className="w-1.5 h-1.5 rounded-full bg-[#107a57] animate-pulse" />
                   متصل

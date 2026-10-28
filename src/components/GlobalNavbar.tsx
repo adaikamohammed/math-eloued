@@ -21,8 +21,8 @@ import { clearInspectionCache } from "@/app/inspector/shared";
 // ─── خريطة عناوين الصفحات المستوحاة من منصة فرسان القرآن ─────────
 const PAGE_INFO: Record<string, { title: string; subtitle: string }> = {
   "/": {
-    title: "منصة جسور التعليمية",
-    subtitle: "المنصة الرقمية الموحدة للتعليم المتوسط • ولاية الوادي",
+    title: "منظومة قِبَاب الجزائر للتربية والتعليم",
+    subtitle: "المنصة الوطنية للتربية والتعليم والتسيير البيداغوجي • Qibab El Djazair",
   },
   "/t/search": {
     title: "دليل الأساتذة",
@@ -123,8 +123,8 @@ function getPageInfo(pathname: string): { title: string; subtitle: string } {
   }
 
   return {
-    title: "منصة جسور التعليمية",
-    subtitle: "المنصة الرقمية الموحدة لولاية الوادي",
+    title: "منظومة قِبَاب الجزائر للتربية والتعليم",
+    subtitle: "المنصة الوطنية للتربية والتعليم والتسيير البيداغوجي • Qibab El Djazair",
   };
 }
 

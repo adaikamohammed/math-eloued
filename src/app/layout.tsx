@@ -4,8 +4,8 @@ import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 import { AppShell } from "@/components/AppShell";
 
 export const metadata: Metadata = {
-  title: "منصة جسور التعليمية — فضاء الأستاذ، الولي، والتلميذ",
-  description: "المنصة الرقمية الموحدة للتعليم المتوسط — فضاء دراسي وبيداغوجي مستقل للأستاذ للتواصل اليومي مع الأولياء، نشر كراس القسم، الواجبات، وميثاق التقويم المستمر بشفافية.",
+  title: "منظومة قِبَاب الجزائر للتربية والتعليم — Qibab El Djazair",
+  description: "المنصة الوطنية الموحدة للتربية والتعليم والتسيير البيداغوجي — فضاء دراسي وبيداغوجي مستقل للأستاذ، الإدارة، المفتش، والولي لمتابعة كراس القسم والتقويم والامتحانات بشفافية تامة.",
   manifest: "/manifest.json",
   icons: {
     icon: [
@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "منصة جسور",
+    title: "قِبَاب الجزائر",
   },
 };
 

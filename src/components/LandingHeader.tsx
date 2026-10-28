@@ -26,10 +26,10 @@ export function LandingHeader() {
           </div>
           <div className="leading-tight min-w-0">
             <p className="text-sm sm:text-base font-black text-gray-900 truncate">
-              منصة جسور التعليمية
+              قِبَاب الجزائر
             </p>
             <p className="text-[10px] sm:text-[11px] text-[#107a57] font-bold truncate">
-              التعليم المتوسط • ولاية الوادي
+              المنظومة الوطنية للتربية والتعليم • Qibab El Djazair
             </p>
           </div>
         </Link>

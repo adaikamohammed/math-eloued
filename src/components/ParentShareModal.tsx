@@ -51,7 +51,7 @@ export function ParentShareModal({
     ? `${window.location.origin}/t/${slug || teacherCode}`
     : `/t/${slug || teacherCode}`;
 
-  const homeUrl = typeof window !== "undefined" ? window.location.origin : "https://math-eloued.dz";
+  const homeUrl = typeof window !== "undefined" ? window.location.origin : "https://qibab-dz.vercel.app";
 
   // توليد رمز QR
   useEffect(() => {

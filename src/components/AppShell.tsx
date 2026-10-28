@@ -14,6 +14,7 @@ const DASHBOARD_ROUTES = [
   "/admin",
   "/super-admin",
   "/inspector",
+  "/principal",
   "/settings",
   "/forum",
   "/pedagogy",
@@ -74,7 +75,7 @@ function AppShellContent({ children }: { children: React.ReactNode }) {
           </div>
 
           <footer className="mt-12 text-center text-xs text-gray-400 py-4 border-t border-[#e8e8e0] hidden md:block">
-            منصة جسور التعليمية — المنصة الرقمية الموحدة للتعليم المتوسط • مديرية التربية لولاية الوادي
+            منظومة قِبَاب الجزائر للتربية والتعليم — Qibab El Djazair
           </footer>
         </main>
       </div>
