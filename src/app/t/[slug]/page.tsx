@@ -295,10 +295,10 @@ export default async function TeacherPublicSpace({ params, searchParams }: Teach
               </div>
             </div>
             <Link
-              href={`/assessment?teacher=${profile.id}${isValidLevel ? `&lvl=${requestedLevel}` : ""}`}
+              href={`/parents?teacher=${profile.id}${isValidLevel ? `&lvl=${requestedLevel}` : ""}`}
               className="text-xs font-bold text-emerald-800 bg-white border border-emerald-200 px-3.5 py-2 rounded-xl hover:bg-emerald-100 active:scale-95 transition shadow-2xs shrink-0"
             >
-              اطلاع الولي 🔍
+              متابعة الولي 🔍
             </Link>
           </div>
         )}
