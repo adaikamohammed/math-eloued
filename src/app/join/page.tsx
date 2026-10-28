@@ -4,6 +4,7 @@ import { Suspense, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { validatePasswordStrength } from "@/lib/passwordPolicy";
 import {
   GraduationCap,
   Mail,
@@ -55,8 +56,9 @@ function JoinTeacherForm() {
       return;
     }
 
-    if (password.length < 6) {
-      setErrorMsg("كلمة المرور يجب أن لا تقل عن 6 أحرف أو أرقام");
+    const pwdCheck = validatePasswordStrength(password);
+    if (!pwdCheck.valid) {
+      setErrorMsg(pwdCheck.error || "كلمة المرور غير صالحة");
       return;
     }
 
@@ -313,10 +315,10 @@ function JoinTeacherForm() {
                   <input
                     type="password"
                     required
-                    minLength={6}
+                    minLength={8}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="6 أحرف أو أرقام على الأقل"
+                    placeholder="8 خانات مركبة على الأقل (أحرف وأرقام)"
                     dir="ltr"
                     className="w-full pl-3 pr-10 py-2.5 rounded-xl bg-[#fafaf7] border border-[#e8e8e0] text-xs font-mono text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57] transition text-right"
                   />

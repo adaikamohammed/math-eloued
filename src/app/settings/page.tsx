@@ -30,6 +30,7 @@ import {
 import { LoginRequired } from "@/components/LoginRequired";
 import { TeacherQR } from "@/components/TeacherQR";
 import { ChangePassword } from "@/components/ChangePassword";
+import { BackupDataCard } from "@/components/BackupDataCard";
 import { supabase } from "@/lib/supabase";
 import { useProfile } from "@/lib/useProfile";
 import {
@@ -717,6 +718,8 @@ export default function TeacherSettingsPage() {
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} حفظ الإعدادات والميزات
         </button>
       </form>
+
+      <BackupDataCard />
 
       <ChangePassword />
     </div>

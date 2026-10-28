@@ -13,6 +13,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [pendingReview, setPendingReview] = useState(false);
+  const [isSharedDevice, setIsSharedDevice] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,6 +52,15 @@ export default function LoginPage() {
         setPendingReview(true);
         return;
       }
+
+      // حفظ وضع الحاسوب المشترك في الجلسة لتأمين الحساب
+      try {
+        if (isSharedDevice) {
+          sessionStorage.setItem("jusoor_shared_device", "true");
+        } else {
+          sessionStorage.removeItem("jusoor_shared_device");
+        }
+      } catch {}
 
       // توجيه ذكي حسب الدور
       const next = new URLSearchParams(window.location.search).get("next");
@@ -98,34 +108,30 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 font-sans" dir="rtl">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md mb-2 text-right">
+      <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <Link
           href="/"
-          className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 font-bold transition bg-white px-3 py-1.5 rounded-xl border border-slate-200"
+          className="inline-flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-slate-800 mb-6 transition"
         >
-          <ArrowRight className="w-3.5 h-3.5" />
-          <span>العودة لصفحة الهبوط الرئيسية</span>
+          <ArrowRight className="w-4 h-4" />
+          <span>العودة للرئيسية</span>
         </Link>
+
+        <div className="text-center space-y-2">
+          <div className="w-14 h-14 rounded-3xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center mx-auto shadow-lg shadow-emerald-600/20">
+            <GraduationCap className="w-8 h-8" />
+          </div>
+          <h2 className="text-2xl font-black tracking-tight text-slate-900">
+            تسجيل دخول الأستاذ والمفتش
+          </h2>
+          <p className="text-xs text-slate-500">
+            أدخل بريدك الإلكتروني وكلمة المرور للوصول إلى لوحة التحكم
+          </p>
+        </div>
       </div>
 
-      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center space-y-2">
-        <div className="inline-flex items-center justify-center w-14 h-14 rounded-3xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white shadow-lg shadow-emerald-500/20 mb-2">
-          <GraduationCap className="w-7 h-7" />
-        </div>
-        <div className="inline-flex items-center gap-2 bg-emerald-50 border border-emerald-200/60 px-3 py-1 rounded-full text-[11px] text-emerald-800 font-bold">
-          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-          <span>بوابة الدخول الموحدة — ولاية الوادي</span>
-        </div>
-        <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-          تسجيل الدخول
-        </h1>
-        <p className="text-xs text-slate-500">
-          دخول الأساتذة ومفتشي التعليم المتوسط لكافة المواد
-        </p>
-      </div>
-
-      <div className="mt-6 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-6 sm:px-10 shadow-xl shadow-slate-200/50 rounded-3xl border border-slate-200/80">
+      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+        <div className="bg-white py-8 px-6 shadow-xl shadow-slate-200/50 rounded-3xl border border-slate-100 sm:px-10">
           {errorMsg && (
             <div className="mb-5 p-4 bg-red-50 border border-red-200 rounded-2xl text-red-700 text-xs font-bold animate-shake space-y-2.5">
               <div className="flex items-start gap-2.5">
@@ -194,6 +200,26 @@ export default function LoginPage() {
                 />
                 <Lock className="w-4 h-4 text-slate-400 absolute right-3.5 top-3" />
               </div>
+            </div>
+
+            {/* خيار حماية الجلسة في الحواسيب المشتركة بقاعة الأساتذة */}
+            <div className="pt-1">
+              <label className="flex items-start gap-2.5 cursor-pointer select-none bg-slate-50 p-2.5 rounded-xl border border-slate-200/80 hover:bg-slate-100/70 transition">
+                <input
+                  type="checkbox"
+                  checked={isSharedDevice}
+                  onChange={(e) => setIsSharedDevice(e.target.checked)}
+                  className="rounded text-emerald-600 focus:ring-emerald-500 mt-1 cursor-pointer"
+                />
+                <div className="text-right">
+                  <span className="text-xs font-black text-slate-800 block">
+                    حاسوب قاعة الأساتذة أو جهاز مشترك 🖥️
+                  </span>
+                  <span className="text-[10px] text-slate-500 leading-snug block mt-0.5">
+                    حماية الجلسة: تسجيل خروج ومسح الذاكرة المؤقتة تلقائياً عند إغلاق التبويب.
+                  </span>
+                </div>
+              </label>
             </div>
 
             <button

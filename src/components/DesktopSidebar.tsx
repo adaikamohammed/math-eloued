@@ -28,6 +28,8 @@ import {
   MessageSquare,
 } from "lucide-react";
 import { useLayout } from "@/context/LayoutContext";
+import { supabase } from "@/lib/supabase";
+import { clearInspectionCache } from "@/app/inspector/shared";
 import { TeacherFeatureFlags } from "@/lib/types";
 
 interface NavItem {
@@ -48,9 +50,15 @@ export function DesktopSidebar() {
   const { isSidebarCollapsed, toggleSidebar, isMobileMenuOpen, setIsMobileMenuOpen, user } = useLayout();
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
   const [featureFlags, setFeatureFlags] = useState<TeacherFeatureFlags | null>(null);
+  const [isSharedSession, setIsSharedSession] = useState(false);
 
   // جلب تفضيلات الأستاذ لإظهار وإخفاء الصفحات ديناميكياً ولحظياً
   useEffect(() => {
+    // 0. التحقق من وضع الحاسوب المشترك
+    try {
+      setIsSharedSession(sessionStorage.getItem("jusoor_shared_device") === "true");
+    } catch {}
+
     // 1. القراءة الفورية من الكاش المحلي 0ms
     try {
       const cached = localStorage.getItem("teacher_feature_flags_cache");
@@ -471,7 +479,27 @@ export function DesktopSidebar() {
         </div>
 
         {/* ── تذييل الشريط الجانبي (نسخة المنصة وحالة النظام) ── */}
-        <div className="p-3 border-t border-[#e8e8e0] shrink-0 text-center space-y-1">
+        <div className="p-3 border-t border-[#e8e8e0] shrink-0 text-center space-y-1.5">
+          {!isSidebarCollapsed && user && isSharedSession && (
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  localStorage.removeItem("teacher_feature_flags_cache");
+                  clearInspectionCache();
+                  sessionStorage.clear();
+                } catch {}
+                await supabase.auth.signOut();
+                window.location.href = "/";
+              }}
+              className="w-full py-1.5 px-2 rounded-xl bg-amber-50 hover:bg-red-50 text-amber-900 hover:text-red-700 border border-amber-200 hover:border-red-200 text-[10px] font-bold flex items-center justify-center gap-1.5 transition cursor-pointer"
+              title="تسجيل خروج فوري ومسح أي أثر محلي على هذا الحاسوب المشترك"
+            >
+              <LogOut className="w-3.5 h-3.5 text-red-600" />
+              <span>خروج من الحاسوب المشترك</span>
+            </button>
+          )}
+
           {!isSidebarCollapsed ? (
             <>
               <div className="flex items-center justify-between text-[11px] text-gray-400 px-1">

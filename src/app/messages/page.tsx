@@ -72,6 +72,7 @@ export default function MessagesPage() {
   const [category, setCategory] = useState<MessageCategory>("question");
   const [targetLevel, setTargetLevel] = useState("");
   const [content, setContent] = useState("");
+  const [hpWebsite, setHpWebsite] = useState("");
   const [sending, setSending] = useState(false);
   const [success, setSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
@@ -126,6 +127,7 @@ export default function MessagesPage() {
           category,
           targetLevel: targetLevel || undefined,
           content: content.trim(),
+          website: hpWebsite,
         }),
       });
 
@@ -219,6 +221,19 @@ export default function MessagesPage() {
             onSubmit={handleSubmit}
             className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-100 shadow-xs space-y-4"
           >
+            {/* حقل فخ لمنع الروبوتات من إغراق المنظومة (مخفي برمجياً عن المستخدمين الحقيقيين) */}
+            <div aria-hidden="true" style={{ position: "absolute", left: "-9999px", opacity: 0, height: 0, width: 0, overflow: "hidden" }}>
+              <label htmlFor="website">اترك هذا الحقل فارغاً</label>
+              <input
+                id="website"
+                type="text"
+                name="website"
+                tabIndex={-1}
+                autoComplete="off"
+                value={hpWebsite}
+                onChange={(e) => setHpWebsite(e.target.value)}
+              />
+            </div>
             {/* 1. نوع الرسالة */}
             <div>
               <label className="text-xs font-black text-slate-800 block mb-2">

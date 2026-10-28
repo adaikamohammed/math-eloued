@@ -27,6 +27,7 @@ import {
   ChevronUp,
   School,
   ExternalLink,
+  ShieldCheck,
 } from "lucide-react";
 import { HonorStudent, StudentRosterItem, StudentEvaluation } from "@/lib/types";
 
@@ -48,6 +49,16 @@ const PRESET_NOTES = [
   "إتقان تام للواجبات وحرص دائم على الاستيعاب والفهم.",
   "قفزة نوعية وإرادة فولاذية نحو التفوق والتميز، واصل تألقك!",
 ];
+
+// دالة حماية خصوصية الأطفال: تحجب اللقب وتُبقي الحرف الأول فقط عند تفعيل الخيار (مثال: يوسف ب.)
+function formatStudentDisplayName(fullName: string, mask: boolean): string {
+  if (!mask || !fullName) return fullName;
+  const parts = fullName.trim().split(/\s+/);
+  if (parts.length <= 1) return fullName;
+  const firstName = parts[0];
+  const lastNameInitial = parts[1][0] || "";
+  return `${firstName} ${lastNameInitial}.`;
+}
 
 export default function HonorRollPage() {
   const teacherId = useTeacherId();
@@ -90,6 +101,26 @@ export default function HonorRollPage() {
   // إشعار سريع Toast
   const [toast, setToast] = useState<{ type: "ok" | "err"; msg: string } | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // وضع حماية خصوصية الأطفال (إخفاء اللقب: يوسف ب.)
+  const [maskLastName, setMaskLastName] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("jusoor_mask_honor_names");
+      if (saved === "true") setMaskLastName(true);
+    }
+  }, []);
+
+  const toggleMaskLastName = () => {
+    setMaskLastName((prev) => {
+      const next = !prev;
+      if (typeof window !== "undefined") {
+        localStorage.setItem("jusoor_mask_honor_names", String(next));
+      }
+      return next;
+    });
+  };
 
   const formRef = useRef<HTMLDivElement>(null);
 
@@ -329,9 +360,10 @@ export default function HonorRollPage() {
 
   // مشاركة بطاقة التكريم عبر واتساب أو تليغرام
   const handleShareHonor = (item: HonorStudent) => {
+    const displayName = formatStudentDisplayName(item.studentName, maskLastName);
     const text = `🎉 تهنئة وتكريم رسمي:
 يسرّنا أن نبارك للتلميذ(ة) المتميز(ة):
-⭐ ${item.studentName} ⭐
+⭐ ${displayName} ⭐
 من قسم: ${item.className}
 تتويجه بلقب: «${item.badge || "نجم التفوق والاجتهاد"}»
 وإدراجه في لوحة الشرف الرسمية للمؤسسة.
@@ -340,7 +372,7 @@ ${item.notes ? `💬 كلمة الأستاذ: «${item.notes}»\n` : ""}
 
     navigator.clipboard.writeText(text);
     setCopiedId(item.id);
-    showToast("ok", `تم نسخ بطاقة تكريم "${item.studentName}" لمشاركتها مع الولي ✨`);
+    showToast("ok", `تم نسخ بطاقة تكريم "${displayName}" لمشاركتها مع الولي ✨`);
     setTimeout(() => setCopiedId(null), 3000);
   };
 
@@ -690,15 +722,31 @@ ${item.notes ? `💬 كلمة الأستاذ: «${item.notes}»\n` : ""}
               </div>
             )}
 
-            <div className="relative w-full sm:w-64">
-              <Search className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                className="w-full bg-slate-50 rounded-xl border border-slate-200 py-2 pr-9 pl-3 text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-amber-500 focus:bg-white transition"
-                placeholder="ابحث باسم التلميذ أو الفوج..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={toggleMaskLastName}
+                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition border cursor-pointer shrink-0 ${
+                  maskLastName
+                    ? "bg-emerald-50 text-emerald-800 border-emerald-300 ring-1 ring-emerald-200"
+                    : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+                }`}
+                title="حماية خصوصية الأطفال عبر الإنترنت بحجب اللقب والاكتفاء بالحرف الأول (مثال: يوسف ب.)"
+              >
+                <ShieldCheck className={`w-3.5 h-3.5 ${maskLastName ? "text-emerald-600" : "text-slate-400"}`} />
+                <span>{maskLastName ? "حماية اللقب: مفعلة (يوسف ب.)" : "حماية خصوصية اللقب"}</span>
+              </button>
+
+              <div className="relative w-full sm:w-60">
+                <Search className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  className="w-full bg-slate-50 rounded-xl border border-slate-200 py-2 pr-9 pl-3 text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-amber-500 focus:bg-white transition"
+                  placeholder="ابحث باسم التلميذ أو الفوج..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -742,7 +790,7 @@ ${item.notes ? `💬 كلمة الأستاذ: «${item.notes}»\n` : ""}
                       <div className="flex-1 min-w-0 space-y-1">
                         <div className="flex items-center justify-between gap-1.5">
                           <h3 className="text-sm font-black text-slate-900 truncate">
-                            {item.studentName}
+                            {formatStudentDisplayName(item.studentName, maskLastName)}
                           </h3>
                           <span className="text-[11px] font-black bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-lg shrink-0">
                             {item.className}

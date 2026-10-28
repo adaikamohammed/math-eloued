@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -10,11 +10,13 @@ import {
   LogOut,
   GraduationCap,
   ShieldCheck,
+  ShieldAlert,
   User,
   ExternalLink,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useLayout } from "@/context/LayoutContext";
+import { clearInspectionCache } from "@/app/inspector/shared";
 
 // ─── خريطة عناوين الصفحات المستوحاة من منصة فرسان القرآن ─────────
 const PAGE_INFO: Record<string, { title: string; subtitle: string }> = {
@@ -137,7 +139,14 @@ export function GlobalNavbar() {
   } = useLayout();
 
   const [searchCode, setSearchCode] = useState("");
+  const [isSharedSession, setIsSharedSession] = useState(false);
   const pageInfo = getPageInfo(pathname);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setIsSharedSession(sessionStorage.getItem("jusoor_shared_device") === "true");
+    }
+  }, [user]);
 
   const handleSearchCode = (e: React.FormEvent) => {
     e.preventDefault();
@@ -148,6 +157,11 @@ export function GlobalNavbar() {
   };
 
   const handleLogout = async () => {
+    try {
+      localStorage.removeItem("teacher_feature_flags_cache");
+      clearInspectionCache();
+      sessionStorage.clear();
+    } catch {}
     await supabase.auth.signOut();
     router.push("/");
     router.refresh();
@@ -219,6 +233,15 @@ export function GlobalNavbar() {
             <div className="w-24 h-9 bg-gray-100 animate-pulse rounded-xl" />
           ) : user ? (
             <div className="flex items-center gap-1.5 sm:gap-2">
+              {isSharedSession && (
+                <span
+                  className="hidden md:inline-flex items-center gap-1 text-[10px] font-black text-amber-900 bg-amber-100/90 border border-amber-300 px-2 py-1 rounded-xl shadow-2xs"
+                  title="جلسة مؤقتة على حاسوب مشترك — سيتم مسح الأثر عند تسجيل الخروج"
+                >
+                  <ShieldAlert className="w-3.5 h-3.5 text-amber-600" />
+                  <span>حاسوب مشترك</span>
+                </span>
+              )}
               <Link
                 href={getWorkspaceUrl()}
                 className="flex items-center gap-2 py-1.5 px-3 rounded-xl bg-[#e6f4ee] hover:bg-[#d5eee2] text-[#107a57] border border-[#107a57]/20 text-xs font-bold transition shadow-2xs group"

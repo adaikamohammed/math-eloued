@@ -3,6 +3,7 @@ import { getLessonsData, saveLessonsData } from "@/lib/storage";
 import { requireTeacher, resolveReader } from "@/lib/auth";
 import { clientIp, rateLimit } from "@/lib/rateLimit";
 import { MessageCategory } from "@/lib/types";
+import { moderateMessage } from "@/lib/moderation";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -14,12 +15,22 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { content, category = "other", targetLevel } = body;
+    const { content, category = "other", targetLevel, website, hp_email } = body;
 
     const trimmedContent = (content || "").trim();
-    if (!trimmedContent || trimmedContent.length < 3) {
+
+    // فحص الأمان وفلترة المحتوى والسبام (Honeypot + Word filter)
+    const mod = moderateMessage(trimmedContent, website || hp_email);
+    if (mod.isSpamBot) {
+      // الروبوتات يتم إسقاطها بهدوء مع إرجاع نجاح وهمي دون تلويث فضاء الأستاذ
+      return NextResponse.json({
+        success: true,
+        message: "تم إرسال رسالتك بسرية تامة 🔒! شكراً لصراحتك وملاحظتك القيمة.",
+      });
+    }
+    if (!mod.allowed) {
       return NextResponse.json(
-        { error: "يرجى كتابة نص الرسالة (3 أحرف على الأقل)" },
+        { error: mod.reason || "تعذر إرسال الرسالة لمخالفتها معايير النشر والآداب العامة." },
         { status: 400 }
       );
     }

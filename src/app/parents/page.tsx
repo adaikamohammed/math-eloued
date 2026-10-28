@@ -51,6 +51,7 @@ export default function ParentsPage() {
   const [searchingCode, setSearchingCode] = useState(false);
   const [parentResult, setParentResult] = useState<ParentSummons | null>(null);
   const [searchAttempted, setSearchAttempted] = useState(false);
+  const [rateLimitMessage, setRateLimitMessage] = useState<string | null>(null);
 
   // استمارة إضافة استدعاء جديد من قبل الأستاذ
   const [newStudentName, setNewStudentName] = useState("");
@@ -125,6 +126,7 @@ export default function ParentsPage() {
     setSearchingCode(true);
     setSearchAttempted(true);
     setParentResult(null);
+    setRateLimitMessage(null);
 
     try {
       const queryParams = new URLSearchParams();
@@ -137,6 +139,12 @@ export default function ParentsPage() {
       const url = withTeacher(`/api/summons?${queryParams.toString()}`);
       const res = await fetch(url, { cache: "no-store" });
       const data = await res.json();
+
+      if (res.status === 429 || data.rateLimited) {
+        setRateLimitMessage(data.error || "تم حظر محاولات الاستعلام مؤقتاً لحماية الأمان. يرجى المحاولة بعد 15 دقيقة.");
+        setParentResult(null);
+        return;
+      }
 
       if (Array.isArray(data.summons) && data.summons.length > 0) {
         setParentResult(data.summons[0]);
@@ -461,6 +469,14 @@ export default function ParentsPage() {
 
                 <p className="text-[10px] text-emerald-700 font-medium">
                   🔒 تم فتح هذه البطاقة حصرياً بالرمز السري الممنوح لكم.
+                </p>
+              </div>
+            ) : rateLimitMessage ? (
+              <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-center space-y-1.5">
+                <AlertCircle className="w-5 h-5 text-rose-600 mx-auto" />
+                <p className="text-xs font-black text-rose-900">تنبيه أمان وحماية</p>
+                <p className="text-[11px] text-rose-800 max-w-sm mx-auto font-medium">
+                  {rateLimitMessage}
                 </p>
               </div>
             ) : (

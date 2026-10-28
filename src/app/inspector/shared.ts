@@ -95,6 +95,27 @@ export function daysSince(iso?: string | null) {
 
 const VISITS_STORAGE_KEY = "inspector_visits_records_v2";
 
+// اختيار مساحة التخزين الآمنة (إذا كان حاسوباً مشتركاً، تُحفظ في الذاكرة المؤقتة للجلسة فقط لحماية السر المهني)
+function getSecureStorage(): Storage | null {
+  if (typeof window === "undefined") return null;
+  try {
+    if (sessionStorage.getItem("jusoor_shared_device") === "true") {
+      return sessionStorage;
+    }
+    return localStorage;
+  } catch {
+    return null;
+  }
+}
+
+export function clearInspectionCache(): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(VISITS_STORAGE_KEY);
+    sessionStorage.removeItem(VISITS_STORAGE_KEY);
+  } catch {}
+}
+
 export const SEED_VISITS: InspectionVisitRecord[] = [
   {
     id: "seed-visit-1",
@@ -137,11 +158,12 @@ export const SEED_VISITS: InspectionVisitRecord[] = [
 ];
 
 export function getLocalVisits(districtId: number): InspectionVisitRecord[] {
-  if (typeof window === "undefined") return SEED_VISITS;
+  const store = getSecureStorage();
+  if (!store) return SEED_VISITS;
   try {
-    const raw = localStorage.getItem(VISITS_STORAGE_KEY);
+    const raw = store.getItem(VISITS_STORAGE_KEY);
     if (!raw) {
-      localStorage.setItem(VISITS_STORAGE_KEY, JSON.stringify(SEED_VISITS));
+      store.setItem(VISITS_STORAGE_KEY, JSON.stringify(SEED_VISITS));
       return SEED_VISITS;
     }
     const parsed = JSON.parse(raw);
@@ -155,7 +177,8 @@ export function getLocalVisits(districtId: number): InspectionVisitRecord[] {
 }
 
 export function saveLocalVisit(visit: InspectionVisitRecord): void {
-  if (typeof window === "undefined") return;
+  const store = getSecureStorage();
+  if (!store) return;
   try {
     const list = getLocalVisits(visit.districtId);
     const existingIndex = list.findIndex((v) => v.id === visit.id);
@@ -166,18 +189,19 @@ export function saveLocalVisit(visit: InspectionVisitRecord): void {
     } else {
       nextList = [visit, ...list];
     }
-    localStorage.setItem(VISITS_STORAGE_KEY, JSON.stringify(nextList));
+    store.setItem(VISITS_STORAGE_KEY, JSON.stringify(nextList));
   } catch (e) {
     console.error("Error saving visit", e);
   }
 }
 
 export function deleteLocalVisit(visitId: string, districtId: number): void {
-  if (typeof window === "undefined") return;
+  const store = getSecureStorage();
+  if (!store) return;
   try {
     const list = getLocalVisits(districtId);
     const nextList = list.filter((v) => v.id !== visitId);
-    localStorage.setItem(VISITS_STORAGE_KEY, JSON.stringify(nextList));
+    store.setItem(VISITS_STORAGE_KEY, JSON.stringify(nextList));
   } catch (e) {
     console.error("Error deleting visit", e);
   }

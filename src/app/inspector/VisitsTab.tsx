@@ -127,6 +127,16 @@ export function VisitsTab({
 
   return (
     <div className="space-y-4">
+      {/* تنبيه السر المهني وأمن السجلات التفتيشية */}
+      <div className="bg-indigo-50/60 border border-indigo-100 p-3 rounded-2xl flex items-center justify-between gap-3 text-xs text-indigo-950">
+        <div className="flex items-center gap-2">
+          <ShieldCheck className="w-4 h-4 text-indigo-600 shrink-0" />
+          <span className="font-bold">
+            السر المهني محفوظ: تقارير التفتيش والنقاط التربوية محمية طبقاً للقانون 18-07 والمادة 26 من القانون الأساسي لقطاع التربية الوطنية.
+          </span>
+        </div>
+      </div>
+
       {/* الشريط العلوي وأزرار التحكم */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200">
         <div className="flex items-center gap-2">

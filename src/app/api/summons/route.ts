@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getLessonsData, saveLessonsData } from "@/lib/storage";
 import { requireTeacher, resolveReader } from "@/lib/auth";
 import { ParentSummons } from "@/lib/types";
+import { clientIp, checkFailedAttempts, recordFailedAttempt, clearFailedAttempts } from "@/lib/rateLimit";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -13,7 +14,7 @@ function generateAccessCode(): string {
 
 // جلب قائمة استدعاءات الأولياء
 // للأستاذ المالك: تظهر جميع الاستدعاءات مع الرموز السرية لتسليمها للأولياء
-// للولي أو الزائر العام: تتطلب إدخال الرمز السري الخاص بالتلميذ، ولا يُعرض أي اسم علناً (امتثالاً للقانون 18-07 و 15-12)
+// للولي أو الزائر العام: تتطلب إدخال الرمز السري الخاص بالتلميذ مع حماية كاملة ضد التخمين الآلي
 export async function GET(req: NextRequest) {
   const ctx = await resolveReader(req);
   if (!ctx) {
@@ -44,7 +45,7 @@ export async function GET(req: NextRequest) {
     } catch {}
   }
 
-  // 1. إذا كان الطالب هو الأستاذ صاحب الحساب: يرى جميع الاستدعاءات لإدارتها
+  // 1. إذا كان المستخدم هو الأستاذ صاحب الحساب: يرى جميع الاستدعاءات لإدارتها
   if (ctx.mode === "owner") {
     summons.sort((a, b) => {
       if (a.isUrgent && !b.isUrgent) return -1;
@@ -65,8 +66,24 @@ export async function GET(req: NextRequest) {
   }
 
   // 2. إذا كان زائر عام أو ولي أمر:
-  // حماية خصوصية الأطفال الصارمة: لا نرسل أي استدعاء إطلاقاً إلا إذا تطابق الرمز السري المدخل
+  // حماية ضد التخمين الآلي (Brute-Force): 5 محاولات خاطئة كحد أقصى لكل 15 دقيقة
   if (codeParam) {
+    const ip = clientIp(req);
+    const rateLimitKey = `summons_probe:${ip}:${ctx.teacherId}`;
+    const check = checkFailedAttempts(rateLimitKey, 5, 15 * 60_000);
+
+    if (!check.allowed) {
+      const waitMin = Math.max(1, Math.ceil(check.retryAfter / 60));
+      return NextResponse.json(
+        {
+          error: `تم حظر محاولات الاستعلام مؤقتاً بسبب تكرار إدخال رمز خاطئ. يُرجى المحاولة بعد ${waitMin} دقيقة حفاظاً على الأمان.`,
+          rateLimited: true,
+          retryAfter: check.retryAfter,
+        },
+        { status: 429 }
+      );
+    }
+
     const matched = summons.filter((s) => {
       const codeMatch = (s.accessCode || "").trim().toUpperCase() === codeParam;
       if (!codeMatch) return false;
@@ -77,10 +94,27 @@ export async function GET(req: NextRequest) {
       return true;
     });
 
+    if (matched.length === 0) {
+      recordFailedAttempt(rateLimitKey);
+      return NextResponse.json(
+        { summons: [], notFound: true, isOwner: false },
+        {
+          headers: {
+            "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+            Pragma: "no-cache",
+            Expires: "0",
+          },
+        }
+      );
+    }
+
+    // عند النجاح نمسح العداد
+    clearFailedAttempts(rateLimitKey);
+
     return NextResponse.json(
       {
         summons: matched,
-        notFound: matched.length === 0,
+        notFound: false,
         isOwner: false,
       },
       {
