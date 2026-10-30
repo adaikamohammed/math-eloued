@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import TeacherWallet from "@/components/TeacherWallet";
 import { LandingHeader } from "@/components/LandingHeader";
+import { SaveOfflineButton } from "@/components/OfflineIndicator";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -75,6 +76,10 @@ export default function WilayaHomePage() {
               <div className="flex items-center justify-center gap-2 text-xs text-gray-500 mt-3 font-medium">
                 <span className="text-[#107a57]">💡</span>
                 <span>يمنح الأستاذ الكود لولي الأمر في الكراس المدرسي. لا يلزم أي تسجيل حساب للولي.</span>
+              </div>
+
+              <div className="flex items-center justify-center mt-4">
+                <SaveOfflineButton className="shadow-xs hover:shadow-md" />
               </div>
             </div>
           </div>

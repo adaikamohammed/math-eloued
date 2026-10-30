@@ -32,6 +32,7 @@ import { useLayout } from "@/context/LayoutContext";
 import { supabase } from "@/lib/supabase";
 import { clearInspectionCache } from "@/app/inspector/shared";
 import { TeacherFeatureFlags } from "@/lib/types";
+import { SaveOfflineButton } from "@/components/OfflineIndicator";
 
 interface NavItem {
   label: string;
@@ -525,6 +526,9 @@ export function DesktopSidebar() {
 
           {!isSidebarCollapsed ? (
             <>
+              <div className="mb-2">
+                <SaveOfflineButton className="w-full justify-center text-[10px] py-1.5" />
+              </div>
               <div className="flex items-center justify-between text-[11px] text-gray-400 px-1">
                 <span>منصة جسور v2.5</span>
                 <span className="inline-flex items-center gap-1 text-[#107a57] font-bold">
