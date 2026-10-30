@@ -1,53 +1,55 @@
 "use client";
 
-import { useCallback, useEffect, useState, useMemo } from "react";
+import React, { useCallback, useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { LoginRequired } from "@/components/LoginRequired";
 import {
+  Scale,
   ClipboardCheck,
   Calculator,
   Users,
   Plus,
   Trash2,
-  Lock,
-  ArrowRight,
-  CheckCircle2,
-  AlertCircle,
-  X,
+  Printer,
   Search,
   BookOpen,
   Calendar,
   Layers,
   Sparkles,
-  Printer,
-  ChevronDown,
-  ChevronUp,
-  Pencil,
+  CheckCircle2,
+  AlertCircle,
+  X,
   RotateCcw,
   Check,
-  Scale,
-  LogOut,
-  Loader2,
   Download,
   Upload,
   Wifi,
   WifiOff,
   RefreshCw,
-  ArrowLeftRight,
+  LogOut,
+  LogIn,
+  Loader2,
+  FileText,
+  Award,
+  ChevronRight,
+  Sliders,
+  TrendingUp,
+  BarChart3,
+  HelpCircle,
+  ExternalLink,
 } from "lucide-react";
 import {
-  // dynamic classes
   type InspectionSession,
   type InspectionRecord,
   type StudentRosterItem,
   type StudentEvaluation,
 } from "@/lib/types";
-
 import { PrintModal } from "@/components/print/PrintModal";
 import { EvaluationRosterPrintDoc } from "@/components/print/EvaluationRosterPrintDoc";
+import { SaveOfflineButton } from "@/components/OfflineIndicator";
 
 export default function FastEvaluationPage() {
-  const [authenticated, setAuthenticated] = useState<boolean | null>(null);
+  const [authenticated, setAuthenticated] = useState<boolean>(false);
 
   const checkAuth = useCallback(async () => {
     try {
@@ -63,54 +65,45 @@ export default function FastEvaluationPage() {
     checkAuth();
   }, [checkAuth]);
 
-  if (authenticated === null) {
-    return (
-      <div className="flex justify-center items-center min-h-[60vh] text-slate-400">
-        <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
-      </div>
-    );
-  }
-
-  return authenticated ? (
-    <EvaluationDashboard onLogout={() => setAuthenticated(false)} />
-  ) : (
-    <LoginRequired next="/eval" title="دفتر التقييم الميداني السريع" />
+  return (
+    <EvaluationDashboard
+      isAuthenticated={Boolean(authenticated)}
+      onLogout={() => setAuthenticated(false)}
+    />
   );
 }
 
-/* ---------------- 2. لوحة التقييم الميداني المتكاملة ---------------- */
-function EvaluationDashboard({ onLogout }: { onLogout: () => void }) {
-  const [activeTab, setActiveTab] = useState<"sessions" | "averages" | "roster">("sessions");
-  const [selectedClass, setSelectedClass] = useState<string>("");
-  const [teacherClasses, setTeacherClasses] = useState<string[]>([]);
-  const [showEvalPrintModal, setShowEvalPrintModal] = useState(false);
+/* ═══════════════════════════════════════════════════════════════════
+   2. لوحة التقويم البيداغوجي وميثاق 20/20 الحديثة المتجاوبة بالكامل
+   ═══════════════════════════════════════════════════════════════════ */
+function EvaluationDashboard({
+  isAuthenticated,
+  onLogout,
+}: {
+  isAuthenticated: boolean;
+  onLogout: () => void;
+}) {
+  // التبويب النشط
+  const [activeTab, setActiveTab] = useState<"charter" | "roster" | "sessions">("charter");
 
-  useEffect(() => {
-    fetch("/api/lessons")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data?.customClasses && Array.isArray(data.customClasses) && data.customClasses.length > 0) {
-          setTeacherClasses(data.customClasses);
-          setSelectedClass((prev) => (prev ? prev : data.customClasses[0]));
-        }
-      })
-      .catch(() => {});
-  }, []);
-
-
-
+  // بيانات الأستاذ والأقسام
+  const [teacherProfile, setTeacherProfile] = useState<{
+    name: string;
+    school: string;
+    subject: string;
+  }>({
+    name: "الأستاذ",
+    school: "المؤسسة التعليمية",
+    subject: "الرياضيات",
+  });
+  const [selectedClass, setSelectedClass] = useState<string>("1م1");
+  const [teacherClasses, setTeacherClasses] = useState<string[]>(["1م1", "1م2", "2م1", "2م2"]);
   const [selectedGroup, setSelectedGroup] = useState<"فوج 1" | "فوج 2" | "القسم كامل">("فوج 1");
   const [searchStudent, setSearchStudent] = useState("");
-  const [rosterGroupFilter, setRosterGroupFilter] = useState<"all" | "فوج 1" | "فوج 2">("all");
 
+  // جلسات المراقبة وقائمة التلاميذ
   const [sessions, setSessions] = useState<InspectionSession[]>([]);
   const [roster, setRoster] = useState<StudentRosterItem[]>([]);
-
-  const classesList = useMemo(() => {
-    if (teacherClasses.length > 0) return teacherClasses;
-    const fromRoster = Array.from(new Set(roster.map((r) => r.className))).filter(Boolean);
-    return fromRoster;
-  }, [teacherClasses, roster]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -119,30 +112,37 @@ function EvaluationDashboard({ onLogout }: { onLogout: () => void }) {
   const [pendingSyncCount, setPendingSyncCount] = useState<number>(0);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
-  // حالات نافذة إنشاء جلسة جديدة
+  // نوافذ الحوار (Modals)
   const [isNewSessionModalOpen, setIsNewSessionModalOpen] = useState(false);
   const [sessionTitleInput, setSessionTitleInput] = useState("");
   const [sessionDateInput, setSessionDateInput] = useState("");
-  const [sessionRangeInput, setSessionRangeInput] = useState("من 1 إلى 8");
   const [sessionLessonsCount, setSessionLessonsCount] = useState<number>(8);
   const [sessionHomeworksCount, setSessionHomeworksCount] = useState<number>(8);
 
-  // حالات نافذة استيراد أسماء التلاميذ
   const [isRosterModalOpen, setIsRosterModalOpen] = useState(false);
   const [rosterBatchNames, setRosterBatchNames] = useState("");
   const [singleStudentName, setSingleStudentName] = useState("");
 
-  const [toastMsg, setToastMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [showEvalPrintModal, setShowEvalPrintModal] = useState(false);
+  const [showCharterPrintModal, setShowCharterPrintModal] = useState(false);
 
+  // حاسبة التقويم التفاعلية التجريبية (Simulator)
+  const [simLessons, setSimLessons] = useState<number>(5);
+  const [simHomework, setSimHomework] = useState<number>(4.5);
+  const [simBehavior, setSimBehavior] = useState<number>(5);
+  const [simActivity, setSimActivity] = useState<number>(4);
+
+  // إشعارات Toast
+  const [toastMsg, setToastMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const showToast = (type: "success" | "error", text: string) => {
     setToastMsg({ type, text });
     setTimeout(() => {
       setToastMsg((cur) => (cur?.text === text ? null : cur));
-    }, 3500);
+    }, 4000);
   };
 
-  const CACHE_KEY = `math_eval_cache_${selectedClass.replace(/\s+/g, "")}`;
-  const PENDING_KEY = `math_eval_pending_${selectedClass.replace(/\s+/g, "")}`;
+  const CACHE_KEY = `jusoor_eval_cache_${selectedClass.replace(/\s+/g, "")}`;
+  const PENDING_KEY = `jusoor_eval_pending_${selectedClass.replace(/\s+/g, "")}`;
 
   // 1. مراقبة حالة الاتصال بالإنترنت
   useEffect(() => {
@@ -150,12 +150,12 @@ function EvaluationDashboard({ onLogout }: { onLogout: () => void }) {
 
     const handleOnline = () => {
       setIsOnline(true);
-      showToast("success", "🟢 تم استعادة الاتصال بالإنترنت! يمكنك مزامنة التحديثات.");
+      showToast("success", "🟢 تم استعادة الاتصال بالإنترنت! بياناتك جاهزة للمزامنة السحابية.");
     };
 
     const handleOffline = () => {
       setIsOnline(false);
-      showToast("error", "🔴 أنت الآن في وضع أوفلاين (بدون إنترنت). يتم الحفظ محلياً بأمان.");
+      showToast("error", "📡 أنت الآن في وضع العمل بدون إنترنت (أوفلاين). يتم الحفظ محلياً بأمان.");
     };
 
     window.addEventListener("online", handleOnline);
@@ -166,7 +166,27 @@ function EvaluationDashboard({ onLogout }: { onLogout: () => void }) {
     };
   }, []);
 
-  // 2. تحميل البيانات محلياً من ذاكرة الهاتف فوراً عند فتح الصفحة أو تبديل القسم
+  // 2. جلب بيانات الدروس والأقسام وهوية الأستاذ
+  useEffect(() => {
+    fetch("/api/lessons")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.customClasses && Array.isArray(data.customClasses) && data.customClasses.length > 0) {
+          setTeacherClasses(data.customClasses);
+          setSelectedClass((prev) => (prev ? prev : data.customClasses[0]));
+        }
+        if (data?.teacherProfile) {
+          setTeacherProfile({
+            name: data.teacherProfile.full_name || "الأستاذ",
+            school: data.teacherProfile.school_custom_name || "المؤسسة التعليمية",
+            subject: data.teacherProfile.subject_name || "الرياضيات",
+          });
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // 3. تحميل البيانات من الكاش المحلي فوراً
   useEffect(() => {
     try {
       const localData = localStorage.getItem(CACHE_KEY);
@@ -190,54 +210,29 @@ function EvaluationDashboard({ onLogout }: { onLogout: () => void }) {
     }
   }, [CACHE_KEY]);
 
-  // 3. حفظ نسخة احتياطية في ذاكرة الهاتف تلقائياً مع كل تعديل (مع التأكد الصارم من تطابق القسم)
-  useEffect(() => {
-    const curCls = selectedClass.replace(/\s+/g, "");
-    const rosterMatches =
-      roster.length === 0 ||
-      roster.every((r) => (r.className || "").replace(/\s+/g, "") === curCls);
-    const sessionsMatch =
-      sessions.length === 0 ||
-      sessions.every((s) => (s.className || "").replace(/\s+/g, "") === curCls);
-
-    if (rosterMatches && sessionsMatch && (sessions.length > 0 || roster.length > 0)) {
-      try {
-        localStorage.setItem(
-          CACHE_KEY,
-          JSON.stringify({ sessions, roster, updatedAt: new Date().toISOString() })
-        );
-      } catch (e) {
-        console.warn("Could not write local cache", e);
-      }
-    }
-  }, [sessions, roster, CACHE_KEY, selectedClass]);
-
-  // جلب البيانات من الخادم (إن وُجد اتصال)
+  // 4. جلب البيانات من السيرفر عند وجود اتصال
   const loadData = useCallback(async () => {
+    if (!navigator.onLine) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     try {
-      setLoading(true);
-      const res = await fetch(
-        `/api/inspections?class=${encodeURIComponent(selectedClass)}&_t=${Date.now()}`,
-        { cache: "no-store" }
-      );
+      const res = await fetch(`/api/inspections?class=${encodeURIComponent(selectedClass)}`);
       if (res.ok) {
         const data = await res.json();
-        const loadedSessions: InspectionSession[] = data.sessions || [];
-        const loadedRoster: StudentRosterItem[] = data.roster || [];
-
-        setSessions(loadedSessions);
-        setRoster(loadedRoster);
-
-        if (loadedSessions.length > 0) {
-          setActiveSessionId((prev) => {
-            if (prev && loadedSessions.some((s) => s.id === prev)) return prev;
-            return loadedSessions[loadedSessions.length - 1].id;
-          });
+        if (data.sessions && Array.isArray(data.sessions)) {
+          setSessions(data.sessions);
+          if (data.sessions.length > 0) {
+            setActiveSessionId(data.sessions[data.sessions.length - 1].id);
+          }
+        }
+        if (data.roster && Array.isArray(data.roster)) {
+          setRoster(data.roster);
         }
       }
     } catch {
-      // وضع أوفلاين: الاعتماد على ذاكرة الهاتف
-      setIsOnline(false);
+      // الاعتماد على الكاش
     } finally {
       setLoading(false);
     }
@@ -247,7 +242,75 @@ function EvaluationDashboard({ onLogout }: { onLogout: () => void }) {
     loadData();
   }, [loadData]);
 
-  // 4. دالة المزامنة اليدوية مع السيرفر عند توفر الإنترنت
+  // 5. حفظ نسخة احتياطية في ذاكرة المتصفح تلقائياً مع كل تعديل
+  useEffect(() => {
+    if (sessions.length > 0 || roster.length > 0) {
+      try {
+        localStorage.setItem(
+          CACHE_KEY,
+          JSON.stringify({
+            className: selectedClass,
+            sessions,
+            roster,
+            updatedAt: new Date().toISOString(),
+          })
+        );
+      } catch (e) {
+        console.warn("Could not save to localStorage", e);
+      }
+    }
+  }, [sessions, roster, selectedClass, CACHE_KEY]);
+
+  // الجلسة الحالية
+  const currentSession = useMemo(() => {
+    if (!activeSessionId) return sessions[sessions.length - 1] || null;
+    return sessions.find((s) => s.id === activeSessionId) || sessions[sessions.length - 1] || null;
+  }, [sessions, activeSessionId]);
+
+  // قائمة التلاميذ المصفاة وفق الفوج والبحث
+  const filteredStudents = useMemo(() => {
+    const list = roster.filter((r) => {
+      const classMatch =
+        (r.className || "").trim().toLowerCase() === selectedClass.trim().toLowerCase();
+      const groupMatch =
+        selectedGroup === "القسم كامل" || (r.groupName || "").trim() === selectedGroup.trim();
+      return classMatch && groupMatch;
+    });
+
+    if (!searchStudent.trim()) return list;
+    return list.filter((s) => s.studentName.toLowerCase().includes(searchStudent.toLowerCase()));
+  }, [roster, selectedClass, selectedGroup, searchStudent]);
+
+  // إحصائيات سريعة للقسم الحالي
+  const stats = useMemo(() => {
+    const totalStudents = filteredStudents.length;
+    if (totalStudents === 0 || !currentSession) {
+      return { totalStudents, avgScore: 0, fullScoresCount: 0, homeworkAvg: 0 };
+    }
+
+    let sumScore = 0;
+    let fullScores = 0;
+    let sumHW = 0;
+
+    filteredStudents.forEach((st) => {
+      const rec = currentSession.records?.[st.studentName];
+      if (rec) {
+        sumScore += rec.score || 0;
+        if (rec.score >= 19.5) fullScores++;
+        sumHW += rec.homeworksDone || 0;
+      }
+    });
+
+    const avgScore = totalStudents > 0 ? Math.round((sumScore / totalStudents) * 10) / 10 : 0;
+    const homeworkAvg =
+      totalStudents > 0 && currentSession.totalHomeworks > 0
+        ? Math.round((sumHW / (totalStudents * currentSession.totalHomeworks)) * 100)
+        : 0;
+
+    return { totalStudents, avgScore, fullScoresCount: fullScores, homeworkAvg };
+  }, [filteredStudents, currentSession]);
+
+  // دالة المزامنة السحابية
   const handleSyncWithServer = async () => {
     setIsSyncing(true);
     try {
@@ -264,247 +327,115 @@ function EvaluationDashboard({ onLogout }: { onLogout: () => void }) {
       if (res.ok) {
         localStorage.removeItem(PENDING_KEY);
         setPendingSyncCount(0);
-        showToast("success", "✓ تمت مزامنة كافة بيانات التقييم مع السيرفر بنجاح! ☁️");
+        showToast("success", "✓ تمت المزامنة السحابية بنجاح! السجلات محدثة بالكامل ☁️");
       } else {
-        throw new Error("فشلت المزامنة من السيرفر");
+        throw new Error();
       }
     } catch {
-      showToast("error", "تعذر الاتصال بالسيرفر حالياً. بياناتك محفوظة بأمان على جهازك.");
+      showToast("error", "تعذر الاتصال بالسيرفر حالياً. بياناتك محفوظة محلياً على جهازك.");
     } finally {
       setIsSyncing(false);
     }
   };
 
-  // 5. تصدير ملف JSON آمن للتحميل على الهاتف أو الحاسوب
-  const handleExportJson = () => {
-    const exportObject = {
-      platform: "MathLessonsEvaluation",
-      className: selectedClass,
-      exportedAt: new Date().toISOString(),
-      dateArabic: new Date().toLocaleDateString("ar-DZ"),
-      sessions,
-      roster,
+  // تحديث رصد التلميذ
+  const handleUpdateRecord = async (studentName: string, updates: Partial<InspectionRecord>) => {
+    if (!currentSession) return;
+    const existing = currentSession.records?.[studentName] || {
+      studentName,
+      lessonsDone: currentSession.totalLessons,
+      homeworksDone: currentSession.totalHomeworks,
+      behaviorScore: 5,
+      activityScore: 5,
+      score: 20,
     };
 
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportObject, null, 2));
-    const downloadAnchor = document.createElement("a");
-    downloadAnchor.setAttribute("href", dataStr);
-    downloadAnchor.setAttribute(
-      "download",
-      `تقييم_${selectedClass.replace(/\s+/g, "_")}_${new Date().toISOString().slice(0, 10)}.json`
-    );
-    document.body.appendChild(downloadAnchor);
-    downloadAnchor.click();
-    downloadAnchor.remove();
-
-    showToast("success", "✓ تم حفظ وتنزيل ملف JSON الآمن على جهازك بنجاح! 📥");
-  };
-
-  // 6. استيراد ملف JSON آمن واسترجاع البيانات محلياً وفورياً
-  const handleImportJson = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      try {
-        const text = event.target?.result as string;
-        const parsed = JSON.parse(text);
-
-        if (parsed.sessions && Array.isArray(parsed.sessions)) {
-          setSessions(parsed.sessions);
-          if (parsed.sessions.length > 0) setActiveSessionId(parsed.sessions[0].id);
-        }
-        if (parsed.roster && Array.isArray(parsed.roster)) {
-          setRoster(parsed.roster);
-        }
-
-        showToast("success", "✓ تم استيراد وتحميل البيانات بنجاح من ملف JSON! 📤");
-
-        // محاولة مزامنة السيرفر إن كان متصلاً
-        if (navigator.onLine) {
-          fetch("/api/inspections", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              type: "syncOfflineData",
-              className: selectedClass,
-              sessions: parsed.sessions || [],
-              roster: parsed.roster || [],
-            }),
-          }).catch(() => {});
-        }
-      } catch {
-        showToast("error", "ملف JSON غير صالح أو به خطأ في البنية");
-      }
+    const updatedRec: InspectionRecord = {
+      ...existing,
+      ...updates,
     };
-    reader.readAsText(file);
-    e.target.value = "";
-  };
 
-  // 7. تغيير فوج تلميذ بنقرة واحدة (بين فوج 1 وفوج 2)
-  const handleToggleStudentGroup = async (student: StudentRosterItem) => {
-    const nextGroup = student.groupName === "فوج 1" ? "فوج 2" : "فوج 1";
-    setRoster((prev) =>
-      prev.map((r) =>
-        r.studentName === student.studentName && r.className === student.className
-          ? { ...r, groupName: nextGroup }
-          : r
-      )
+    // إعادة حساب العلامة
+    const tL = currentSession.totalLessons > 0 ? currentSession.totalLessons : 1;
+    const tH = currentSession.totalHomeworks > 0 ? currentSession.totalHomeworks : 1;
+    const nbPts = Math.min(5, Math.max(0, (updatedRec.lessonsDone / tL) * 5));
+    const hwPts = Math.min(5, Math.max(0, (updatedRec.homeworksDone / tH) * 5));
+    const behPts = Math.min(5, Math.max(0, updatedRec.behaviorScore || 0));
+    const actPts = Math.min(5, Math.max(0, updatedRec.activityScore || 0));
+
+    const total = nbPts + hwPts + behPts + actPts;
+    updatedRec.score = Math.min(20, Math.max(0, Math.round(total * 10) / 10));
+
+    // تحديث الواجهة فورياً 0ms
+    setSessions((prev) =>
+      prev.map((s) => {
+        if (s.id !== currentSession.id) return s;
+        return {
+          ...s,
+          records: {
+            ...s.records,
+            [studentName]: updatedRec,
+          },
+        };
+      })
     );
-    showToast("success", `✓ تم نقل التلميذ (${student.studentName}) إلى ${nextGroup}`);
 
-    if (navigator.onLine) {
-      try {
-        await fetch("/api/inspections", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            type: "switchGroup",
-            studentName: student.studentName,
-            className: student.className,
-            newGroup: nextGroup,
-          }),
-        });
-      } catch {}
-    }
-  };
-
-  // 8. تقسيم تلقائي 50/50 لتلاميذ القسم بين الفوج 1 والفوج 2
-  const handleAutoSplitGroups = async () => {
-    const allInClass = roster.filter(
-      (r) => r.className.replace(/\s+/g, "") === selectedClass.replace(/\s+/g, "")
-    );
-    if (allInClass.length === 0) {
-      showToast("error", "لا يوجد تلاميذ مسجلين في هذا القسم لتقسيمهم");
+    // إرسال للخادم
+    if (!navigator.onLine) {
+      setPendingSyncCount((c) => c + 1);
       return;
     }
-    if (!window.confirm(`هل تريد تقسيم (${allInClass.length}) تلميذ في قسم ${selectedClass} تلقائياً بالتساوي بين الفوج 1 والفوج 2؟`))
-      return;
 
-    const half = Math.ceil(allInClass.length / 2);
-    const assignments: { studentName: string; groupName: "فوج 1" | "فوج 2" }[] = [];
-
-    const updatedRoster = roster.map((r) => {
-      if (r.className.replace(/\s+/g, "") !== selectedClass.replace(/\s+/g, "")) return r;
-      const idx = allInClass.findIndex((item) => item.studentName === r.studentName);
-      const grp: "فوج 1" | "فوج 2" = idx < half ? "فوج 1" : "فوج 2";
-      assignments.push({ studentName: r.studentName, groupName: grp });
-      return { ...r, groupName: grp };
-    });
-
-    setRoster(updatedRoster);
-    showToast("success", `✓ تم تقسيم القسم: (${half}) تلاميذ في فوج 1 و (${allInClass.length - half}) تلاميذ في فوج 2!`);
-
-    if (navigator.onLine) {
-      try {
-        await fetch("/api/inspections", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            type: "batchAssignGroups",
-            className: selectedClass,
-            assignments,
-          }),
-        });
-      } catch {}
-    }
-  };
-
-  // الجلسة الحالية المعروضة
-  const currentSession = useMemo(() => {
-    if (!sessions || sessions.length === 0) return null;
-    return sessions.find((s) => s.id === activeSessionId) || sessions[sessions.length - 1] || null;
-  }, [sessions, activeSessionId]);
-
-  // قائمة أسماء تلاميذ الفوج الحالي
-  const currentStudentsList = useMemo(() => {
-    const list = roster.filter((r) => {
-      const matchClass =
-        (r.className || "").replace(/\s+/g, "") === selectedClass.replace(/\s+/g, "");
-      if (!matchClass) return false;
-      if (selectedGroup === "القسم كامل") return true;
-      const grp = r.groupName || "فوج 1";
-      return grp === selectedGroup;
-    });
-    // ترتيب أبجدي
-    return list.sort((a, b) => a.studentName.localeCompare(b.studentName, "ar"));
-  }, [roster, selectedClass, selectedGroup]);
-
-  // بدء جلسة مراقبة سريعة بنقرة واحدة (بدون تعقيدات)
-  const handleQuickStartDefaultSession = async () => {
     try {
-      const existingForClass = sessions.filter(
-        (s) => (s.className || "").replace(/\s+/g, "") === selectedClass.replace(/\s+/g, "")
-      );
-      const nextNum = existingForClass.length + 1;
-      const countL = 8;
-      const countH = 8;
-      const defaultRange = `من 1 إلى 8`;
-
-      const res = await fetch("/api/inspections", {
-        method: "POST",
+      await fetch("/api/inspections", {
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          className: selectedClass,
-          groupName: selectedGroup,
-          title: `المراقبة ${nextNum} (${defaultRange})`,
-          date: new Date().toLocaleDateString("ar-DZ", {
-            weekday: "long",
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-          }),
-          lessonRange: defaultRange,
-          totalLessons: countL,
-          totalHomeworks: countH,
+          sessionId: currentSession.id,
+          studentName,
+          ...updates,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-
-      showToast("success", `✓ تم بدء المراقبة ${nextNum} بنجاح! جاهز للتفقد الميداني 📱`);
-      await loadData();
-      if (data.session) setActiveSessionId(data.session.id);
-    } catch (err: any) {
-      showToast("error", err.message || "فشل بدء الجلسة");
+    } catch {
+      setPendingSyncCount((c) => c + 1);
     }
   };
 
-  // إنشاء جلسة مراقبة جديدة
-  const handleCreateSession = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const nowFormatted =
-        sessionDateInput.trim() ||
-        new Date().toLocaleDateString("ar-DZ", {
-          weekday: "long",
-          year: "numeric",
-          month: "long",
-          day: "numeric",
-        });
+  // منح 20/20 كاملة للتلميذ
+  const handleSetFullScore = (studentName: string) => {
+    if (!currentSession) return;
+    handleUpdateRecord(studentName, {
+      lessonsDone: currentSession.totalLessons,
+      homeworksDone: currentSession.totalHomeworks,
+      behaviorScore: 5,
+      activityScore: 5,
+    });
+    showToast("success", `🌟 تم منح علامة 20/20 كاملة للتلميذ (${studentName})`);
+  };
 
+  // إنشاء جلسة جديدة
+  const handleCreateSession = async () => {
+    if (!sessionTitleInput.trim()) return;
+    try {
       const res = await fetch("/api/inspections", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          type: "session",
           className: selectedClass,
-          groupName: selectedGroup,
-          title: sessionTitleInput.trim() || undefined,
-          date: nowFormatted,
-          lessonRange: sessionRangeInput.trim() || "من 1 إلى 8",
+          title: sessionTitleInput.trim(),
+          inspectionDate: sessionDateInput || new Date().toISOString().slice(0, 10),
+          range: `الدروس (1 إلى ${sessionLessonsCount})`,
           totalLessons: Number(sessionLessonsCount) || 8,
           totalHomeworks: Number(sessionHomeworksCount) || 8,
         }),
       });
-
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
-      showToast("success", `✓ تم إنشاء جلسة المراقبة بنجاح! جاهز للتفقد 📱`);
+      showToast("success", "✓ تم إنشاء جلسة المراقبة بنجاح!");
       setIsNewSessionModalOpen(false);
       setSessionTitleInput("");
-      setSessionDateInput("");
       await loadData();
       if (data.session) setActiveSessionId(data.session.id);
     } catch (err: any) {
@@ -512,7 +443,7 @@ function EvaluationDashboard({ onLogout }: { onLogout: () => void }) {
     }
   };
 
-  // استيراد دفعة تلاميذ للفوج
+  // استيراد دفعة تلاميذ
   const handleImportRoster = async () => {
     if (!rosterBatchNames.trim()) return;
     const names = rosterBatchNames
@@ -528,23 +459,23 @@ function EvaluationDashboard({ onLogout }: { onLogout: () => void }) {
         body: JSON.stringify({
           type: "roster",
           className: selectedClass,
-          groupName: selectedGroup,
+          groupName: selectedGroup === "القسم كامل" ? "فوج 1" : selectedGroup,
           students: names,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
-      showToast("success", `✓ تم استيراد (${data.addedCount}) تلاميذ بنجاح إلى ${selectedClass} (${selectedGroup})`);
+      showToast("success", `✓ تم استيراد (${data.addedCount}) تلميذ بنجاح!`);
       setIsRosterModalOpen(false);
       setRosterBatchNames("");
       loadData();
     } catch (err: any) {
-      showToast("error", err.message || "فشل الاستيراد");
+      showToast("error", err.message || "فشل استيراد الأسماء");
     }
   };
 
-  // إضافة تلميذ فردي للفوج
+  // إضافة تلميذ فردي
   const handleAddSingleStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!singleStudentName.trim()) return;
@@ -555,7 +486,7 @@ function EvaluationDashboard({ onLogout }: { onLogout: () => void }) {
         body: JSON.stringify({
           type: "roster",
           className: selectedClass,
-          groupName: selectedGroup,
+          groupName: selectedGroup === "القسم كامل" ? "فوج 1" : selectedGroup,
           students: [singleStudentName.trim()],
         }),
       });
@@ -569,23 +500,9 @@ function EvaluationDashboard({ onLogout }: { onLogout: () => void }) {
     }
   };
 
-  // حذف جلسة مراقبة
-  const handleDeleteSession = async (sessionId: string) => {
-    if (!window.confirm("هل أنت متأكد من حذف جلسة المراقبة هذه؟")) return;
-    try {
-      const res = await fetch(`/api/inspections?sessionId=${sessionId}`, { method: "DELETE" });
-      if (res.ok) {
-        showToast("success", "✓ تم حذف جلسة المراقبة");
-        loadData();
-      }
-    } catch {
-      showToast("error", "فشل الحذف");
-    }
-  };
-
-  // حذف تلميذ من الفوج
+  // حذف تلميذ
   const handleDeleteStudent = async (studentName: string) => {
-    if (!window.confirm(`هل أنت متأكد من حذف التلميذ "${studentName}" من هذا القسم؟`)) return;
+    if (!window.confirm(`هل أنت متأكد من حذف التلميذ "${studentName}" من قائمة هذا القسم؟`)) return;
     try {
       const res = await fetch(
         `/api/inspections?studentName=${encodeURIComponent(studentName)}&class=${encodeURIComponent(
@@ -598,1274 +515,1118 @@ function EvaluationDashboard({ onLogout }: { onLogout: () => void }) {
         loadData();
       }
     } catch {
-      showToast("error", "فشل الحذف");
+      showToast("error", "فشل حذف التلميذ");
     }
   };
 
-  // تحديث سجل تلميذ في الجلسة الحالية (تحديث تفاؤلي فوري في المتصفح ثم إرسال للخادم)
-  const handleUpdateRecord = async (
-    studentName: string,
-    updates: Partial<InspectionRecord>
-  ) => {
-    let targetSession = currentSession;
-    if (!targetSession) {
-      await handleQuickStartDefaultSession();
-      return;
-    }
-
-    const existing = targetSession.records?.[studentName] || {
-      studentName,
-      lessonsDone: targetSession.totalLessons,
-      homeworksDone: targetSession.totalHomeworks,
-      behaviorScore: 5,
-      activityScore: 5,
-      score: 20,
+  // تصدير ملف JSON
+  const handleExportJson = () => {
+    const exportObject = {
+      platform: "JusoorEducationalPlatform",
+      className: selectedClass,
+      exportedAt: new Date().toISOString(),
+      sessions,
+      roster,
     };
-
-    const updatedRec: InspectionRecord = {
-      ...existing,
-      ...updates,
-    };
-
-    // إعادة حساب العلامة بدقة
-    const tL = targetSession.totalLessons > 0 ? targetSession.totalLessons : 1;
-    const tH = targetSession.totalHomeworks > 0 ? targetSession.totalHomeworks : 1;
-    const nbPts = (updatedRec.lessonsDone / tL) * 5;
-    const hwPts = (updatedRec.homeworksDone / tH) * 5;
-    const total = nbPts + hwPts + updatedRec.behaviorScore + updatedRec.activityScore;
-    updatedRec.score = Math.min(20, Math.max(0, Math.round(total * 10) / 10));
-
-    // تحديث الواجهة فورياً بدون أي تأخير
-    setSessions((prev) =>
-      prev.map((s) => {
-        if (s.id !== targetSession.id) return s;
-        return {
-          ...s,
-          records: {
-            ...s.records,
-            [studentName]: updatedRec,
-          },
-        };
-      })
-    );
-
-    // إرسال للخادم أو حفظ محلي في حالة عدم توفر الإنترنت
-    if (!navigator.onLine) {
-      setPendingSyncCount((c) => c + 1);
-      showToast("success", `✓ تم الحفظ محلياً (${studentName}) 📶 وضع أوفلاين`);
-      return;
-    }
-
-    try {
-      const res = await fetch("/api/inspections", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sessionId: targetSession.id,
-          studentName,
-          ...updates,
-        }),
-      });
-      if (!res.ok) throw new Error("تعذر الحفظ في السيرفر");
-    } catch {
-      setPendingSyncCount((c) => c + 1);
-      showToast("success", `✓ تم الحفظ في الهاتف (سيتم الرفع عند عودة الاتصال) 📱`);
-    }
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportObject, null, 2));
+    const a = document.createElement("a");
+    a.href = dataStr;
+    a.download = `تقييم_جسور_${selectedClass}_${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    showToast("success", "✓ تم تصدير وتحميل النسخة الاحتياطية بنجاح 📥");
   };
 
-  // زر لمسة واحدة: تعيين كل شيء كامل (20/20)
-  const handleSetFullScore = async (studentName: string) => {
-    let targetSession = currentSession;
-    if (!targetSession) {
-      await handleQuickStartDefaultSession();
-      return;
-    }
-    handleUpdateRecord(studentName, {
-      lessonsDone: targetSession.totalLessons,
-      homeworksDone: targetSession.totalHomeworks,
-      behaviorScore: 5,
-      activityScore: 5,
+  // تحويل بيانات الرصد لصيغة الطباعة
+  const evaluationsForPrint: StudentEvaluation[] = useMemo(() => {
+    if (!currentSession) return [];
+    return filteredStudents.map((st, idx) => {
+      const rec = currentSession.records?.[st.studentName] || {
+        studentName: st.studentName,
+        lessonsDone: currentSession.totalLessons,
+        homeworksDone: currentSession.totalHomeworks,
+        behaviorScore: 5,
+        activityScore: 5,
+        score: 20,
+      };
+      const tL = currentSession.totalLessons > 0 ? currentSession.totalLessons : 1;
+      const tH = currentSession.totalHomeworks > 0 ? currentSession.totalHomeworks : 1;
+      const nb = Math.min(5, Math.round(((rec.lessonsDone || 0) / tL) * 5 * 10) / 10);
+      const hw = Math.min(5, Math.round(((rec.homeworksDone || 0) / tH) * 5 * 10) / 10);
+      const total = rec.score || Math.min(20, nb + hw + (rec.behaviorScore || 5) + (rec.activityScore || 5));
+
+      const rating = total >= 18 ? "excellent" : total >= 15 ? "very_good" : total >= 12 ? "good" : total >= 10 ? "medium" : "weak";
+      const ratingColor: "green" | "emerald" | "amber" | "rose" = total >= 18 ? "emerald" : total >= 15 ? "green" : total >= 10 ? "amber" : "rose";
+      const grp = (st.groupName === "فوج 2" ? "فوج 2" : st.groupName === "القسم كامل" ? "القسم كامل" : "فوج 1") as "فوج 1" | "فوج 2" | "القسم كامل";
+
+      return {
+        id: `ev_${idx}`,
+        studentName: st.studentName,
+        className: selectedClass,
+        groupName: grp,
+        notebookScore: nb,
+        homeworkScore: hw,
+        behaviorScore: rec.behaviorScore || 5,
+        toolsScore: rec.behaviorScore || 5,
+        activityScore: rec.activityScore || 5,
+        totalScore: total,
+        rating,
+        ratingColor,
+        notes: "",
+        updatedAt: new Date().toISOString(),
+      };
     });
+  }, [currentSession, filteredStudents, selectedClass]);
+
+  // حساب معدل الحاسبة التجريبية
+  const simTotal = Math.min(
+    20,
+    Math.max(0, Math.round((simLessons + simHomework + simBehavior + simActivity) * 10) / 10)
+  );
+
+  const getGradeAssessment = (score: number) => {
+    if (score >= 18) return { label: "ممتاز جداً 🌟", color: "text-emerald-700 bg-emerald-50 border-emerald-200" };
+    if (score >= 15) return { label: "جيد جداً 👏", color: "text-teal-700 bg-teal-50 border-teal-200" };
+    if (score >= 12) return { label: "جيد وسلوك إيجابي 👍", color: "text-blue-700 bg-blue-50 border-blue-200" };
+    if (score >= 10) return { label: "متوسط (يحتاج دعم في الواجبات)", color: "text-amber-700 bg-amber-50 border-amber-200" };
+    return { label: "دون المتوسط (يستلزم استدعاء الولي للمتابعة)", color: "text-red-700 bg-red-50 border-red-200" };
   };
 
   return (
-    <div className="pb-16 pt-3 px-3 max-w-xl mx-auto space-y-3.5 fade-up">
-      {/* إشعار عائم */}
+    <div className="min-h-screen bg-[#fafaf7] pb-20 pt-4 sm:pt-6 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-6" dir="rtl">
+      {/* ─── إشعار Toast العائم ─── */}
       {toastMsg && (
         <div
-          className={`fixed top-4 left-4 right-4 z-50 max-w-md mx-auto p-3.5 rounded-2xl shadow-lg flex items-center gap-2.5 text-xs font-bold transition-all border ${
+          className={`fixed top-5 left-4 right-4 sm:left-auto sm:right-6 z-50 max-w-md p-4 rounded-2xl shadow-xl flex items-center gap-3 text-xs sm:text-sm font-bold border transition-all ${
             toastMsg.type === "success"
-              ? "bg-emerald-600 text-white border-emerald-500 shadow-emerald-600/30"
-              : "bg-red-600 text-white border-red-500 shadow-red-600/30"
+              ? "bg-emerald-700 text-white border-emerald-600 shadow-emerald-900/20"
+              : "bg-red-700 text-white border-red-600 shadow-red-900/20"
           }`}
         >
           {toastMsg.type === "success" ? (
-            <CheckCircle2 className="w-4 h-4 shrink-0" />
+            <CheckCircle2 className="w-5 h-5 shrink-0" />
           ) : (
-            <AlertCircle className="w-4 h-4 shrink-0" />
+            <AlertCircle className="w-5 h-5 shrink-0" />
           )}
           <span className="flex-1">{toastMsg.text}</span>
           <button onClick={() => setToastMsg(null)} className="p-1 hover:bg-white/20 rounded-lg">
-            <X className="w-3.5 h-3.5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
-      {/* الشريط العلوي المدمج للهاتف */}
-      <div className="bg-white p-3 rounded-2xl border border-slate-100 shadow-2xs space-y-2.5">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-black">
-              📱
-            </div>
-            <div>
-              <h1 className="text-xs font-black text-slate-900">دفتر التقييم الميداني السريع</h1>
-              <p className="text-[10px] text-emerald-700 font-bold">مادة الرياضيات — فضاء الأستاذ</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            <Link
-              href="/admin"
-              className="px-2 py-1 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 text-[11px] font-bold transition"
-            >
-              لوحة التحكم
-            </Link>
-            <button
-              onClick={async () => {
-                await fetch("/api/auth", { method: "DELETE" });
-                onLogout();
-              }}
-              className="p-1.5 rounded-lg border border-slate-200 text-slate-400 hover:text-red-600 transition"
-              title="تسجيل الخروج"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-
-        {/* التبويب العلوي الرئيسي: الجلسات أو جدول المعدلات أو قائمة الفوج */}
-        <div className="grid grid-cols-3 gap-1 bg-slate-100/80 p-1 rounded-xl text-center">
-          <button
-            type="button"
-            onClick={() => setActiveTab("sessions")}
-            className={`py-1.5 px-1 rounded-lg text-xs font-black transition flex items-center justify-center gap-1 ${
-              activeTab === "sessions"
-                ? "bg-emerald-600 text-white shadow-2xs"
-                : "text-slate-600 hover:bg-white/60"
-            }`}
-          >
-            <ClipboardCheck className="w-3.5 h-3.5" />
-            <span>جلسات التفقد</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("averages")}
-            className={`py-1.5 px-1 rounded-lg text-xs font-black transition flex items-center justify-center gap-1 ${
-              activeTab === "averages"
-                ? "bg-slate-900 text-white shadow-2xs"
-                : "text-slate-600 hover:bg-white/60"
-            }`}
-          >
-            <Calculator className="w-3.5 h-3.5" />
-            <span>المعدل العام</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("roster")}
-            className={`py-1.5 px-1 rounded-lg text-xs font-black transition flex items-center justify-center gap-1 ${
-              activeTab === "roster"
-                ? "bg-sky-600 text-white shadow-2xs"
-                : "text-slate-600 hover:bg-white/60"
-            }`}
-          >
-            <Users className="w-3.5 h-3.5" />
-            <span>قائمة الفوج ({currentStudentsList.length})</span>
-          </button>
-        </div>
-
-        {/* شريط حالة الأوفلاين والمزامنة والنسخ الاحتياطي JSON */}
-        <div className="flex items-center justify-between text-[11px] font-bold pt-2 border-t border-slate-100 flex-wrap gap-1.5">
-          {/* مؤشر الاتصال */}
-          <div className="flex items-center gap-1.5">
-            {isOnline ? (
-              <span className="flex items-center gap-1 text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 text-[10px]">
-                <Wifi className="w-3 h-3 text-emerald-600" />
-                <span>متصل بالإنترنت</span>
-              </span>
-            ) : (
-              <span className="flex items-center gap-1 text-amber-900 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-300 text-[10px]">
-                <WifiOff className="w-3 h-3 text-amber-600" />
-                <span>أوفلاين (حفظ محلي)</span>
-              </span>
-            )}
-
-            {pendingSyncCount > 0 && (
-              <span className="text-[10px] bg-red-100 text-red-800 px-1.5 py-0.2 rounded font-black border border-red-200">
-                {pendingSyncCount} معلق
-              </span>
-            )}
-          </div>
-
-          {/* أزرار المزامنة وتصدير/استيراد JSON */}
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={handleSyncWithServer}
-              disabled={isSyncing}
-              className="py-1 px-2 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 transition flex items-center gap-1 text-[11px]"
-              title="مزامنة التعديلات مع السيرفر"
-            >
-              <RefreshCw className={`w-3 h-3 ${isSyncing ? "animate-spin" : ""}`} />
-              <span>مزامنة</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleExportJson}
-              className="py-1 px-2 rounded-lg bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100 transition flex items-center gap-1 text-[11px]"
-              title="تصدير نسخة احتياطية من التقييمات كملف JSON آمن"
-            >
-              <Download className="w-3 h-3 text-slate-500" />
-              <span>حفظ JSON 📥</span>
-            </button>
-
-            <label
-              className="py-1 px-2 rounded-lg bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100 transition flex items-center gap-1 text-[11px] cursor-pointer"
-              title="استيراد ملف JSON آمن محلياً"
-            >
-              <Upload className="w-3 h-3 text-slate-500" />
-              <span>استيراد 📤</span>
-              <input type="file" accept=".json,application/json" hidden onChange={handleImportJson} />
-            </label>
-          </div>
-        </div>
-      </div>
-
-      {/* محدد القسم والفوج السريع - متجاوب تماماً مع شاشات الهواتف */}
-      <div className="bg-white p-3 rounded-2xl border border-slate-100 shadow-2xs space-y-2.5">
-        <div>
-          <div className="text-[11px] font-black text-slate-700 mb-1">القسم المعني:</div>
-          <div className="grid grid-cols-4 gap-1.5">
-            {classesList.map((cls) => (
-              <button
-                key={cls}
-                type="button"
-                onClick={() => setSelectedClass(cls)}
-                className={`py-2 rounded-xl text-xs font-black transition ${
-                  selectedClass === cls
-                    ? "bg-emerald-600 text-white shadow-2xs ring-2 ring-emerald-300"
-                    : "bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200"
-                }`}
-              >
-                {cls}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <div className="text-[11px] font-black text-slate-700 mb-1">الفوج (حصة التفويج):</div>
-          <div className="grid grid-cols-3 gap-1.5">
-            {(["فوج 1", "فوج 2", "القسم كامل"] as const).map((grp) => (
-              <button
-                key={grp}
-                type="button"
-                onClick={() => setSelectedGroup(grp)}
-                className={`py-2 px-1 rounded-xl text-xs font-black transition flex items-center justify-center gap-1 ${
-                  selectedGroup === grp
-                    ? "bg-slate-900 text-white shadow-2xs ring-2 ring-slate-400"
-                    : "bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200"
-                }`}
-              >
-                <span>{grp === "فوج 1" ? "🟢 فوج 1" : grp === "فوج 2" ? "🔵 فوج 2" : "👥 القسم كامل"}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* ======================================================== */}
-      {/* 1. تبويب جلسات التفقد الميداني (حصة المراقبة) */}
-      {/* ======================================================== */}
-      {activeTab === "sessions" && (
-        <div className="space-y-3">
-          {/* شريط اختيار الجلسة أو إنشاء جلسة جديدة */}
-          <div className="bg-white p-3 rounded-2xl border border-slate-100 shadow-2xs space-y-2.5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-black text-slate-800 flex items-center gap-1">
-                <Calendar className="w-3.5 h-3.5 text-emerald-600" />
-                <span>جلسة المراقبة المعنية:</span>
-              </span>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setSessionDateInput(
-                    new Date().toLocaleDateString("ar-DZ", {
-                      weekday: "long",
-                      year: "numeric",
-                      month: "long",
-                      day: "numeric",
-                    })
-                  );
-                  setIsNewSessionModalOpen(true);
-                }}
-                className="py-1 px-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-black flex items-center gap-1 shadow-2xs transition active:scale-95"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>بدء مراقبة جديدة</span>
-              </button>
+      {/* ─── ترويسة الصفحة العريضة والفخمة ─── */}
+      <header className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-xs relative overflow-hidden">
+        <div className="absolute top-0 right-0 left-0 h-1.5 bg-gradient-to-r from-emerald-600 via-teal-500 to-emerald-700" />
+        
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
+          <div className="space-y-3">
+            <div className="inline-flex items-center gap-2 bg-emerald-50 text-emerald-800 px-3.5 py-1.5 rounded-full text-xs font-black border border-emerald-200/70">
+              <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
+              <span>الجمهورية الجزائرية الديمقراطية الشعبية • منصة جسور التعليمية</span>
             </div>
 
-            {/* أزرار التبديل بين الجلسات المسجلة */}
-            {sessions.length === 0 ? (
-              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-700 to-emerald-800 text-white shadow-sm flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-xs font-black">بدء المراقبة الأولى (الدروس 1 إلى 8) 🎯</div>
-                  <div className="text-[11px] text-emerald-100 mt-0.5">
-                    تفقد وتقييم فوري لكراريس وواجبات تلاميذ {selectedClass}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleQuickStartDefaultSession}
-                  className="px-3.5 py-2 rounded-xl bg-white text-emerald-800 font-black text-xs hover:bg-emerald-50 active:scale-95 transition shadow-sm shrink-0 flex items-center gap-1.5"
-                >
-                  <Plus className="w-4 h-4 text-emerald-600" />
-                  <span>بدء التفقد الآن 🚀</span>
-                </button>
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-700 to-teal-600 text-white flex items-center justify-center shadow-md shadow-emerald-700/20">
+                <Scale className="w-6 h-6" />
               </div>
+              <div>
+                <h1 className="text-xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                  ميثاق ونظام التقويم البيداغوجي المستمر (20/20)
+                </h1>
+                <p className="text-xs sm:text-sm text-slate-500 font-medium mt-0.5">
+                  معايير التنقيط المعتمدة في التعليم المتوسط والربط الميداني الشفاف بين الأستاذ، الولي، والتلميذ
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* أزرار الإجراءات السريعة */}
+          <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              onClick={() => setShowCharterPrintModal(true)}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold shadow-2xs transition cursor-pointer"
+            >
+              <Printer className="w-4 h-4 text-emerald-700" />
+              <span>طباعة الميثاق (PDF)</span>
+            </button>
+
+            <SaveOfflineButton className="shadow-2xs text-xs py-2.5 px-3.5" />
+
+            <div className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-600">
+              {isOnline ? (
+                <>
+                  <Wifi className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>متصل بالسحابة</span>
+                </>
+              ) : (
+                <>
+                  <WifiOff className="w-3.5 h-3.5 text-amber-600" />
+                  <span>أوفلاين محلي</span>
+                </>
+              )}
+            </div>
+
+            {isAuthenticated ? (
+              <button
+                onClick={async () => {
+                  await fetch("/api/auth", { method: "DELETE" });
+                  onLogout();
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-red-700 text-xs font-bold transition cursor-pointer"
+                title="تسجيل الخروج"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>خروج الأستاذ</span>
+              </button>
             ) : (
-              <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-                {sessions.map((sess) => (
+              <Link
+                href="/login?next=/eval"
+                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-xs"
+              >
+                <LogIn className="w-3.5 h-3.5" />
+                <span>دخول الأستاذ لرصد الأفواج</span>
+              </Link>
+            )}
+          </div>
+        </div>
+
+        {/* ─── شريط التبويبات الرئيسي ─── */}
+        <div className="mt-8 pt-4 border-t border-slate-100 flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setActiveTab("charter")}
+            className={`flex items-center gap-2 py-3 px-5 rounded-2xl text-xs sm:text-sm font-black transition cursor-pointer ${
+              activeTab === "charter"
+                ? "bg-emerald-700 text-white shadow-md shadow-emerald-700/20"
+                : "bg-slate-100/80 hover:bg-slate-200 text-slate-700"
+            }`}
+          >
+            <Scale className="w-4 h-4" />
+            <span>1. ميثاق التقويم ومعايير 20/20</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("roster")}
+            className={`flex items-center gap-2 py-3 px-5 rounded-2xl text-xs sm:text-sm font-black transition cursor-pointer ${
+              activeTab === "roster"
+                ? "bg-emerald-700 text-white shadow-md shadow-emerald-700/20"
+                : "bg-slate-100/80 hover:bg-slate-200 text-slate-700"
+            }`}
+          >
+            <ClipboardCheck className="w-4 h-4" />
+            <span>2. شبكة الرصد والتنقيط الميداني</span>
+            {filteredStudents.length > 0 && (
+              <span className={`px-2 py-0.5 rounded-full text-[11px] font-mono ${
+                activeTab === "roster" ? "bg-white/20 text-white" : "bg-emerald-100 text-emerald-800"
+              }`}>
+                {filteredStudents.length}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => setActiveTab("sessions")}
+            className={`flex items-center gap-2 py-3 px-5 rounded-2xl text-xs sm:text-sm font-black transition cursor-pointer ${
+              activeTab === "sessions"
+                ? "bg-emerald-700 text-white shadow-md shadow-emerald-700/20"
+                : "bg-slate-100/80 hover:bg-slate-200 text-slate-700"
+            }`}
+          >
+            <BarChart3 className="w-4 h-4" />
+            <span>3. سجل الجلسات والمعدلات</span>
+          </button>
+        </div>
+      </header>
+
+      {/* ════════════════════════════════════════════════════════════════
+          التبويب 1: ميثاق التقويم الرسمي ومعايير 20/20 (الميثاق والحاسبة)
+          ════════════════════════════════════════════════════════════════ */}
+      {activeTab === "charter" && (
+        <section className="space-y-6 fade-up">
+          {/* المعايير البيداغوجية الأربعة */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+            {/* المعيار 1: كراس الدروس */}
+            <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-xs space-y-4 hover:border-emerald-500/40 hover:shadow-md transition">
+              <div className="flex items-center justify-between">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-black">
+                  <BookOpen className="w-6 h-6" />
+                </div>
+                <span className="text-xl font-black text-emerald-800 bg-emerald-50 px-3 py-1 rounded-xl border border-emerald-200">
+                  05 ن
+                </span>
+              </div>
+              <div className="space-y-1.5">
+                <h3 className="font-black text-base text-slate-800">1. كراس القسم والمحاولات</h3>
+                <p className="text-xs text-slate-500 leading-relaxed font-medium">
+                  الوثيقة الشاهدة على مرافقة التلميذ للحصة اليومية ومجهوده الكتابي.
+                </p>
+              </div>
+              <ul className="text-xs text-slate-600 space-y-2 border-t border-slate-100 pt-3">
+                <li className="flex items-center gap-2">
+                  <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span>اكتمال عناصر الدرس وخلوه من البياض</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span>نظافة الكراس والتسطير والعناية بالخط</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span>تدوين المحاولات وحل التمارين وتصحيحها</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* المعيار 2: الواجبات المنزلية */}
+            <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-xs space-y-4 hover:border-amber-500/40 hover:shadow-md transition">
+              <div className="flex items-center justify-between">
+                <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-700 flex items-center justify-center font-black">
+                  <FileText className="w-6 h-6" />
+                </div>
+                <span className="text-xl font-black text-amber-800 bg-amber-50 px-3 py-1 rounded-xl border border-amber-200">
+                  05 ن
+                </span>
+              </div>
+              <div className="space-y-1.5">
+                <h3 className="font-black text-base text-slate-800">2. الواجبات والأنشطة المنزلية</h3>
+                <p className="text-xs text-slate-500 leading-relaxed font-medium">
+                  قياس مدى التزام التلميذ بالتعلم الذاتي خارج حجرة التدريس.
+                </p>
+              </div>
+              <ul className="text-xs text-slate-600 space-y-2 border-t border-slate-100 pt-3">
+                <li className="flex items-center gap-2">
+                  <Check className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  <span>تسليم التمارين في مواعيدها المحددة</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  <span>الجدية في المحاولات وتجنب النقل الحرفي</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  <span>المشاركة في المشاريع والبحوث المقررة</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* المعيار 3: الانضباط والسلوك */}
+            <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-xs space-y-4 hover:border-blue-500/40 hover:shadow-md transition">
+              <div className="flex items-center justify-between">
+                <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-700 flex items-center justify-center font-black">
+                  <Award className="w-6 h-6" />
+                </div>
+                <span className="text-xl font-black text-blue-800 bg-blue-50 px-3 py-1 rounded-xl border border-blue-200">
+                  05 ن
+                </span>
+              </div>
+              <div className="space-y-1.5">
+                <h3 className="font-black text-base text-slate-800">3. الانضباط والسلوك والمواظبة</h3>
+                <p className="text-xs text-slate-500 leading-relaxed font-medium">
+                  التحلي بالآداب التربوية واحترام النظام الداخلي للمؤسسة.
+                </p>
+              </div>
+              <ul className="text-xs text-slate-600 space-y-2 border-t border-slate-100 pt-3">
+                <li className="flex items-center gap-2">
+                  <Check className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                  <span>الحضور المنتظم وتجنب الغيابات غير المبررة</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                  <span>إحضار الكتاب والأدوات المدرسية كاملة</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                  <span>حسن الاستماع وتجنب أي سلوك مشوش</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* المعيار 4: الاستجوابات والمشاركة */}
+            <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-xs space-y-4 hover:border-purple-500/40 hover:shadow-md transition">
+              <div className="flex items-center justify-between">
+                <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-700 flex items-center justify-center font-black">
+                  <Sparkles className="w-6 h-6" />
+                </div>
+                <span className="text-xl font-black text-purple-800 bg-purple-50 px-3 py-1 rounded-xl border border-purple-200">
+                  05 ن
+                </span>
+              </div>
+              <div className="space-y-1.5">
+                <h3 className="font-black text-base text-slate-800">4. الاستجوابات والتقويم المرحلي</h3>
+                <p className="text-xs text-slate-500 leading-relaxed font-medium">
+                  التقويم المستمر للقدرات الاستيعابية والتفاعل الصفي الحي.
+                </p>
+              </div>
+              <ul className="text-xs text-slate-600 space-y-2 border-t border-slate-100 pt-3">
+                <li className="flex items-center gap-2">
+                  <Check className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                  <span>الاستجوابات الكتابية الدورية والفجائية</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                  <span>المشاركة الإيجابية في بناء الدرس على السبورة</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                  <span>الرغبة المستمرة في التدارك والتحسن</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          {/* الحاسبة التفاعلية لحساب علامة التقويم (20/20) مع التوجيه */}
+          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-xs space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-black">
+                  <Calculator className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-black text-slate-900">
+                    الحاسبة البيداغوجية التقديرية (Simulator)
+                  </h2>
+                  <p className="text-xs text-slate-500 font-medium">
+                    جرّب إدخال علامات المعايير الأربعة لمعاينة النتيجة والتقدير الموجه للتلميذ والولي
+                  </p>
+                </div>
+              </div>
+
+              {/* النتيجة الإجمالية */}
+              <div className="flex items-center gap-3 bg-slate-50 px-5 py-3 rounded-2xl border border-slate-200">
+                <span className="text-xs font-bold text-slate-500">العلامة الإجمالية:</span>
+                <span className="text-2xl font-black text-emerald-700 font-mono">
+                  {simTotal} / 20
+                </span>
+                <span className={`text-xs font-bold px-3 py-1 rounded-full border ${getGradeAssessment(simTotal).color}`}>
+                  {getGradeAssessment(simTotal).label}
+                </span>
+              </div>
+            </div>
+
+            {/* أدوات التحكم بالسلايدرات */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 pt-2">
+              <div className="space-y-2 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                <div className="flex justify-between items-center text-xs font-bold">
+                  <span>كراس الدروس (5ن)</span>
+                  <span className="text-emerald-700 font-mono font-black">{simLessons} / 5</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="5"
+                  step="0.5"
+                  value={simLessons}
+                  onChange={(e) => setSimLessons(Number(e.target.value))}
+                  className="w-full accent-emerald-600 cursor-pointer"
+                />
+              </div>
+
+              <div className="space-y-2 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                <div className="flex justify-between items-center text-xs font-bold">
+                  <span>الواجبات المنزلية (5ن)</span>
+                  <span className="text-amber-700 font-mono font-black">{simHomework} / 5</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="5"
+                  step="0.5"
+                  value={simHomework}
+                  onChange={(e) => setSimHomework(Number(e.target.value))}
+                  className="w-full accent-amber-600 cursor-pointer"
+                />
+              </div>
+
+              <div className="space-y-2 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                <div className="flex justify-between items-center text-xs font-bold">
+                  <span>السلوك والمواظبة (5ن)</span>
+                  <span className="text-blue-700 font-mono font-black">{simBehavior} / 5</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="5"
+                  step="0.5"
+                  value={simBehavior}
+                  onChange={(e) => setSimBehavior(Number(e.target.value))}
+                  className="w-full accent-blue-600 cursor-pointer"
+                />
+              </div>
+
+              <div className="space-y-2 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                <div className="flex justify-between items-center text-xs font-bold">
+                  <span>المشاركة والاستجوابات (5ن)</span>
+                  <span className="text-purple-700 font-mono font-black">{simActivity} / 5</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="5"
+                  step="0.5"
+                  value={simActivity}
+                  onChange={(e) => setSimActivity(Number(e.target.value))}
+                  className="w-full accent-purple-600 cursor-pointer"
+                />
+              </div>
+            </div>
+
+            <div className="bg-emerald-50/60 rounded-2xl p-4 border border-emerald-100 text-xs text-emerald-900 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <HelpCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>
+                  <strong>توجيه بيداغوجي للولي والتلميذ:</strong> التقويم المستمر ليس مجرد نقطة عددية، بل هو مسار تربوي تراكمي يمنح التلميذ فرصة يومية للتعويض والارتقاء عبر العناية بكراسه وحل واجباته.
+                </span>
+              </div>
+              <button
+                onClick={() => setActiveTab("roster")}
+                className="btn-primary text-xs py-2 px-4 shrink-0 shadow-2xs font-bold cursor-pointer"
+              >
+                <span>الانتقال لشبكة الرصد الميداني</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ════════════════════════════════════════════════════════════════
+          التبويب 2: شبكة الرصد والتنقيط الميداني للأفواج
+          ════════════════════════════════════════════════════════════════ */}
+      {activeTab === "roster" && (
+        !isAuthenticated ? (
+          <div className="bg-white rounded-3xl p-10 border border-slate-200/80 shadow-xs text-center space-y-4 max-w-lg mx-auto my-8 fade-up">
+            <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto shadow-inner">
+              <ClipboardCheck className="w-7 h-7" />
+            </div>
+            <div className="space-y-1.5">
+              <h3 className="text-lg font-black text-slate-800">فضاء رصد علامات وتفقد الأفواج</h3>
+              <p className="text-xs text-slate-500 leading-relaxed max-w-sm mx-auto">
+                هذا القسم مخصص للأساتذة لتنقيط ومتابعة التلاميذ والكراريس والواجبات وإصدار الكشوفات. سجّل الدخول بحسابك للوصول الفوري.
+              </p>
+            </div>
+            <div className="pt-2">
+              <Link
+                href="/login?next=/eval"
+                className="btn-primary text-xs py-3 px-8 font-black shadow-md inline-flex items-center gap-2 cursor-pointer"
+              >
+                <LogIn className="w-4 h-4" />
+                <span>تسجيل الدخول كأستاذ</span>
+              </Link>
+            </div>
+          </div>
+        ) : (
+        <section className="space-y-6 fade-up">
+          {/* شريط التحكم واختيار القسم والفوج */}
+          <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/80 shadow-xs space-y-4">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              {/* اختيار القسم */}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-black text-slate-500 ml-1">القسم:</span>
+                {teacherClasses.map((cls) => (
                   <button
-                    key={sess.id}
-                    type="button"
-                    onClick={() => setActiveSessionId(sess.id)}
-                    className={`px-3 py-2 rounded-xl text-xs font-black shrink-0 transition flex flex-col items-start gap-0.5 border ${
-                      activeSessionId === sess.id
-                        ? "bg-emerald-700 text-white border-emerald-800 shadow-2xs ring-2 ring-emerald-300"
-                        : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                    key={cls}
+                    onClick={() => setSelectedClass(cls)}
+                    className={`px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer ${
+                      selectedClass === cls
+                        ? "bg-emerald-700 text-white shadow-sm"
+                        : "bg-slate-100 hover:bg-slate-200 text-slate-700"
                     }`}
                   >
-                    <span>{sess.title || `المراقبة ${sess.sessionNumber}`}</span>
-                    <span
-                      className={`text-[10px] ${
-                        activeSessionId === sess.id ? "text-emerald-100" : "text-slate-400"
-                      }`}
-                    >
-                      {sess.lessonRange}
-                    </span>
+                    {cls}
                   </button>
                 ))}
               </div>
-            )}
+
+              {/* اختيار الفوج */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black text-slate-500 ml-1">حصة التفويج:</span>
+                {(["فوج 1", "فوج 2", "القسم كامل"] as const).map((grp) => (
+                  <button
+                    key={grp}
+                    onClick={() => setSelectedGroup(grp)}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                      selectedGroup === grp
+                        ? "bg-slate-900 text-white shadow-xs"
+                        : "bg-slate-100 hover:bg-slate-200 text-slate-600"
+                    }`}
+                  >
+                    {grp}
+                  </button>
+                ))}
+              </div>
+
+              {/* أزرار الإجراءات السريعة في الفوج */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setIsRosterModalOpen(true)}
+                  className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>استيراد أسماء الفوج</span>
+                </button>
+
+                <button
+                  onClick={() => setShowEvalPrintModal(true)}
+                  className="px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5 text-emerald-700" />
+                  <span>طباعة الكشف الرسمي</span>
+                </button>
+
+                <button
+                  onClick={handleSyncWithServer}
+                  disabled={isSyncing}
+                  className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                  title="مزامنة السجلات مع السيرفر"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? "animate-spin text-emerald-600" : ""}`} />
+                  <span>مزامنة</span>
+                </button>
+              </div>
+            </div>
+
+            {/* شريط الإحصائيات ومعلومات الجلسة النشطة */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-slate-100 text-xs">
+              <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                <p className="text-slate-400 font-bold">تعداد التلاميذ:</p>
+                <p className="text-lg font-black text-slate-800">{stats.totalStudents} تلميذ</p>
+              </div>
+
+              <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                <p className="text-slate-400 font-bold">متوسط التقويم:</p>
+                <p className="text-lg font-black text-emerald-700">{stats.avgScore} / 20</p>
+              </div>
+
+              <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                <p className="text-slate-400 font-bold">العلامات الكاملة (20):</p>
+                <p className="text-lg font-black text-emerald-800">{stats.fullScoresCount} تلميذ</p>
+              </div>
+
+              <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                <p className="text-slate-400 font-bold">الجلسة المفعلة:</p>
+                <p className="text-xs font-black text-slate-800 truncate" title={currentSession?.title || "لا توجد جلسة"}>
+                  {currentSession?.title || "افتراضية (1 إلى 8)"}
+                </p>
+              </div>
+            </div>
           </div>
 
-          {/* تفاصيل الجلسة الحالية وتفقد التلاميذ */}
-          {currentSession && (
-            <div className="space-y-3">
-              {/* شريط معلومات الجلسة النشطة */}
-              <div className="bg-emerald-850 text-white p-3.5 rounded-2xl shadow-sm space-y-1.5 border border-emerald-700">
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="w-6 h-6 rounded-lg bg-white/20 flex items-center justify-center text-xs font-black">
-                      #{currentSession.sessionNumber}
-                    </span>
-                    <span className="font-black text-sm">{currentSession.title}</span>
-                  </div>
+          {/* حقل البحث السريع وإضافة تلميذ فردي */}
+          <div className="flex flex-col sm:flex-row items-stretch gap-3">
+            <div className="relative flex-1">
+              <input
+                type="text"
+                placeholder="ابحث عن اسم تلميذ في هذا الفوج..."
+                value={searchStudent}
+                onChange={(e) => setSearchStudent(e.target.value)}
+                className="w-full pr-10 pl-4 py-3 rounded-2xl bg-white border border-slate-200 text-xs sm:text-sm focus:outline-none focus:border-emerald-600 transition"
+              />
+              <Search className="w-4 h-4 text-slate-400 absolute right-3.5 top-3.5" />
+            </div>
 
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteSession(currentSession.id)}
-                    className="text-white/60 hover:text-red-300 p-1 rounded-lg text-xs transition"
-                    title="حذف هذه الجلسة"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+            <form onSubmit={handleAddSingleStudent} className="flex items-center gap-2">
+              <input
+                type="text"
+                placeholder="اسم ولقب تلميذ جديد..."
+                value={singleStudentName}
+                onChange={(e) => setSingleStudentName(e.target.value)}
+                className="w-48 sm:w-56 px-4 py-3 rounded-2xl bg-white border border-slate-200 text-xs focus:outline-none focus:border-emerald-600 transition"
+              />
+              <button
+                type="submit"
+                className="btn-primary text-xs py-3 px-4 font-bold shrink-0 cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>إضافة</span>
+              </button>
+            </form>
+          </div>
+
+          {/* ─── جدول الرصد الميداني العريض (Desktop & Mobile) ─── */}
+          <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs overflow-hidden">
+            {filteredStudents.length === 0 ? (
+              <div className="text-center py-16 px-4 space-y-4">
+                <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto">
+                  <Users className="w-8 h-8" />
                 </div>
-
-                <div className="flex items-center justify-between text-[11px] text-emerald-100 flex-wrap gap-2 pt-1 border-t border-white/10">
-                  <span>📅 {currentSession.date}</span>
-                  <span className="font-bold bg-white/15 px-2 py-0.5 rounded-md">
-                    المقرر للتفقد: {currentSession.totalLessons} دروس و {currentSession.totalHomeworks} واجبات
-                  </span>
+                <div className="space-y-1">
+                  <h3 className="font-black text-slate-800 text-base">لا توجد أسماء تلاميذ مسجلة في {selectedClass} ({selectedGroup})</h3>
+                  <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                    يمكنك استيراد قائمة الأسماء دفعة واحدة عبر زر "استيراد أسماء الفوج" بالأعلى أو إضافتها تدريجياً.
+                  </p>
                 </div>
-              </div>
-
-              {/* أزرار التبديل السريع بين أفواج التفقد أثناء الحصة الميدانية */}
-              <div className="flex items-center gap-1 bg-slate-100/90 p-1 rounded-xl text-xs font-black">
                 <button
-                  type="button"
-                  onClick={() => setSelectedGroup("فوج 1")}
-                  className={`flex-1 py-1.5 px-1 rounded-lg transition text-center flex items-center justify-center gap-1 ${
-                    selectedGroup === "فوج 1"
-                      ? "bg-emerald-600 text-white shadow-2xs"
-                      : "text-slate-600 hover:bg-white/60"
-                  }`}
+                  onClick={() => setIsRosterModalOpen(true)}
+                  className="btn-primary text-xs py-2.5 px-6 font-bold cursor-pointer inline-flex items-center gap-2"
                 >
-                  <span>🟢 فوج 1</span>
-                  <span className="text-[10px] opacity-80">
-                    ({roster.filter((r) => (r.className || "").replace(/\s+/g, "") === selectedClass.replace(/\s+/g, "") && (r.groupName || "فوج 1") === "فوج 1").length})
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedGroup("فوج 2")}
-                  className={`flex-1 py-1.5 px-1 rounded-lg transition text-center flex items-center justify-center gap-1 ${
-                    selectedGroup === "فوج 2"
-                      ? "bg-blue-600 text-white shadow-2xs"
-                      : "text-slate-600 hover:bg-white/60"
-                  }`}
-                >
-                  <span>🔵 فوج 2</span>
-                  <span className="text-[10px] opacity-80">
-                    ({roster.filter((r) => (r.className || "").replace(/\s+/g, "") === selectedClass.replace(/\s+/g, "") && r.groupName === "فوج 2").length})
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedGroup("القسم كامل")}
-                  className={`flex-1 py-1.5 px-1 rounded-lg transition text-center flex items-center justify-center gap-1 ${
-                    selectedGroup === "القسم كامل"
-                      ? "bg-slate-900 text-white shadow-2xs"
-                      : "text-slate-600 hover:bg-white/60"
-                  }`}
-                >
-                  <span>👥 القسم كامل</span>
-                  <span className="text-[10px] opacity-80">
-                    ({roster.filter((r) => (r.className || "").replace(/\s+/g, "") === selectedClass.replace(/\s+/g, "")).length})
-                  </span>
+                  <Plus className="w-4 h-4" />
+                  <span>استيراد قائمة الفوج الآن</span>
                 </button>
               </div>
-
-              {/* حقل البحث عن تلميذ في الجلسة */}
-              <div className="relative">
-                <input
-                  type="text"
-                  className="w-full bg-white py-2 pr-3 pl-8 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  placeholder="ابحث عن اسم تلميذ في هذا الفوج..."
-                  value={searchStudent}
-                  onChange={(e) => setSearchStudent(e.target.value)}
-                />
-                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              </div>
-
-              {/* قائمة بطاقات التلاميذ للتفقد السريع في الحصة */}
-              {(() => {
-                const studentsToDisplay = currentStudentsList.filter((st) =>
-                  !searchStudent.trim() ||
-                  st.studentName.toLowerCase().includes(searchStudent.trim().toLowerCase())
-                );
-
-                if (studentsToDisplay.length === 0) {
-                  return (
-                    <div className="p-6 bg-white rounded-2xl border border-dashed border-slate-200 text-center text-xs text-slate-400 space-y-2">
-                      <div>لا يوجد تلاميذ في قائمة هذا الفوج ({selectedClass} - {selectedGroup}).</div>
-                      <button
-                        type="button"
-                        onClick={() => setIsRosterModalOpen(true)}
-                        className="py-1.5 px-3 rounded-xl bg-sky-600 text-white font-bold text-xs inline-flex items-center gap-1 shadow-2xs"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>استيراد أسماء تلاميذ الفوج الآن</span>
-                      </button>
-                    </div>
-                  );
-                }
-
-                return (
-                  <div className="space-y-2.5">
-                    {studentsToDisplay.map((student) => {
-                      const rec: InspectionRecord = currentSession.records?.[student.studentName] || {
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-right border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50/80 text-slate-600 text-xs font-black border-b border-slate-100">
+                      <th className="py-3.5 px-4 w-12 text-center">#</th>
+                      <th className="py-3.5 px-4">اسم ولقب التلميذ</th>
+                      <th className="py-3.5 px-4 w-24 text-center">الفوج</th>
+                      <th className="py-3.5 px-4 w-36 text-center">كراس القسم (5ن)</th>
+                      <th className="py-3.5 px-4 w-36 text-center">الواجبات (5ن)</th>
+                      <th className="py-3.5 px-4 w-32 text-center">السلوك (5ن)</th>
+                      <th className="py-3.5 px-4 w-32 text-center">المشاركة (5ن)</th>
+                      <th className="py-3.5 px-4 w-28 text-center">المجموع (20)</th>
+                      <th className="py-3.5 px-4 w-32 text-center">إجراءات سريعة</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-xs">
+                    {filteredStudents.map((student, idx) => {
+                      const rec = currentSession?.records?.[student.studentName] || {
                         studentName: student.studentName,
-                        lessonsDone: currentSession.totalLessons,
-                        homeworksDone: currentSession.totalHomeworks,
+                        lessonsDone: currentSession?.totalLessons || 8,
+                        homeworksDone: currentSession?.totalHomeworks || 8,
                         behaviorScore: 5,
                         activityScore: 5,
                         score: 20,
                       };
 
-                      const isFull =
-                        rec.lessonsDone === currentSession.totalLessons &&
-                        rec.homeworksDone === currentSession.totalHomeworks &&
-                        rec.behaviorScore === 5 &&
-                        rec.activityScore === 5;
-
-                      const isWeak = rec.score < 10;
-                      const isMed = rec.score >= 10 && rec.score < 15;
-                      const isGood = rec.score >= 15 && rec.score < 18;
-                      const isExc = rec.score >= 18;
-
                       return (
-                        <div
-                          key={student.studentName}
-                          className="bg-white rounded-2xl p-3.5 border border-slate-200 shadow-2xs space-y-2.5 hover:border-emerald-300 transition"
-                        >
-                          {/* سطر الاسم والعلامة الإجمالية وزر تبديل الفوج السريع */}
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span className="font-black text-sm text-slate-900 truncate">
-                                {student.studentName}
+                        <tr key={student.studentName} className="hover:bg-slate-50/60 transition">
+                          <td className="py-3 px-4 text-center text-slate-400 font-mono font-bold">
+                            {idx + 1}
+                          </td>
+                          <td className="py-3 px-4 font-bold text-slate-800">
+                            {student.studentName}
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 text-[11px] font-bold">
+                              {student.groupName}
+                            </span>
+                          </td>
+
+                          {/* كراس القسم (تعديل سريع) */}
+                          <td className="py-3 px-4 text-center">
+                            <div className="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2 py-1 rounded-xl">
+                              <button
+                                onClick={() =>
+                                  handleUpdateRecord(student.studentName, {
+                                    lessonsDone: Math.max(0, (rec.lessonsDone || 0) - 1),
+                                  })
+                                }
+                                className="w-5 h-5 rounded-md bg-white hover:bg-slate-100 flex items-center justify-center font-bold text-slate-600 cursor-pointer"
+                              >
+                                -
+                              </button>
+                              <span className="font-mono font-black text-emerald-800 px-1 text-xs">
+                                {rec.lessonsDone} / {currentSession?.totalLessons || 8}
                               </span>
                               <button
-                                type="button"
-                                onClick={() => handleToggleStudentGroup(student)}
-                                className={`px-2 py-0.5 rounded-md text-[10px] font-black shrink-0 transition border active:scale-95 ${
-                                  (student.groupName || "فوج 1") === "فوج 1"
-                                    ? "bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100"
-                                    : "bg-blue-50 text-blue-800 border-blue-300 hover:bg-blue-100"
-                                }`}
-                                title="انقر لنقل التلميذ مباشرة بين فوج 1 وفوج 2"
+                                onClick={() =>
+                                  handleUpdateRecord(student.studentName, {
+                                    lessonsDone: Math.min(
+                                      currentSession?.totalLessons || 8,
+                                      (rec.lessonsDone || 0) + 1
+                                    ),
+                                  })
+                                }
+                                className="w-5 h-5 rounded-md bg-white hover:bg-slate-100 flex items-center justify-center font-bold text-slate-600 cursor-pointer"
                               >
-                                {(student.groupName || "فوج 1") === "فوج 1" ? "🟢 فوج 1" : "🔵 فوج 2"}
+                                +
                               </button>
                             </div>
+                          </td>
 
-                            {/* شارة العلامة */}
-                            <div
-                              className={`px-3 py-1 rounded-xl font-black text-xs shadow-2xs flex items-center gap-1 ${
-                                isExc
-                                  ? "bg-emerald-600 text-white"
-                                  : isGood
-                                  ? "bg-teal-600 text-white"
-                                  : isMed
-                                  ? "bg-amber-500 text-white"
-                                  : "bg-rose-600 text-white"
-                              }`}
-                            >
-                              <span>{rec.score} / 20</span>
-                              <span className="text-[10px] opacity-80">
-                                {isExc ? "🟢" : isGood ? "🔵" : isMed ? "🟡" : "🔴"}
+                          {/* الواجبات */}
+                          <td className="py-3 px-4 text-center">
+                            <div className="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2 py-1 rounded-xl">
+                              <button
+                                onClick={() =>
+                                  handleUpdateRecord(student.studentName, {
+                                    homeworksDone: Math.max(0, (rec.homeworksDone || 0) - 1),
+                                  })
+                                }
+                                className="w-5 h-5 rounded-md bg-white hover:bg-slate-100 flex items-center justify-center font-bold text-slate-600 cursor-pointer"
+                              >
+                                -
+                              </button>
+                              <span className="font-mono font-black text-amber-800 px-1 text-xs">
+                                {rec.homeworksDone} / {currentSession?.totalHomeworks || 8}
                               </span>
+                              <button
+                                onClick={() =>
+                                  handleUpdateRecord(student.studentName, {
+                                    homeworksDone: Math.min(
+                                      currentSession?.totalHomeworks || 8,
+                                      (rec.homeworksDone || 0) + 1
+                                    ),
+                                  })
+                                }
+                                className="w-5 h-5 rounded-md bg-white hover:bg-slate-100 flex items-center justify-center font-bold text-slate-600 cursor-pointer"
+                              >
+                                +
+                              </button>
                             </div>
-                          </div>
+                          </td>
 
-                          {/* زر لمسة واحدة: مكتمل بالكامل 20/20 */}
-                          <button
-                            type="button"
-                            onClick={() => handleSetFullScore(student.studentName)}
-                            className={`w-full py-1.5 px-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 ${
-                              isFull
-                                ? "bg-emerald-50 text-emerald-800 border-2 border-emerald-400 shadow-2xs"
-                                : "bg-slate-50 text-slate-600 border border-slate-200 hover:bg-emerald-50 hover:text-emerald-800"
-                            }`}
-                          >
-                            <Check className="w-3.5 h-3.5" />
-                            <span>
-                              {isFull ? "✓ كل شيء كامل ومتقن (20 / 20)" : "تعيين مكتمل بالكامل (20 / 20)"}
+                          {/* السلوك (من 5) */}
+                          <td className="py-3 px-4 text-center">
+                            <select
+                              value={rec.behaviorScore ?? 5}
+                              onChange={(e) =>
+                                handleUpdateRecord(student.studentName, {
+                                  behaviorScore: Number(e.target.value),
+                                })
+                              }
+                              className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs font-bold text-blue-800 focus:outline-none cursor-pointer"
+                            >
+                              {[5, 4.5, 4, 3.5, 3, 2.5, 2, 1, 0].map((v) => (
+                                <option key={v} value={v}>
+                                  {v} ن
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+
+                          {/* المشاركة والاستجوابات (من 5) */}
+                          <td className="py-3 px-4 text-center">
+                            <select
+                              value={rec.activityScore ?? 5}
+                              onChange={(e) =>
+                                handleUpdateRecord(student.studentName, {
+                                  activityScore: Number(e.target.value),
+                                })
+                              }
+                              className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs font-bold text-purple-800 focus:outline-none cursor-pointer"
+                            >
+                              {[5, 4.5, 4, 3.5, 3, 2.5, 2, 1, 0].map((v) => (
+                                <option key={v} value={v}>
+                                  {v} ن
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+
+                          {/* المجموع من 20 */}
+                          <td className="py-3 px-4 text-center">
+                            <span className="font-mono font-black text-sm px-2.5 py-1 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200">
+                              {rec.score ?? 20}
                             </span>
-                          </button>
+                          </td>
 
-                          {/* معايير التفقد الأربعة التفصيلية - أزرار لمس مريحة للهاتف */}
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-0.5">
-                            {/* 1. كراس الدروس */}
-                            <div className="bg-slate-50/90 p-2.5 rounded-xl border border-slate-200 space-y-1.5">
-                              <div className="flex justify-between items-center text-xs font-black text-slate-700">
-                                <span>📘 كراس الدروس:</span>
-                                <span className="text-emerald-700 font-extrabold bg-emerald-100/70 px-2 py-0.5 rounded-md text-[11px]">
-                                  {rec.lessonsDone} / {currentSession.totalLessons}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-1.5">
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    handleUpdateRecord(student.studentName, {
-                                      lessonsDone: Math.max(0, rec.lessonsDone - 1),
-                                    })
-                                  }
-                                  className="w-9 h-9 rounded-xl bg-white border border-slate-200 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300 font-black text-lg text-slate-700 active:scale-90 transition flex items-center justify-center shrink-0 shadow-2xs"
-                                  title="إنقاص درس"
-                                >
-                                  -
-                                </button>
-                                <div className="flex-1 text-center font-black text-xs text-slate-800 bg-white py-2 rounded-xl border border-slate-100 shadow-inner">
-                                  {rec.lessonsDone === currentSession.totalLessons ? "كامل ✓" : `${rec.lessonsDone} درس`}
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    handleUpdateRecord(student.studentName, {
-                                      lessonsDone: Math.min(currentSession.totalLessons, rec.lessonsDone + 1),
-                                    })
-                                  }
-                                  className="w-9 h-9 rounded-xl bg-white border border-slate-200 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300 font-black text-lg text-slate-700 active:scale-90 transition flex items-center justify-center shrink-0 shadow-2xs"
-                                  title="زيادة درس"
-                                >
-                                  +
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    handleUpdateRecord(student.studentName, {
-                                      lessonsDone: currentSession.totalLessons,
-                                    })
-                                  }
-                                  className="px-2 h-9 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 font-black text-[11px] active:scale-95 transition shrink-0"
-                                >
-                                  كامل
-                                </button>
-                              </div>
+                          {/* زر لمسة واحدة 20/20 + حذف */}
+                          <td className="py-3 px-4 text-center">
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                onClick={() => handleSetFullScore(student.studentName)}
+                                className="px-2 py-1 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold text-[11px] transition cursor-pointer"
+                                title="منح علامة 20/20 كاملة"
+                              >
+                                🌟 20
+                              </button>
+                              <button
+                                onClick={() => handleDeleteStudent(student.studentName)}
+                                className="p-1 rounded-lg text-slate-400 hover:text-red-600 transition cursor-pointer"
+                                title="حذف من الفوج"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
                             </div>
-
-                            {/* 2. حل الواجبات */}
-                            <div className="bg-slate-50/90 p-2.5 rounded-xl border border-slate-200 space-y-1.5">
-                              <div className="flex justify-between items-center text-xs font-black text-slate-700">
-                                <span>📝 حل الواجبات:</span>
-                                <span className="text-sky-700 font-extrabold bg-sky-100/70 px-2 py-0.5 rounded-md text-[11px]">
-                                  {rec.homeworksDone} / {currentSession.totalHomeworks}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-1.5">
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    handleUpdateRecord(student.studentName, {
-                                      homeworksDone: Math.max(0, rec.homeworksDone - 1),
-                                    })
-                                  }
-                                  className="w-9 h-9 rounded-xl bg-white border border-slate-200 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300 font-black text-lg text-slate-700 active:scale-90 transition flex items-center justify-center shrink-0 shadow-2xs"
-                                  title="إنقاص واجب"
-                                >
-                                  -
-                                </button>
-                                <div className="flex-1 text-center font-black text-xs text-slate-800 bg-white py-2 rounded-xl border border-slate-100 shadow-inner">
-                                  {rec.homeworksDone === currentSession.totalHomeworks ? "كامل ✓" : `${rec.homeworksDone} واجب`}
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    handleUpdateRecord(student.studentName, {
-                                      homeworksDone: Math.min(currentSession.totalHomeworks, rec.homeworksDone + 1),
-                                    })
-                                  }
-                                  className="w-9 h-9 rounded-xl bg-white border border-slate-200 hover:bg-sky-50 hover:text-sky-700 hover:border-sky-300 font-black text-lg text-slate-700 active:scale-90 transition flex items-center justify-center shrink-0 shadow-2xs"
-                                  title="زيادة واجب"
-                                >
-                                  +
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    handleUpdateRecord(student.studentName, {
-                                      homeworksDone: currentSession.totalHomeworks,
-                                    })
-                                  }
-                                  className="px-2 h-9 rounded-xl bg-sky-50 border border-sky-200 text-sky-800 font-black text-[11px] active:scale-95 transition shrink-0"
-                                >
-                                  كامل
-                                </button>
-                              </div>
-                            </div>
-
-                            {/* 3. علامة السلوك والأدوات */}
-                            <div className="bg-slate-50/90 p-2.5 rounded-xl border border-slate-200 space-y-1.5">
-                              <div className="flex justify-between items-center text-xs font-black text-slate-700">
-                                <span>⚖️ السلوك والأدوات:</span>
-                                <span className="text-amber-700 font-extrabold bg-amber-100/70 px-2 py-0.5 rounded-md text-[11px]">
-                                  {rec.behaviorScore} / 5
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-1.5">
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    handleUpdateRecord(student.studentName, {
-                                      behaviorScore: Math.max(0, rec.behaviorScore - 1),
-                                    })
-                                  }
-                                  className="w-9 h-9 rounded-xl bg-white border border-slate-200 hover:bg-rose-50 hover:text-rose-700 font-black text-lg text-slate-700 active:scale-90 transition flex items-center justify-center shrink-0 shadow-2xs"
-                                >
-                                  -
-                                </button>
-                                <div className="flex-1 text-center font-black text-xs text-slate-800 bg-white py-2 rounded-xl border border-slate-100 shadow-inner">
-                                  {rec.behaviorScore} من 5
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    handleUpdateRecord(student.studentName, {
-                                      behaviorScore: Math.min(5, rec.behaviorScore + 1),
-                                    })
-                                  }
-                                  className="w-9 h-9 rounded-xl bg-white border border-slate-200 hover:bg-amber-50 hover:text-amber-700 font-black text-lg text-slate-700 active:scale-90 transition flex items-center justify-center shrink-0 shadow-2xs"
-                                >
-                                  +
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    handleUpdateRecord(student.studentName, { behaviorScore: 5 })
-                                  }
-                                  className="px-2 h-9 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 font-black text-[11px] active:scale-95 transition shrink-0"
-                                >
-                                  5ن
-                                </button>
-                              </div>
-                            </div>
-
-                            {/* 4. علامة حل النشاط والمشاركة */}
-                            <div className="bg-slate-50/90 p-2.5 rounded-xl border border-slate-200 space-y-1.5">
-                              <div className="flex justify-between items-center text-xs font-black text-slate-700">
-                                <span>💡 حل النشاط:</span>
-                                <span className="text-purple-700 font-extrabold bg-purple-100/70 px-2 py-0.5 rounded-md text-[11px]">
-                                  {rec.activityScore} / 5
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-1.5">
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    handleUpdateRecord(student.studentName, {
-                                      activityScore: Math.max(0, rec.activityScore - 1),
-                                    })
-                                  }
-                                  className="w-9 h-9 rounded-xl bg-white border border-slate-200 hover:bg-rose-50 hover:text-rose-700 font-black text-lg text-slate-700 active:scale-90 transition flex items-center justify-center shrink-0 shadow-2xs"
-                                >
-                                  -
-                                </button>
-                                <div className="flex-1 text-center font-black text-xs text-slate-800 bg-white py-2 rounded-xl border border-slate-100 shadow-inner">
-                                  {rec.activityScore} من 5
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    handleUpdateRecord(student.studentName, {
-                                      activityScore: Math.min(5, rec.activityScore + 1),
-                                    })
-                                  }
-                                  className="w-9 h-9 rounded-xl bg-white border border-slate-200 hover:bg-purple-50 hover:text-purple-700 font-black text-lg text-slate-700 active:scale-90 transition flex items-center justify-center shrink-0 shadow-2xs"
-                                >
-                                  +
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    handleUpdateRecord(student.studentName, { activityScore: 5 })
-                                  }
-                                  className="px-2 h-9 rounded-xl bg-purple-50 border border-purple-200 text-purple-800 font-black text-[11px] active:scale-95 transition shrink-0"
-                                >
-                                  5ن
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* ملخص احتساب العلامة الصفي */}
-                          <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-slate-100">
-                            <span>
-                              كراس: {((rec.lessonsDone / currentSession.totalLessons) * 5).toFixed(1)}ن • واجب:{" "}
-                              {((rec.homeworksDone / currentSession.totalHomeworks) * 5).toFixed(1)}ن • سلوك:{" "}
-                              {rec.behaviorScore}ن • نشاط: {rec.activityScore}ن
-                            </span>
-                            <span className="font-bold text-slate-700">{rec.score} / 20</span>
-                          </div>
-                        </div>
+                          </td>
+                        </tr>
                       );
                     })}
-                  </div>
-                );
-              })()}
-            </div>
-          )}
-        </div>
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </section>
+        )
       )}
 
-      {/* ======================================================== */}
-      {/* 2. تبويب جدول المعدل العام (المتوسط الحسابي للمراقبات) */}
-      {/* ======================================================== */}
-      {activeTab === "averages" && (
-        <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-2xs space-y-4">
-          <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-            <div>
-              <h2 className="text-sm font-black text-slate-900">
-                جدول معدلات التقويم المستمر — {selectedClass} ({selectedGroup})
-              </h2>
-              <p className="text-[11px] text-slate-400">
-                المتوسط الحسابي التلقائي لجميع جلسات المراقبة الدورية المنجزة حتى الآن
+      {/* ════════════════════════════════════════════════════════════════
+          التبويب 3: سجل جلسات المراقبة الدورية والتحميل الاحتياطي
+          ════════════════════════════════════════════════════════════════ */}
+      {activeTab === "sessions" && (
+        !isAuthenticated ? (
+          <div className="bg-white rounded-3xl p-10 border border-slate-200/80 shadow-xs text-center space-y-4 max-w-lg mx-auto my-8 fade-up">
+            <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto shadow-inner">
+              <BarChart3 className="w-7 h-7" />
+            </div>
+            <div className="space-y-1.5">
+              <h3 className="text-lg font-black text-slate-800">سجل جلسات التفقد الدوري</h3>
+              <p className="text-xs text-slate-500 leading-relaxed max-w-sm mx-auto">
+                توثيق جلسات المراقبة الدورية للكراريس والواجبات متاح للأستاذ المسجل. يرجى تسجيل الدخول بحسابك.
               </p>
             </div>
-
-            <button
-              type="button"
-              onClick={() => setShowEvalPrintModal(true)}
-              className="py-1 px-2.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 text-[11px] font-bold flex items-center gap-1 transition"
-            >
-              <Printer className="w-3.5 h-3.5" />
-              <span>طباعة</span>
-            </button>
+            <div className="pt-2">
+              <Link
+                href="/login?next=/eval"
+                className="btn-primary text-xs py-3 px-8 font-black shadow-md inline-flex items-center gap-2 cursor-pointer"
+              >
+                <LogIn className="w-4 h-4" />
+                <span>تسجيل الدخول كأستاذ</span>
+              </Link>
+            </div>
           </div>
-
-          {sessions.length === 0 ? (
-            <div className="text-center py-8 text-xs text-slate-400 space-y-1">
-              <div>لم تسجل أي جلسات مراقبة لهذا الفوج بعد.</div>
-              <div className="text-emerald-700 font-bold">ابدأ أول جلسة مراقبة ليتم احتساب المعدل تلقائياً!</div>
-            </div>
-          ) : currentStudentsList.length === 0 ? (
-            <div className="text-center py-8 text-xs text-slate-400">
-              لا توجد أسماء مسجلة في هذا الفوج.
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-right text-xs">
-                <thead>
-                  <tr className="bg-slate-50 text-slate-700 border-b border-slate-200 text-[11px]">
-                    <th className="py-2 px-2 font-black">#</th>
-                    <th className="py-2 px-2 font-black">اسم ولقب التلميذ</th>
-                    {sessions.map((s) => (
-                      <th key={s.id} className="py-2 px-2 font-black text-center whitespace-nowrap">
-                        {s.title || `مراقبة ${s.sessionNumber}`}
-                        <span className="block text-[9px] text-slate-400 font-normal">
-                          {s.lessonRange}
-                        </span>
-                      </th>
-                    ))}
-                    <th className="py-2 px-2 font-black text-center bg-emerald-50 text-emerald-900">
-                      معدل التقويم المستمر
-                    </th>
-                    <th className="py-2 px-2 font-black text-center">التقدير</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {currentStudentsList.map((st, idx) => {
-                    const studentScores: number[] = [];
-                    for (const s of sessions) {
-                      const rec = s.records?.[st.studentName];
-                      if (rec && typeof rec.score === "number") {
-                        studentScores.push(rec.score);
-                      }
-                    }
-
-                    const avg =
-                      studentScores.length > 0
-                        ? (studentScores.reduce((a, b) => a + b, 0) / studentScores.length).toFixed(2)
-                        : "-";
-
-                    const numAvg = parseFloat(avg);
-                    const isExc = numAvg >= 18;
-                    const isGood = numAvg >= 14 && numAvg < 18;
-                    const isMed = numAvg >= 10 && numAvg < 14;
-                    const isWeak = numAvg < 10;
-
-                    return (
-                      <tr key={st.studentName} className="hover:bg-slate-50/80 transition">
-                        <td className="py-2.5 px-2 text-slate-400 font-bold text-[11px]">{idx + 1}</td>
-                        <td className="py-2.5 px-2 font-black text-slate-900">{st.studentName}</td>
-                        {sessions.map((s) => {
-                          const sc = s.records?.[st.studentName]?.score;
-                          return (
-                            <td key={s.id} className="py-2.5 px-2 text-center font-bold text-slate-700">
-                              {sc !== undefined ? `${sc}` : "-"}
-                            </td>
-                          );
-                        })}
-                        <td className="py-2.5 px-2 text-center font-black bg-emerald-50/60 text-emerald-900 text-sm">
-                          {avg !== "-" ? `${avg} / 20` : "-"}
-                        </td>
-                        <td className="py-2.5 px-2 text-center">
-                          {avg !== "-" ? (
-                            <span
-                              className={`px-2 py-0.5 rounded-md text-[10px] font-black ${
-                                isExc
-                                  ? "bg-emerald-100 text-emerald-800"
-                                  : isGood
-                                  ? "bg-teal-100 text-teal-800"
-                                  : isMed
-                                  ? "bg-amber-100 text-amber-800"
-                                  : "bg-rose-100 text-rose-800"
-                              }`}
-                            >
-                              {isExc ? "ممتاز 🟢" : isGood ? "جيد 🔵" : isMed ? "متوسط 🟡" : "ضعيف 🔴"}
-                            </span>
-                          ) : (
-                            "-"
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ======================================================== */}
-      {/* 3. تبويب إدارة قائمة وتفويج تلاميذ القسم */}
-      {/* ======================================================== */}
-      {activeTab === "roster" && (() => {
-        const allClassStudents = roster.filter(
-          (r) => (r.className || "").replace(/\s+/g, "") === selectedClass.replace(/\s+/g, "")
-        );
-        const group1Count = allClassStudents.filter((r) => r.groupName === "فوج 1").length;
-        const group2Count = allClassStudents.filter((r) => r.groupName === "فوج 2").length;
-
-        const displayedStudents = allClassStudents
-          .filter((r) => (rosterGroupFilter === "all" ? true : r.groupName === rosterGroupFilter))
-          .sort((a, b) => a.studentName.localeCompare(b.studentName, "ar"));
-
-        return (
-          <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-2xs space-y-3.5">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100 flex-wrap gap-2">
+        ) : (
+        <section className="space-y-6 fade-up">
+          <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <h2 className="text-xs font-black text-slate-900">
-                  قائمة وتفويج تلاميذ {selectedClass}
-                </h2>
-                <p className="text-[10px] text-slate-400">
-                  إجمالي القسم: {allClassStudents.length} تلميذ • (فوج 1: {group1Count} • فوج 2: {group2Count})
+                <h2 className="text-lg font-black text-slate-900">سجل جلسات التفقد الدوري للكراريس والواجبات</h2>
+                <p className="text-xs text-slate-500 font-medium">
+                  توثيق المراقبات المرحلية (الدروس 1-8، 9-16...) لربط التلميذ بالمراجعة الدورية
                 </p>
               </div>
 
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-2">
                 <button
-                  type="button"
-                  onClick={handleAutoSplitGroups}
-                  className="py-1 px-2.5 rounded-xl bg-purple-50 text-purple-800 hover:bg-purple-100 border border-purple-200 font-bold text-xs flex items-center gap-1 transition"
-                  title="تقسيم التلاميذ تلقائياً بالتساوي بين الفوجين"
+                  onClick={() => setIsNewSessionModalOpen(true)}
+                  className="btn-primary text-xs py-2.5 px-4 font-bold cursor-pointer inline-flex items-center gap-1.5"
                 >
-                  <ArrowLeftRight className="w-3.5 h-3.5 text-purple-600" />
-                  <span>تقسيم آلي (50/50)</span>
+                  <Plus className="w-4 h-4" />
+                  <span>بدء جلسة مراقبة جديدة</span>
                 </button>
-
                 <button
-                  type="button"
-                  onClick={() => setIsRosterModalOpen(true)}
-                  className="py-1 px-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs flex items-center gap-1 shadow-2xs transition"
+                  onClick={handleExportJson}
+                  className="px-3 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                  title="تصدير نسخة احتياطية JSON"
                 >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>استيراد أسماء</span>
+                  <Download className="w-3.5 h-3.5" />
+                  <span>تصدير JSON</span>
                 </button>
               </div>
             </div>
 
-            {/* تنبيه ذكي عند وجود جميع التلاميذ في فوج واحد */}
-            {allClassStudents.length > 0 && group2Count === 0 && (
-              <div className="bg-amber-50/80 border border-amber-200/90 p-3 rounded-xl text-xs text-amber-900 space-y-1">
-                <div className="font-black flex items-center gap-1.5">
-                  <Sparkles className="w-4 h-4 text-amber-600" />
-                  <span>تلميح لتنظيم حصص التفويج:</span>
-                </div>
-                <p className="text-[11px] leading-relaxed text-amber-800 font-medium">
-                  جميع تلاميذ هذا القسم ({allClassStudents.length} تلميذ) مسجلون حالياً ضمن <strong>فوج 1</strong>.
-                  يمكنك الضغط على زر <strong>[⚡ تقسيم آلي (50/50)]</strong> أعلاه لتوزيع نصفهم إلى فوج 2 بنقرة واحدة،
-                  أو النقر على زر الفوج بجانب أي تلميذ بالأسفل لنقله مباشرة.
-                </p>
-              </div>
-            )}
-
-            {/* فلتر عرض الأفواج */}
-            <div className="grid grid-cols-3 gap-1 bg-slate-100/80 p-1 rounded-xl text-center text-xs font-black">
-              <button
-                type="button"
-                onClick={() => setRosterGroupFilter("all")}
-                className={`py-1 rounded-lg transition ${
-                  rosterGroupFilter === "all"
-                    ? "bg-white text-slate-900 shadow-2xs"
-                    : "text-slate-600 hover:bg-white/40"
-                }`}
-              >
-                الكل ({allClassStudents.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setRosterGroupFilter("فوج 1")}
-                className={`py-1 rounded-lg transition ${
-                  rosterGroupFilter === "فوج 1"
-                    ? "bg-emerald-600 text-white shadow-2xs"
-                    : "text-slate-600 hover:bg-white/40"
-                }`}
-              >
-                فوج 1 ({group1Count}) 🟢
-              </button>
-              <button
-                type="button"
-                onClick={() => setRosterGroupFilter("فوج 2")}
-                className={`py-1 rounded-lg transition ${
-                  rosterGroupFilter === "فوج 2"
-                    ? "bg-blue-600 text-white shadow-2xs"
-                    : "text-slate-600 hover:bg-white/40"
-                }`}
-              >
-                فوج 2 ({group2Count}) 🔵
-              </button>
-            </div>
-
-            {/* إضافة تلميذ فردي */}
-            <form onSubmit={handleAddSingleStudent} className="flex gap-1.5">
-              <input
-                className="flex-1 py-1.5 px-3 rounded-xl border border-slate-200 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-sky-500"
-                placeholder="اسم ولقب تلميذ جديد..."
-                value={singleStudentName}
-                onChange={(e) => setSingleStudentName(e.target.value)}
-              />
-              <button
-                type="submit"
-                className="py-1.5 px-3 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition"
-              >
-                إضافة
-              </button>
-            </form>
-
-            {/* عرض أسماء التلاميذ مع زر التبديل بين الفوجين بنقرة واحدة */}
-            {displayedStudents.length === 0 ? (
-              <div className="text-center py-8 text-xs text-slate-400">
-                لا توجد أسماء مسجلة في هذا الفوج. اضغط "استيراد أسماء" لإضافتهم دفعة واحدة.
-              </div>
-            ) : (
-              <div className="divide-y divide-slate-100 max-h-96 overflow-y-auto">
-                {displayedStudents.map((st, idx) => (
-                  <div key={st.studentName} className="py-2 flex items-center justify-between text-xs gap-2">
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-600 font-bold text-[10px] flex items-center justify-center shrink-0">
-                        {idx + 1}
-                      </span>
-                      <span className="font-bold text-slate-800 truncate">{st.studentName}</span>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {/* زر تبديل الفوج بنقرة واحدة */}
-                      <button
-                        type="button"
-                        onClick={() => handleToggleStudentGroup(st)}
-                        className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition flex items-center gap-1 active:scale-95 border ${
-                          st.groupName === "فوج 1"
-                            ? "bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100"
-                            : "bg-blue-50 text-blue-800 border-blue-300 hover:bg-blue-100"
-                        }`}
-                        title="انقر لنقل التلميذ مباشرة إلى الفوج الآخر"
-                      >
-                        <ArrowLeftRight className="w-3 h-3" />
-                        <span>{st.groupName === "فوج 1" ? "فوج 1 🟢" : "فوج 2 🔵"}</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteStudent(st.studentName)}
-                        className="p-1 text-slate-300 hover:text-red-600 transition"
-                        title="حذف هذا التلميذ"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+            {/* بطاقات الجلسات */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
+              {sessions.map((sess) => (
+                <div
+                  key={sess.id}
+                  onClick={() => {
+                    setActiveSessionId(sess.id);
+                    setActiveTab("roster");
+                  }}
+                  className={`p-5 rounded-2xl border transition cursor-pointer space-y-3 ${
+                    activeSessionId === sess.id
+                      ? "bg-emerald-50/60 border-emerald-500 shadow-xs"
+                      : "bg-slate-50 border-slate-200 hover:bg-white hover:border-slate-300"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-emerald-800 bg-white px-2.5 py-1 rounded-lg border border-emerald-200">
+                      {sess.className}
+                    </span>
+                    <span className="text-[11px] text-slate-400 font-mono">
+                      {sess.date || "مستمرة"}
+                    </span>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-        );
-      })()}
 
-      {/* ======================================================== */}
-      {/* نافذة منبثقة: بدء جلسة مراقبة جديدة */}
-      {/* ======================================================== */}
-      {isNewSessionModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <form
-            onSubmit={handleCreateSession}
-            className="bg-white rounded-3xl p-5 max-w-sm w-full space-y-3.5 shadow-xl border border-slate-100 fade-up"
-          >
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center">
-                  <Calendar className="w-4 h-4" />
+                  <div>
+                    <h3 className="font-black text-sm text-slate-900">{sess.title}</h3>
+                    <p className="text-xs text-slate-500 font-medium">{sess.lessonRange || "الدروس المقررة"}</p>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 text-xs">
+                    <span className="text-slate-500">
+                      الدروس: <strong>{sess.totalLessons}</strong> • الواجبات: <strong>{sess.totalHomeworks}</strong>
+                    </span>
+                    <span className="text-emerald-700 font-bold hover:underline inline-flex items-center gap-1">
+                      <span>عرض الرصد</span>
+                      <ChevronRight className="w-3 h-3" />
+                    </span>
+                  </div>
                 </div>
-                <h3 className="font-extrabold text-sm text-slate-900">بدء جلسة مراقبة جديدة</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsNewSessionModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:bg-slate-100"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="p-2 rounded-xl bg-emerald-50/60 border border-emerald-200 text-xs font-bold text-emerald-950 flex items-center justify-between">
-              <span>القسم: {selectedClass}</span>
-              <span>الفوج: {selectedGroup}</span>
-            </div>
-
-            <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">
-                تاريخ ويوم الحصة:
-              </label>
-              <input
-                className="w-full py-2 px-3 rounded-xl border border-slate-200 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                placeholder="مثال: الأربعاء 09 أكتوبر 2026"
-                value={sessionDateInput}
-                onChange={(e) => setSessionDateInput(e.target.value)}
-                required
-              />
-            </div>
-
-            <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">
-                مجال الدروس المعنية بالمراقبة:
-              </label>
-              <input
-                className="w-full py-2 px-3 rounded-xl border border-slate-200 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                placeholder="مثال: من 1 إلى 8 (أو من 9 إلى 15)"
-                value={sessionRangeInput}
-                onChange={(e) => setSessionRangeInput(e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">
-                  عدد الدروس المقررة:
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="50"
-                  className="w-full py-2 px-3 rounded-xl border border-slate-200 text-xs font-bold text-center focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  value={sessionLessonsCount}
-                  onChange={(e) => setSessionLessonsCount(Number(e.target.value))}
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">
-                  عدد الواجبات المقررة:
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="50"
-                  className="w-full py-2 px-3 rounded-xl border border-slate-200 text-xs font-bold text-center focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  value={sessionHomeworksCount}
-                  onChange={(e) => setSessionHomeworksCount(Number(e.target.value))}
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-2 pt-2">
-              <button
-                type="submit"
-                className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm transition"
-              >
-                حفظ وبدء التفقد الميداني
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsNewSessionModalOpen(false)}
-                className="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition"
-              >
-                إلغاء
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* ======================================================== */}
-      {/* نافذة منبثقة: استيراد دفعة تلاميذ */}
-      {/* ======================================================== */}
-      {isRosterModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-5 max-w-sm w-full space-y-3.5 shadow-xl border border-slate-100 fade-up">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-sky-50 text-sky-700 flex items-center justify-center">
-                  <Users className="w-4 h-4" />
-                </div>
-                <h3 className="font-extrabold text-sm text-slate-900">
-                  استيراد تلاميذ {selectedClass} ({selectedGroup})
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsRosterModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:bg-slate-100"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">
-                الصق الأسماء هنا (كل اسم في سطر):
-              </label>
-              <textarea
-                className="w-full py-2 px-3 rounded-xl border border-slate-200 text-xs font-mono min-h-[140px] focus:outline-none focus:ring-2 focus:ring-sky-500"
-                placeholder={"أحمد بوخالفة\nسارة لعريبي\nيونس بلحاج\nمحمد زياني..."}
-                value={rosterBatchNames}
-                onChange={(e) => setRosterBatchNames(e.target.value)}
-              />
-              <p className="text-[10px] text-slate-400 mt-1">
-                انسخ العمود مباشرة من ملف إكسل أو وورد والصقه هنا.
-              </p>
-            </div>
-
-            <div className="flex gap-2 pt-1">
-              <button
-                type="button"
-                onClick={handleImportRoster}
-                className="flex-1 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs shadow-sm transition"
-              >
-                استيراد القائمة مباشرة
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsRosterModalOpen(false)}
-                className="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition"
-              >
-                إلغاء
-              </button>
+              ))}
             </div>
           </div>
-        </div>
+        </section>
+        )
       )}
 
-      {/* ── نافذة المعاينة والطباعة الرسمية لكشف التقويم المستمر A4 ── */}
+      {/* ─── نافذة طباعة كشف التنقيط الرسمي للأفواج ─── */}
       <PrintModal
         isOpen={showEvalPrintModal}
         onClose={() => setShowEvalPrintModal(false)}
-        documentTitle={`كشف تفريغ علامات التقويم المستمر — ${selectedClass}`}
+        documentTitle={`كشف تقويم ${selectedClass} (${selectedGroup})`}
       >
         <EvaluationRosterPrintDoc
           className={selectedClass}
           groupName={selectedGroup}
-          evaluations={currentStudentsList.map((st, idx) => {
-            const studentScores = [];
-            for (const s of sessions) {
-              const rec = s.records?.[st.studentName];
-              if (rec && typeof rec.score === 'number') studentScores.push(rec.score);
-            }
-            const avg =
-              studentScores.length > 0
-                ? Number((studentScores.reduce((a, b) => a + b, 0) / studentScores.length).toFixed(1))
-                : 15;
-
-            const lastS = sessions.length > 0 ? sessions[sessions.length - 1] : null;
-            const r = lastS?.records?.[st.studentName];
-
-            return {
-              id: `eval_print_${idx}`,
-              studentName: st.studentName,
-              className: selectedClass,
-              groupName: selectedGroup,
-              notebookScore: r ? Math.min(5, Math.round((r.lessonsDone / (lastS?.totalLessons || 8)) * 5)) : 4,
-              homeworkScore: r ? Math.min(5, Math.round((r.homeworksDone / (lastS?.totalHomeworks || 8)) * 5)) : 4,
-              toolsScore: r?.behaviorScore ?? 4,
-              activityScore: r?.activityScore ?? 4,
-              totalScore: avg,
-              rating: avg >= 16 ? 'excellent' : avg >= 14 ? 'very_good' : avg >= 12 ? 'good' : avg >= 10 ? 'medium' : 'weak',
-              ratingColor: avg >= 14 ? 'emerald' : avg >= 10 ? 'amber' : 'rose',
-              updatedAt: new Date().toISOString(),
-            };
-          })}
+          evaluations={evaluationsForPrint}
+          teacherName={teacherProfile.name}
+          schoolName={teacherProfile.school}
+          subjectName={teacherProfile.subject}
         />
       </PrintModal>
+
+      {/* ─── نافذة طباعة ميثاق التقويم الرسمي 20/20 ─── */}
+      <PrintModal
+        isOpen={showCharterPrintModal}
+        onClose={() => setShowCharterPrintModal(false)}
+        documentTitle="ميثاق التقويم البيداغوجي المستمر (20/20)"
+      >
+        <div className="p-8 space-y-6 text-black font-sans leading-relaxed" dir="rtl">
+          <div className="text-center space-y-1 border-b-2 border-black pb-4">
+            <p className="text-xs font-bold">الجمهورية الجزائرية الديمقراطية الشعبية — وزارة التربية الوطنية</p>
+            <h2 className="text-lg font-black">{teacherProfile.school}</h2>
+            <h1 className="text-xl font-black mt-2">
+              ميثاق ونظام التقويم البيداغوجي المستمر (20/20)
+            </h1>
+            <p className="text-xs text-gray-600">
+              المعايير المعتمدة للمراقبة المستمرة لمادة {teacherProfile.subject} — الأستاذ: {teacherProfile.name}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 text-xs">
+            <div className="border border-black p-3 rounded-lg space-y-1">
+              <p className="font-black text-sm">1. كراس الدروس والمحاولات (05 نقاط)</p>
+              <p className="text-gray-700 leading-relaxed">
+                اكتمال كافة عناصر الدرس، نظافة الكراس والتسطير، تدوين كافة التمارين وتصحيحها.
+              </p>
+            </div>
+
+            <div className="border border-black p-3 rounded-lg space-y-1">
+              <p className="font-black text-sm">2. الواجبات المنزلية والأنشطة (05 نقاط)</p>
+              <p className="text-gray-700 leading-relaxed">
+                تسليم الواجبات في مواعيدها، الجدية في المحاولات الفردية والمشاركة في المشاريع التربوية.
+              </p>
+            </div>
+
+            <div className="border border-black p-3 rounded-lg space-y-1">
+              <p className="font-black text-sm">3. الانضباط والسلوك والمواظبة (05 نقاط)</p>
+              <p className="text-gray-700 leading-relaxed">
+                احترام النظام الداخلي للمؤسسة، الحضور المنتظم، إحضار الكتاب والأدوات المدرسية كاملة.
+              </p>
+            </div>
+
+            <div className="border border-black p-3 rounded-lg space-y-1">
+              <p className="font-black text-sm">4. الاستجوابات والتقويم المرحلي (05 نقاط)</p>
+              <p className="text-gray-700 leading-relaxed">
+                الاستجوابات الكتابية المفاجئة والدورية، المشاركة في بناء الدرس، والحرص على التدارك.
+              </p>
+            </div>
+          </div>
+
+          <div className="border-t border-black pt-4 flex justify-between items-center text-xs font-bold">
+            <div>
+              <p>توقيع وختم أستاذ المادة:</p>
+              <p className="mt-8 font-normal">{teacherProfile.name}</p>
+            </div>
+            <div>
+              <p>توقيع وختم السيد مدير المتوسطة:</p>
+              <p className="mt-8 font-normal">....................................</p>
+            </div>
+          </div>
+        </div>
+      </PrintModal>
+
+      {/* ─── نافذة إنشاء جلسة جديدة ─── */}
+      {isNewSessionModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl border border-slate-100" dir="rtl">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="font-black text-slate-800 text-sm">بدء جلسة مراقبة وتفقد جديدة</h3>
+              <button onClick={() => setIsNewSessionModalOpen(false)} className="p-1 text-slate-400 hover:text-slate-600">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block font-bold text-slate-600 mb-1">عنوان الجلسة:</label>
+                <input
+                  type="text"
+                  placeholder="مثال: المراقبة الأولى للكراريس والواجبات"
+                  value={sessionTitleInput}
+                  onChange={(e) => setSessionTitleInput(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-emerald-600"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-600 mb-1">عدد الدروس المقررة:</label>
+                  <input
+                    type="number"
+                    value={sessionLessonsCount}
+                    onChange={(e) => setSessionLessonsCount(Number(e.target.value))}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-emerald-600 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-600 mb-1">عدد الواجبات المقررة:</label>
+                  <input
+                    type="number"
+                    value={sessionHomeworksCount}
+                    onChange={(e) => setSessionHomeworksCount(Number(e.target.value))}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-emerald-600 font-mono"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-2 flex justify-end gap-2">
+              <button
+                onClick={() => setIsNewSessionModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-slate-100 text-slate-600 text-xs font-bold"
+              >
+                إلغاء
+              </button>
+              <button
+                onClick={handleCreateSession}
+                className="btn-primary text-xs py-2 px-5 font-bold cursor-pointer"
+              >
+                تأكيد وبدء الجلسة
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── نافذة استيراد أسماء الفوج دفعة واحدة ─── */}
+      {isRosterModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl border border-slate-100" dir="rtl">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="font-black text-slate-800 text-sm">
+                استيراد أسماء تلاميذ {selectedClass} ({selectedGroup})
+              </h3>
+              <button onClick={() => setIsRosterModalOpen(false)} className="p-1 text-slate-400 hover:text-slate-600">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-2 text-xs">
+              <p className="text-slate-500">
+                الصق قائمة الأسماء هنا (كل تلميذ في سطر مستقل أو مفصولة بفواصل):
+              </p>
+              <textarea
+                rows={6}
+                value={rosterBatchNames}
+                onChange={(e) => setRosterBatchNames(e.target.value)}
+                placeholder={"محمد علي\nسارة أحمد\nيوسف خليل\n..."}
+                className="w-full p-3 rounded-2xl border border-slate-200 focus:outline-none focus:border-emerald-600 text-xs leading-relaxed"
+              />
+            </div>
+
+            <div className="pt-2 flex justify-end gap-2">
+              <button
+                onClick={() => setIsRosterModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-slate-100 text-slate-600 text-xs font-bold"
+              >
+                إلغاء
+              </button>
+              <button
+                onClick={handleImportRoster}
+                className="btn-primary text-xs py-2 px-5 font-bold cursor-pointer"
+              >
+                استيراد وإضافة للقائمة
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

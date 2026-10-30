@@ -18,7 +18,7 @@ export function EvaluationRosterPrintDoc({
   evaluations,
   teacherName = "أستاذ المادة",
   subjectName = "الرياضيات",
-  schoolName = "متوسطة ولاية الوادي",
+  schoolName = "المؤسسة التعليمية",
 }: Props) {
   const subtitle = `كشف تفريغ ومتابعة علامات التقويم المستمر (20/20) — قسم: ${className} ${groupName ? `(${groupName})` : ""}`;
 

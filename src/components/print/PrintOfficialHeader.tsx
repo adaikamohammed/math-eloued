@@ -12,8 +12,8 @@ interface Props {
 export function PrintOfficialHeader({
   title,
   subtitle,
-  schoolName = "متوسطة ولاية الوادي",
-  wilayaName = "الوادي",
+  schoolName = "المؤسسة التعليمية",
+  wilayaName = "مديرية التربية الوطنية",
   academicYear = "2026 / 2027",
   subjectName,
 }: Props) {
