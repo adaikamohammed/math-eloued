@@ -28,7 +28,7 @@ export function SafeHarborDisclaimer({
 
       <div className="flex items-center justify-center gap-2 text-[10px] text-slate-400">
         <Scale className="w-3 h-3 text-slate-400" />
-        <span>نظام الفضاءات البيداغوجية المستقلة — ولاية الوادي 2026</span>
+        <span>نظام الفضاءات البيداغوجية المستقلة — منصة جسور 2026</span>
       </div>
     </footer>
   );

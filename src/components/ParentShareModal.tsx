@@ -51,7 +51,7 @@ export function ParentShareModal({
     ? `${window.location.origin}/t/${slug || teacherCode}`
     : `/t/${slug || teacherCode}`;
 
-  const homeUrl = typeof window !== "undefined" ? window.location.origin : "https://qibab-dz.vercel.app";
+  const homeUrl = typeof window !== "undefined" ? window.location.origin : "https://josoor-dz.vercel.app";
 
   // توليد رمز QR
   useEffect(() => {
@@ -86,9 +86,9 @@ export function ParentShareModal({
   // نص الرسالة العامة الموجهة للأولياء
   const whatsappMessage = `السلام عليكم ورحمة الله وبركاته،
 أولياء التلاميذ المحترمين:
-لمتابعة دروس، سبورة القسم، والواجبات المنزلية لأبنائكم، يرجى الدخول إلى المنصة الرسمية:
+يسرنا دعوتكم لمتابعة دروس، سبورة القسم، والواجبات المنزلية لأبنائكم عبر *منصة جسور التعليمية* (حيث يلتقي الأستاذ، الولي، والتلميذ):
 🔗 الرابط المباشر: ${publicUrl}
-🔑 أو ادخل إلى المنصة: ${homeUrl} واكتب رمز الأستاذ: *${teacherCode}*
+🔑 أو ادخل إلى منصة جسور: ${homeUrl} واكتب رمز الأستاذ: *${teacherCode}*
 
 الأستاذ(ة): ${teacherName}
 ${schoolName}`;
@@ -143,9 +143,9 @@ ${schoolName}`;
   const handleShareLevelWhatsApp = (lvl: number) => {
     const lvlText = `السلام عليكم ورحمة الله وبركاته،
 أولياء وتلاميذ السنة ${lvl} متوسط المحترمين:
-لمتابعة كراس الدروس وصور السبورة اليومية والواجبات لمستوى ابنكم حصراً، يرجى الدخول عبر الرابط المباشر:
+لمتابعة كراس الدروس وصور السبورة اليومية والواجبات لمستوى ابنكم حصراً، يرجى الدخول عبر رابط منصة جسور التعليمية:
 🔗 ${publicUrl}?lvl=${lvl}
-🔑 أو ادخل للمنصة (${homeUrl}) واكتب رمز المستوى: *${teacherCode}-${lvl}*
+🔑 أو ادخل لمنصة جسور (${homeUrl}) واكتب رمز المستوى: *${teacherCode}-${lvl}*
 
 الأستاذ(ة): ${teacherName}
 ${schoolName}`;

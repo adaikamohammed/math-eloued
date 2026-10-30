@@ -112,7 +112,7 @@ export default async function TeacherPublicSpace({ params, searchParams }: Teach
               className="inline-flex items-center gap-1 hover:text-white transition bg-white/10 px-2.5 py-1 rounded-full backdrop-blur-xs"
             >
               <ArrowRight className="w-3.5 h-3.5" />
-              العودة لبوابة ولاية الوادي
+              العودة لبوابة منصة جسور
             </Link>
             <div className="flex items-center gap-2">
               <span className="font-mono bg-white/15 px-2.5 py-0.5 rounded-md font-bold text-[11px]">

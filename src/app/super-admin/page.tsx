@@ -344,7 +344,7 @@ export default function SuperAdminPage() {
               <Crown className="w-5 h-5 text-indigo-300" />
             </div>
             <div>
-              <p className="font-black text-sm">لوحة المشرف العام — ولاية الوادي</p>
+              <p className="font-black text-sm">لوحة المشرف العام — منصة جسور التعليمية</p>
               <p className="text-[11px] text-indigo-300">
                 {stats.teachers} أستاذ • {stats.inspectors} مفتش • {stats.total} حساب
               </p>

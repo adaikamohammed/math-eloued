@@ -115,7 +115,7 @@ export default function ForumPage() {
                 <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-md">
                   <Users className="w-6 h-6" />
                 </div>
-                <span>ملتقى أساتذة الرياضيات — ولاية الوادي</span>
+                <span>ملتقى أساتذة الرياضيات — منصة جسور</span>
               </h1>
               <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
                 مساحة حوار مهنية رفيعة لتبادل المذكرات، الوضعيات الانطلاقية، ومعالجة صعوبات التعلم. إجابات المفتشين تُميّز تلقائياً بختم <strong>«توجيه رسمي معتمد»</strong> وتثبّت في قمة النقاش.

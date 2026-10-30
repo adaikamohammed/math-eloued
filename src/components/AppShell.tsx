@@ -75,7 +75,7 @@ function AppShellContent({ children }: { children: React.ReactNode }) {
           </div>
 
           <footer className="mt-12 text-center text-xs text-gray-400 py-4 border-t border-[#e8e8e0] hidden md:block">
-            منظومة قِبَاب الجزائر للتربية والتعليم — Qibab El Djazair
+            منصة جسور التعليمية — حيث يلتقي الأستاذ، الولي، والتلميذ
           </footer>
         </main>
       </div>

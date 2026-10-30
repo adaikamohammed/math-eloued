@@ -21,15 +21,15 @@ export function LandingHeader() {
       <div className="max-w-6xl mx-auto h-16 flex items-center justify-between gap-4">
         {/* الشعار والهوية الرسمية */}
         <Link href="/" className="flex items-center gap-3 group min-w-0">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#107a57] to-[#0a5c40] flex items-center justify-center text-white shadow-md shadow-[#107a57]/20 group-hover:scale-105 transition-transform shrink-0">
-            <BookOpen className="w-5 h-5 text-white" />
+          <div className="w-10 h-10 rounded-full overflow-hidden border border-emerald-600/20 bg-white shadow-md shadow-[#107a57]/20 group-hover:scale-105 transition-transform shrink-0">
+            <img src="/icon.svg" alt="منصة جسور التعليمية" className="w-full h-full object-contain" />
           </div>
           <div className="leading-tight min-w-0">
             <p className="text-sm sm:text-base font-black text-gray-900 truncate">
-              قِبَاب الجزائر
+              منصة جسور التعليمية
             </p>
             <p className="text-[10px] sm:text-[11px] text-[#107a57] font-bold truncate">
-              المنظومة الوطنية للتربية والتعليم • Qibab El Djazair
+              حيث يلتقي الأستاذ، الولي، والتلميذ
             </p>
           </div>
         </Link>

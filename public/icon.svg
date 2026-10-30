@@ -1,52 +1,64 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-labelledby="jusoorIconTitle">
+  <title id="jusoorIconTitle">منصة جسور التعليمية</title>
   <defs>
-    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#10b981"/>
-      <stop offset="45%" stop-color="#059669"/>
+    <linearGradient id="emeraldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#107a57"/>
       <stop offset="100%" stop-color="#064e3b"/>
     </linearGradient>
     <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#fde047"/>
-      <stop offset="50%" stop-color="#f59e0b"/>
+      <stop offset="0%" stop-color="#fbbf24"/>
       <stop offset="100%" stop-color="#d97706"/>
     </linearGradient>
-    <filter id="shadow" x="-10%" y="-10%" width="130%" height="130%">
-      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#000" flood-opacity="0.35"/>
+    <filter id="badgeShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#000000" flood-opacity="0.12"/>
     </filter>
   </defs>
 
-  <!-- Squircle Background -->
-  <rect x="16" y="16" width="480" height="480" rx="112" fill="url(#bgGrad)" filter="url(#shadow)"/>
-  <rect x="22" y="22" width="468" height="468" rx="106" fill="none" stroke="url(#goldGrad)" stroke-width="8" opacity="0.85"/>
+  <!-- Background Base -->
+  <rect width="512" height="512" rx="100" fill="#ffffff"/>
 
-  <!-- Math Geometry Grid Accents -->
-  <circle cx="256" cy="256" r="170" fill="none" stroke="#ffffff" stroke-width="2" stroke-dasharray="6,8" opacity="0.2"/>
-  <circle cx="256" cy="256" r="120" fill="none" stroke="#ffffff" stroke-width="1.5" opacity="0.15"/>
+  <!-- Outer Single Circle -->
+  <circle cx="256" cy="256" r="215" fill="none" stroke="url(#emeraldGrad)" stroke-width="22" filter="url(#badgeShadow)"/>
+  <circle cx="256" cy="256" r="195" fill="none" stroke="url(#goldGrad)" stroke-width="4" opacity="0.6"/>
 
-  <!-- Center Sigma Symbol ∑ -->
-  <text x="256" y="310" 
-        font-family="system-ui, -apple-system, 'Segoe UI', Arial, sans-serif" 
-        font-size="250" 
-        font-weight="900" 
-        fill="#ffffff" 
-        text-anchor="middle"
-        filter="url(#shadow)">∑</text>
+  <!-- Inner Soft Backdrop -->
+  <circle cx="256" cy="256" r="190" fill="#f8fcf9"/>
 
-  <!-- Subtitle Text -->
-  <text x="256" y="420" 
-        font-family="system-ui, -apple-system, 'Segoe UI', Arial, sans-serif" 
-        font-size="36" 
-        font-weight="800" 
-        fill="#a7f3d0" 
-        letter-spacing="4"
-        text-anchor="middle">مـادة الـريـاضـيـات</text>
+  <!-- Main Bridge Arch (Green) -->
+  <path d="M 105 270 C 135 155, 377 155, 407 270 L 375 270 C 350 185, 162 185, 137 270 Z" 
+        fill="url(#emeraldGrad)"/>
 
-  <!-- Small badge for Prof Adaika -->
-  <rect x="166" y="442" width="180" height="26" rx="13" fill="#ffffff" fill-opacity="0.18"/>
-  <text x="256" y="460" 
-        font-family="system-ui, -apple-system, 'Segoe UI', Arial, sans-serif" 
-        font-size="14" 
-        font-weight="700" 
-        fill="#ffffff" 
-        text-anchor="middle">أ. محمد عدايكة</text>
+  <!-- Secondary Inner Arch (Gold) -->
+  <path d="M 148 270 C 172 195, 340 195, 364 270 C 352 270, 335 215, 256 215 C 177 215, 160 270, 148 270 Z" 
+        fill="url(#goldGrad)"/>
+
+  <!-- Cable / Beam Accents on Bridge -->
+  <line x1="160" y1="230" x2="160" y2="270" stroke="url(#goldGrad)" stroke-width="5" stroke-linecap="round"/>
+  <line x1="200" y1="205" x2="200" y2="270" stroke="url(#goldGrad)" stroke-width="5" stroke-linecap="round"/>
+  <line x1="312" y1="205" x2="312" y2="270" stroke="url(#goldGrad)" stroke-width="5" stroke-linecap="round"/>
+  <line x1="352" y1="230" x2="352" y2="270" stroke="url(#goldGrad)" stroke-width="5" stroke-linecap="round"/>
+
+  <!-- Open Book of Knowledge under the Bridge Arch -->
+  <!-- Left Page -->
+  <path d="M 256 345 Q 210 325, 150 338 L 155 288 Q 210 278, 256 295 Z" 
+        fill="url(#emeraldGrad)"/>
+  <path d="M 250 335 Q 212 318, 162 328 L 166 296 Q 212 288, 250 302 Z" 
+        fill="#ffffff"/>
+  <path d="M 245 328 Q 214 314, 172 322 L 175 304 Q 214 297, 245 309 Z" 
+        fill="url(#goldGrad)" opacity="0.85"/>
+
+  <!-- Right Page -->
+  <path d="M 256 345 Q 302 325, 362 338 L 357 288 Q 302 278, 256 295 Z" 
+        fill="url(#emeraldGrad)"/>
+  <path d="M 262 335 Q 300 318, 350 328 L 346 296 Q 300 288, 262 302 Z" 
+        fill="#ffffff"/>
+  <path d="M 267 328 Q 298 314, 340 322 L 337 304 Q 298 297, 267 309 Z" 
+        fill="url(#goldGrad)" opacity="0.85"/>
+
+  <!-- Book Spine Center -->
+  <path d="M 253 293 Q 256 290, 259 293 L 259 347 Q 256 344, 253 347 Z" fill="url(#goldGrad)"/>
+
+  <!-- Ascending Horizon Pathways below the book -->
+  <path d="M 140 380 Q 256 350, 372 380 Q 256 360, 140 380 Z" fill="url(#goldGrad)"/>
+  <path d="M 170 405 Q 256 380, 342 405 Q 256 392, 170 405 Z" fill="url(#emeraldGrad)" opacity="0.85"/>
 </svg>

@@ -341,17 +341,17 @@ export function DesktopSidebar() {
             className="flex items-center gap-2.5 min-w-0 group"
             onClick={handleItemClick}
           >
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#107a57] to-[#159a6e] flex items-center justify-center text-white shrink-0 shadow-sm group-hover:scale-105 transition-transform">
-              <GraduationCap className="w-5 h-5" />
+            <div className="w-10 h-10 rounded-full overflow-hidden shrink-0 shadow-sm group-hover:scale-105 transition-transform border border-emerald-600/20 bg-white">
+              <img src="/icon.svg" alt="منصة جسور التعليمية" className="w-full h-full object-contain" />
             </div>
 
             {!isSidebarCollapsed && (
               <div className="min-w-0 transition-opacity duration-200">
                 <span className="font-black text-sm text-gray-900 tracking-tight block truncate">
-                  قِبَاب الجزائر
+                  منصة جسور التعليمية
                 </span>
                 <span className="text-[10px] text-emerald-700 font-bold block truncate">
-                  المنظومة الوطنية للتربية والتعليم
+                  حيث يلتقي الأستاذ، الولي، والتلميذ
                 </span>
               </div>
             )}
@@ -526,7 +526,7 @@ export function DesktopSidebar() {
           {!isSidebarCollapsed ? (
             <>
               <div className="flex items-center justify-between text-[11px] text-gray-400 px-1">
-                <span>قِبَاب الجزائر v2.5</span>
+                <span>منصة جسور v2.5</span>
                 <span className="inline-flex items-center gap-1 text-[#107a57] font-bold">
                   <span className="w-1.5 h-1.5 rounded-full bg-[#107a57] animate-pulse" />
                   متصل

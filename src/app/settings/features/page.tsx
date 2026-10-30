@@ -153,7 +153,7 @@ const FEATURE_DEFINITIONS: FeatureCardDef[] = [
   {
     key: "forum",
     label: "ملتقى الأساتذة البيداغوجي",
-    description: "فضاء التبادل المعرفي والمذكرات والاستشارات بين أساتذة المادة في ولاية الوادي.",
+    description: "فضاء التبادل المعرفي والمذكرات والاستشارات بين أساتذة المادة عبر المنصة.",
     icon: Sparkles,
     group: "inspection",
     forParentsToo: false,

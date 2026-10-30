@@ -10,7 +10,7 @@ export function LoginRequired({ next, title }: { next: string; title: string }) 
       </div>
       <h1 className="text-xl font-black text-slate-800">{title}</h1>
       <p className="text-xs text-slate-500">
-        هذا الفضاء خاص بالأستاذ. سجّل الدخول بحسابك على منصة ولاية الوادي للمتابعة.
+        هذا الفضاء خاص بالأستاذ. سجّل الدخول بحسابك على منصة جسور للمتابعة.
       </p>
       <Link
         href={`/login?next=${encodeURIComponent(next)}`}

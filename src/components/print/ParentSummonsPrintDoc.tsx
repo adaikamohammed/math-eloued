@@ -79,7 +79,7 @@ export function ParentSummonsPrintDoc({
           {/* الرمز السري للخصوصية */}
           {summons.accessCode && (
             <div className="p-2.5 bg-[#e6f4ee] border border-[#107a57]/30 rounded-xl flex items-center justify-between text-[11px]">
-              <span>الرمز السري للاطلاع على التوجيهات وملاحظات الأستاذ عبر المنصة:</span>
+              <span>الرمز السري للاطلاع على التوجيهات وملاحظات الأستاذ عبر منصة جسور التعليمية:</span>
               <span className="font-mono font-black text-sm bg-white px-3 py-0.5 rounded border border-[#107a57]/40 text-[#107a57]">
                 {summons.accessCode}
               </span>

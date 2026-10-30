@@ -21,8 +21,8 @@ import { clearInspectionCache } from "@/app/inspector/shared";
 // ─── خريطة عناوين الصفحات المستوحاة من منصة فرسان القرآن ─────────
 const PAGE_INFO: Record<string, { title: string; subtitle: string }> = {
   "/": {
-    title: "منظومة قِبَاب الجزائر للتربية والتعليم",
-    subtitle: "المنصة الوطنية للتربية والتعليم والتسيير البيداغوجي • Qibab El Djazair",
+    title: "منصة جسور التعليمية",
+    subtitle: "حيث يلتقي الأستاذ، الولي، والتلميذ",
   },
   "/t/search": {
     title: "دليل الأساتذة",
@@ -82,7 +82,7 @@ const PAGE_INFO: Record<string, { title: string; subtitle: string }> = {
   },
   "/register": {
     title: "إنشاء حساب أستاذ",
-    subtitle: "الانضمام إلى الأسرة التربوية بولاية الوادي",
+    subtitle: "الانضمام إلى الأسرة التربوية في منصة جسور",
   },
   "/announcement": {
     title: "الإعلانات والمستجدات",
@@ -123,8 +123,8 @@ function getPageInfo(pathname: string): { title: string; subtitle: string } {
   }
 
   return {
-    title: "منظومة قِبَاب الجزائر للتربية والتعليم",
-    subtitle: "المنصة الوطنية للتربية والتعليم والتسيير البيداغوجي • Qibab El Djazair",
+    title: "منصة جسور التعليمية",
+    subtitle: "حيث يلتقي الأستاذ، الولي، والتلميذ",
   };
 }
 
