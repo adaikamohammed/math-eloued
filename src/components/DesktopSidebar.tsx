@@ -27,6 +27,7 @@ import {
   Megaphone,
   MessageSquare,
   Building2,
+  BookMarked,
 } from "lucide-react";
 import { useLayout } from "@/context/LayoutContext";
 import { supabase } from "@/lib/supabase";
@@ -139,6 +140,14 @@ export function DesktopSidebar() {
           label: "الدفتر اليومي (ماذا سأدرس غداً)",
           href: "/admin/diary",
           icon: ClipboardList,
+        });
+      }
+
+      if (flags.cahierTextes !== false) {
+        pedagogyItems.push({
+          label: "دفتر النصوص الميداني",
+          href: "/admin/cahier-textes",
+          icon: BookMarked,
         });
       }
 

@@ -28,6 +28,7 @@ import {
   Zap,
   Info,
   GraduationCap,
+  BookMarked,
 } from "lucide-react";
 import { LoginRequired } from "@/components/LoginRequired";
 import {
@@ -77,12 +78,21 @@ const FEATURE_DEFINITIONS: FeatureCardDef[] = [
   },
   {
     key: "diary",
-    label: "الدفتر اليومي (ماذا سأدرس غداً)",
-    description: "التحضير البيداغوجي المسبق لدروس الغد ومؤشرات الكفاءة وسجل دفتر النصوص.",
+    label: "الدفتر اليومي (المسودة البيداغوجية)",
+    description: "التحضير البيداغوجي اليومي للأستاذ لما سيدرسه غداً لجميع الأفواج، ووثيقة رسمية للمفتشية والإدارة.",
     icon: ClipboardList,
     group: "pedagogy",
-    forParentsToo: true,
-    parentsDescription: "يطلع الولي على عنوان الدرس القادم لتحفيز ابنه على التحضير المسبق.",
+    forParentsToo: false,
+    parentsDescription: "وثيقة بيداغوجية داخلية خاصة بالأستاذ والمفتشية والإدارة فقط.",
+  },
+  {
+    key: "cahierTextes",
+    label: "دفتر النصوص الميداني للأفواج",
+    description: "السجل الميداني لكل فوج تربوي لتوثيق سيرورة التعلم، الوضعيات، الحوصلات، والواجبات المنزلية.",
+    icon: BookMarked,
+    group: "pedagogy",
+    forParentsToo: false,
+    parentsDescription: "وثيقة بيداغوجية داخلية خاصة بالأستاذ والمفتشية والإدارة فقط.",
   },
   {
     key: "homework",
@@ -551,6 +561,12 @@ export default function FeaturesCustomizationPage() {
           {flags.diary !== false && (
             <span className="px-3 py-1.5 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 text-xs font-bold flex items-center gap-1.5">
               <ClipboardList className="w-3.5 h-3.5 text-amber-600" /> الدفتر اليومي
+            </span>
+          )}
+
+          {flags.cahierTextes !== false && (
+            <span className="px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-800 border border-indigo-200 text-xs font-bold flex items-center gap-1.5">
+              <BookMarked className="w-3.5 h-3.5 text-indigo-600" /> دفتر النصوص
             </span>
           )}
 

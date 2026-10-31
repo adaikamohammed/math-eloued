@@ -34,6 +34,7 @@ import {
   Palmtree,
   CalendarDays,
   ShieldCheck,
+  BookMarked,
 } from "lucide-react";
 import { LoginRequired } from "@/components/LoginRequired";
 import { PageExplainer } from "@/components/PageExplainer";
@@ -1212,6 +1213,14 @@ export default function TeacherDiaryPage() {
               <Download className="w-3.5 h-3.5 text-[#107a57]" />
               <span>تحميل PDF أفقياً 📄</span>
             </button>
+            <Link
+              href="/admin/cahier-textes"
+              className="px-3.5 py-1.5 rounded-xl border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-xs font-black text-indigo-800 transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
+              title="الانتقال إلى دفتر النصوص الميداني للأفواج وتوثيق سيرورة الحصص والواجبات"
+            >
+              <BookMarked className="w-3.5 h-3.5 text-indigo-600" />
+              <span>دفتر النصوص الميداني 📖</span>
+            </Link>
             <button
               onClick={() => handlePrepareForDate(tomorrowStr)}
               type="button"

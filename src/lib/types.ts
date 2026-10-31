@@ -270,6 +270,32 @@ export type DailyDiaryEntry = {
   createdAt: string;
 };
 
+// تدوين دفتر النصوص الميداني الرسمي للقسم (Cahier de Textes de la classe)
+export type CahierTextesEntry = {
+  id: string;
+  diaryEntryId?: string;      // معرف الحصة في الدفتر اليومي إن كانت مستوردة منه
+  className: string;          // الفوج: 2م3
+  date: string;               // YYYY-MM-DD
+  dayName: string;            // الأحد، الإثنين...
+  periodTime?: string;        // 11:00 - 12:00
+  sessionType?: string;       // درس ومورد، أعمال موجهة، تقويم، إدماج...
+  field?: string;             // الأنشطة العددية، الأنشطة الهندسية...
+  section?: string;           // المقطع 01: الأعداد الطبيعية والأعداد العشرية...
+  weekLabel?: string;         // الأسبوع 01: الدخول المدرسي وانطلاق المقطع 01 (21 - 25 سبتمبر 2026)
+  resourceTitle: string;      // المورد 01: إجراء سلسلة عمليات دون أقواس
+  warmup?: string;            // تهيئة (تذكير بقواعد الحساب، وضعية انطلاق...)
+  proposedSituation?: string; // وضعية مقترحة (نشاط بناء التعلم...)
+  summary?: string;           // الحوصلة (القاعدة أو القانون أو النتيجة...)
+  reinvestment?: string;      // إعادة الاستثمار (تمرين صفي...)
+  homework?: string;          // الواجب المنزلي (تمرين 02 و 04 ص 14)
+  signature?: string;         // عدايكة ✍
+  notes?: string;             // ملاحظات
+  isTdOrRemediation?: boolean;// هل هي مخصصة لملحق الأعمال الموجهة TD أو الاستدراك
+  subgroup?: string;          // القسم كامل، فوج 1، فوج 2...
+  createdAt?: string;
+  updatedAt?: string;
+};
+
 export type AnnouncementCategory = "absence" | "lesson" | "update" | "general" | "urgent";
 
 export type Announcement = {
@@ -307,6 +333,7 @@ export type TeacherFeatureFlags = {
   students?: boolean;              // إدارة الأفواج والتلاميذ
   timetable?: boolean;             // التوقيت الأسبوعي
   diary?: boolean;                 // الدفتر اليومي (ماذا سأدرس غداً)
+  cahierTextes?: boolean;          // دفتر النصوص الميداني للقسم
   forum?: boolean;                 // ملتقى الأساتذة البيداغوجي
 };
 
@@ -323,6 +350,7 @@ export const DEFAULT_FEATURE_FLAGS: TeacherFeatureFlags = {
   students: true,
   timetable: true,
   diary: true,
+  cahierTextes: true,
   forum: true,
 };
 
@@ -356,6 +384,7 @@ export type LessonsData = {
   customClasses?: string[];
   timetable?: TeacherTimetable;
   diaryEntries?: DailyDiaryEntry[];
+  cahierTextesEntries?: CahierTextesEntry[]; // تدوينات دفتر النصوص الميداني للقسم
   specialDays?: SpecialDayRecord[]; // أيام العطل والغيابات والندوات الرسمية
   diaryDayTitles?: Record<string, string>; // عنوان اليوم العام: تاريخ YYYY-MM-DD -> عنوان اليوم
   customNotebooks?: CustomNotebook[];

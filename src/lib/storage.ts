@@ -79,7 +79,7 @@ export function synchronizeStudents(data: LessonsData): LessonsData {
 // ما يراه الأولياء والتلاميذ
 const PUBLIC_KEYS = ["lessons", "honors", "announcements", "summons", "featureFlags", "subject", "customClasses", "timetable", "customNotebooks", "boardNomenclature"] as const;
 // ما يبقى خاصاً بالأستاذ وحده
-const PRIVATE_KEYS = ["evaluations", "penalties", "inspectionSessions", "studentRoster", "anonymousMessages", "diaryEntries", "specialDays", "diaryDayTitles"] as const;
+const PRIVATE_KEYS = ["evaluations", "penalties", "inspectionSessions", "studentRoster", "anonymousMessages", "diaryEntries", "cahierTextesEntries", "specialDays", "diaryDayTitles"] as const;
 
 export function normalizeData(json: any): LessonsData {
   return {
@@ -97,6 +97,7 @@ export function normalizeData(json: any): LessonsData {
     customClasses: Array.isArray(json?.customClasses) ? json.customClasses : undefined,
     timetable: json?.timetable || undefined,
     diaryEntries: Array.isArray(json?.diaryEntries) ? json.diaryEntries : [],
+    cahierTextesEntries: Array.isArray(json?.cahierTextesEntries) ? json.cahierTextesEntries : [],
     specialDays: Array.isArray(json?.specialDays) ? json.specialDays : [],
     diaryDayTitles: json?.diaryDayTitles && typeof json.diaryDayTitles === "object" ? json.diaryDayTitles : {},
     customNotebooks: Array.isArray(json?.customNotebooks) ? json.customNotebooks : undefined,
