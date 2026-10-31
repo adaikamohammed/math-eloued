@@ -254,6 +254,8 @@ function AuthForm() {
         setErrorMsg("هذا البريد الإلكتروني مسجل مسبقاً في المنصة. يمكنك التبديل إلى تبويب 'تسجيل الدخول' أعلاه.");
       } else if (raw.includes("rate limit") || raw.includes("over_email_send_rate_limit")) {
         setErrorMsg("تم تجاوز الحد المسموح به حالياً. يرجى المحاولة بعد لحظات.");
+      } else if (raw.includes("Failed to fetch") || raw.includes("NetworkError")) {
+        setErrorMsg("تعذر الاتصال بالخادم السحابي حالياً. يرجى إعادة المحاولة أو تحديث الصفحة.");
       } else {
         setErrorMsg(raw || "حدث خطأ أثناء إنشاء الحساب، يرجى التحقق من البيانات والمحاولة مجدداً");
       }

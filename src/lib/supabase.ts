@@ -1,16 +1,21 @@
 import { createClient } from "@supabase/supabase-js";
 import { createBrowserClient } from "@supabase/ssr";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+const DEFAULT_SUPABASE_URL = "https://taoagpwjytgbjhbtnfps.supabase.co";
+const DEFAULT_SUPABASE_ANON_KEY = "sb_publishable_DS5h-FsyUHCcSzUpTn4gCQ_kdc_Fn-K";
+
+const supabaseUrl =
+  process.env.NEXT_PUBLIC_SUPABASE_URL || DEFAULT_SUPABASE_URL;
+
 const supabaseAnonKey =
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
   process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-  "";
+  DEFAULT_SUPABASE_ANON_KEY;
 
-export const isConfigured = Boolean(supabaseUrl && supabaseAnonKey);
+export const isConfigured = true;
 
-export const SUPABASE_URL = supabaseUrl || "https://placeholder.supabase.co";
-export const SUPABASE_ANON_KEY = supabaseAnonKey || "placeholder-anon-key";
+export const SUPABASE_URL = supabaseUrl;
+export const SUPABASE_ANON_KEY = supabaseAnonKey;
 
 // في المتصفح: عميل يحفظ الجلسة في الكوكيز (لتصل إلى نقاط النهاية /api على الخادم)
 // على الخادم (صفحات عامة): عميل مجهول للقراءة العامة فقط
