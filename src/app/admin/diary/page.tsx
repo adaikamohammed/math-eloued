@@ -30,17 +30,33 @@ import {
   Layers,
   HelpCircle,
   Info,
+  Zap,
+  Tag,
+  Palmtree,
+  Coffee,
+  GraduationCap,
+  FileCheck,
+  ChevronLeft,
+  ChevronRight,
+  CalendarDays,
+  FileSignature,
 } from "lucide-react";
 import { LoginRequired } from "@/components/LoginRequired";
 import { PageExplainer } from "@/components/PageExplainer";
 import { useProfile } from "@/lib/useProfile";
 import {
   DailyDiaryEntry,
+  DiaryStage,
+  SpecialDayRecord,
+  SpecialDayType,
   LessonsData,
   COMMON_FIELDS,
   SCHOOL_DAYS,
   TimetableSettings,
+  sortClasses,
+  TeacherTimetable,
 } from "@/lib/types";
+import { getClassColors, CLASS_PALETTE } from "@/app/admin/timetable/page";
 
 // توقيتات الحصص المعتمدة في التعليم المتوسط الجزائري
 const STANDARD_PERIODS = [
@@ -50,9 +66,69 @@ const STANDARD_PERIODS = [
   "11:00 - 12:00",
   "13:00 - 14:00",
   "13:30 - 14:30",
+  "14:00 - 15:00",
   "14:30 - 15:30",
+  "15:00 - 16:00",
   "15:30 - 16:30",
+  "16:00 - 17:00",
 ];
+
+// أنواع الحصص البيداغوجية الرسمية
+const SESSION_TYPES = [
+  "درس",
+  "أعمال موجهة",
+  "تفويج",
+  "تقويم تشخيصي",
+  "إدماج كفاءات",
+  "معالجة بيداغوجية",
+  "استدراك ودعم",
+  "تصحيح واجب منزلي",
+  "استقبال الأولياء",
+  "فرض محروس",
+  "اختبار فصلي",
+] as const;
+
+// قوالب الأيام الخاصة (العطل الرسمية، الغيابات، الندوات)
+const SPECIAL_DAY_CONFIGS: Record<
+  SpecialDayType,
+  { label: string; icon: string; defaultTitle: string; defaultDesc: string; badgeClass: string }
+> = {
+  holiday: {
+    label: "عطلة مدرسية رسمية (عطلة الخريف، الشتاء، الربيع...)",
+    icon: "🍂",
+    defaultTitle: "عطلة الخريف الرسمية",
+    defaultDesc: "عطلة مدرسية رسمية لكافة المؤسسات التعليمية — راحة قانونية للتلاميذ والأساتذة.",
+    badgeClass: "bg-amber-100 text-amber-900 border-amber-300",
+  },
+  absence: {
+    label: "طلب عطلة رسمية / غياب مبرر قانوناً لدى الإدارة",
+    icon: "📋",
+    defaultTitle: "طلب عطلة رسمية (غياب مبرر قانوناً لدى إدارة المؤسسة)",
+    defaultDesc: "غياب مرخص ومبرر مسبقاً لدى إدارة المتوسطة. تمت تسوية كافة الإجراءات الإدارية والقانونية المعمول بها مسبقاً.",
+    badgeClass: "bg-rose-100 text-rose-900 border-rose-300",
+  },
+  seminar: {
+    label: "يوم تكويني بيداغوجي / ندوة تربوية لمقاطعة التفتيش",
+    icon: "★",
+    defaultTitle: "يوم تكويني بيداغوجي لمقاطعة التفتيش",
+    defaultDesc: "تحت إشراف السيد مفتش التربية الوطنية لمقاطعة التفتيش — دراسة التدرجات السنوية ومناقشة المعايير التفتيشية المعتمدة لمسك الدفاتر اليومية والتربوية.",
+    badgeClass: "bg-indigo-100 text-indigo-900 border-indigo-300",
+  },
+  exams: {
+    label: "أسبوع الفروض أو الاختبارات الرسمية",
+    icon: "📝",
+    defaultTitle: "إجراء الفروض المحروسة الرسمية",
+    defaultDesc: "متابعة وإجراء الفروض المحروسة الرسمية للفصل الدراسي حسب الروزنامة المعتمدة بالمؤسسة.",
+    badgeClass: "bg-purple-100 text-purple-900 border-purple-300",
+  },
+  custom: {
+    label: "يوم استثنائي آخر",
+    icon: "📌",
+    defaultTitle: "نشاط تربوي استثنائي",
+    defaultDesc: "نشاط بيداغوجي أو يوم مخصص ومسجل في جدول المتابعة اليومية للأستاذ.",
+    badgeClass: "bg-slate-100 text-slate-900 border-slate-300",
+  },
+};
 
 // حساب اسم اليوم بالعربية من تاريخ بصيغة YYYY-MM-DD
 function getArabicDayName(dateStr: string): string {
@@ -65,7 +141,7 @@ function getArabicDayName(dateStr: string): string {
   return days[dayIndex] || "الأحد";
 }
 
-// تنسيق التاريخ بالعربية (مثلاً: 25 أكتوبر 2026)
+// تنسيق التاريخ بالعربية (مثلاً: 05 أكتوبر 2026)
 function formatArabicFullDate(dateStr: string): string {
   if (!dateStr) return "";
   try {
@@ -75,10 +151,20 @@ function formatArabicFullDate(dateStr: string): string {
       "جانفي", "فيفري", "مارس", "أفريل", "ماي", "جوان",
       "جويلية", "أوت", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"
     ];
-    return `${day} ${months[dateObj.getMonth()]} ${year}`;
+    const paddedDay = day < 10 ? `0${day}` : `${day}`;
+    return `${paddedDay} ${months[dateObj.getMonth()]} ${year}`;
   } catch {
     return dateStr;
   }
+}
+
+// إنشاء مراحل سيرورة الحصة الافتراضية
+function getDefaultStages(): DiaryStage[] {
+  return [
+    { label: "تمهيدي", content: "", color: "sky" },
+    { label: "وسيطي", content: "", color: "emerald" },
+    { label: "نهائي", content: "", color: "amber" },
+  ];
 }
 
 export default function TeacherDiaryPage() {
@@ -91,53 +177,12 @@ export default function TeacherDiaryPage() {
   // الأفواج والبيانات
   const [customClasses, setCustomClasses] = useState<string[]>([]);
   const [entries, setEntries] = useState<DailyDiaryEntry[]>([]);
+  const [specialDays, setSpecialDays] = useState<SpecialDayRecord[]>([]);
+  const [diaryDayTitles, setDiaryDayTitles] = useState<Record<string, string>>({});
+  const [timetable, setTimetable] = useState<TeacherTimetable | null>(null);
   const [timetableSettings, setTimetableSettings] = useState<TimetableSettings | null>(null);
 
-  // الفلاتر والبحث
-  const [selectedClassFilter, setSelectedClassFilter] = useState<string>("all");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [dateFilter, setDateFilter] = useState<"all" | "tomorrow" | "today">("all");
-
-  // مرجع استمارة التحضير للتمرير السلس
-  const formRef = useRef<HTMLDivElement>(null);
-  const titleInputRef = useRef<HTMLInputElement>(null);
-
-  // حالة طي أو فتح استمارة التحضير في الصفحة
-  const [isFormExpanded, setIsFormExpanded] = useState(true);
-
-  // الحصة قيد التعديل (null = تحضير حصة جديدة)
-  const [editingEntry, setEditingEntry] = useState<DailyDiaryEntry | null>(null);
-
-  // حقول الاستمارة المباشرة في الصفحة
-  const [formDate, setFormDate] = useState<string>(() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 1);
-    return d.toISOString().split("T")[0];
-  });
-  const [formClass, setFormClass] = useState("");
-  const [isCustomClassInput, setIsCustomClassInput] = useState(false);
-  const [customClassName, setCustomClassName] = useState("");
-
-  const [formPeriodTime, setFormPeriodTime] = useState("08:00 - 09:00");
-  const [isCustomTimeInput, setIsCustomTimeInput] = useState(false);
-  const [customTimeValue, setCustomTimeValue] = useState("");
-
-  const [formField, setFormField] = useState<string>("أنشطة عددية");
-  const [isCustomFieldInput, setIsCustomFieldInput] = useState(false);
-  const [customFieldValue, setCustomFieldValue] = useState("");
-
-  const [formSection, setFormSection] = useState("");
-  const [formLessonTitle, setFormLessonTitle] = useState("");
-  const [formObjectives, setFormObjectives] = useState("");
-  const [formActivities, setFormActivities] = useState("");
-  const [formHomework, setFormHomework] = useState("");
-  const [formNotes, setFormNotes] = useState("");
-  const [formIsPublic, setFormIsPublic] = useState(true);
-
-  // حساب اليوم المحسوب تلقائياً
-  const calculatedDayName = useMemo(() => getArabicDayName(formDate), [formDate]);
-
-  // حساب تاريخ اليوم وتاريخ الغد
+  // حساب تواريخ اليوم والغد وبعد غد
   const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
   const tomorrowStr = useMemo(() => {
     const t = new Date();
@@ -150,6 +195,61 @@ export default function TeacherDiaryPage() {
     return d.toISOString().split("T")[0];
   }, []);
 
+  // الفلاتر والبحث
+  const [dateFilterTab, setDateFilterTab] = useState<"all" | "today" | "tomorrow" | "future" | "custom">("all");
+  const [customFilterDate, setCustomFilterDate] = useState<string>(tomorrowStr);
+  const [selectedClassFilter, setSelectedClassFilter] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // مرجع استمارة التحضير للتمرير السلس
+  const formRef = useRef<HTMLDivElement>(null);
+  const titleInputRef = useRef<HTMLInputElement>(null);
+
+  // حالة طي أو فتح استمارة التحضير في الصفحة
+  const [isFormExpanded, setIsFormExpanded] = useState(false);
+
+  // الحصة قيد التعديل (null = تحضير حصة جديدة)
+  const [editingEntry, setEditingEntry] = useState<DailyDiaryEntry | null>(null);
+
+  // حقول استمارة الحصة
+  const [formDate, setFormDate] = useState<string>(tomorrowStr);
+  const [formClass, setFormClass] = useState("");
+  const [isCustomClassInput, setIsCustomClassInput] = useState(false);
+  const [customClassName, setCustomClassName] = useState("");
+
+  const [formPeriodTime, setFormPeriodTime] = useState("08:00 - 09:00");
+  const [isCustomTimeInput, setIsCustomTimeInput] = useState(false);
+  const [customTimeValue, setCustomTimeValue] = useState("");
+
+  const [formNoteNumber, setFormNoteNumber] = useState("01 :رقم مذكرة");
+  const [formSessionType, setFormSessionType] = useState<string>("درس");
+
+  const [formField, setFormField] = useState<string>("أنشطة عددية");
+  const [isCustomFieldInput, setIsCustomFieldInput] = useState(false);
+  const [customFieldValue, setCustomFieldValue] = useState("");
+
+  const [formSection, setFormSection] = useState("");
+  const [formLessonTitle, setFormLessonTitle] = useState("");
+  const [formConcepts, setFormConcepts] = useState("");
+  const [formStages, setFormStages] = useState<DiaryStage[]>(getDefaultStages());
+  const [formNotes, setFormNotes] = useState("");
+  const [formIsPublic, setFormIsPublic] = useState(true);
+
+  // حالة نافذة تعيين اليوم كعطلة أو غياب أو ندوة
+  const [isSpecialDayModalOpen, setIsSpecialDayModalOpen] = useState(false);
+  const [specialDayTargetDate, setSpecialDayTargetDate] = useState<string>(todayStr);
+  const [specialDayType, setSpecialDayType] = useState<SpecialDayType>("holiday");
+  const [specialDayTitle, setSpecialDayTitle] = useState("عطلة الخريف الرسمية");
+  const [specialDayDesc, setSpecialDayDesc] = useState(SPECIAL_DAY_CONFIGS.holiday.defaultDesc);
+  const [specialDayEndDate, setSpecialDayEndDate] = useState<string>("");
+
+  // حالة تعديل عنوان اليوم السريع
+  const [editingDayTitleDate, setEditingDayTitleDate] = useState<string | null>(null);
+  const [tempDayTitle, setTempDayTitle] = useState("");
+
+  // حساب اليوم المحسوب تلقائياً
+  const calculatedDayName = useMemo(() => getArabicDayName(formDate), [formDate]);
+
   // جلب البيانات والتحقق من الجلسة
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -158,8 +258,9 @@ export default function TeacherDiaryPage() {
         if (storedClasses) {
           const parsed = JSON.parse(storedClasses);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            setCustomClasses(parsed);
-            setFormClass((prev) => prev || parsed[0]);
+            const sorted = sortClasses(parsed);
+            setCustomClasses(sorted);
+            setFormClass((prev) => prev || sorted[0]);
           }
         }
       } catch {}
@@ -180,7 +281,7 @@ export default function TeacherDiaryPage() {
         if (data) {
           const teacherClasses =
             Array.isArray(data.customClasses) && data.customClasses.length > 0
-              ? data.customClasses
+              ? sortClasses(data.customClasses)
               : [];
           if (teacherClasses.length > 0) {
             setCustomClasses(teacherClasses);
@@ -191,8 +292,19 @@ export default function TeacherDiaryPage() {
             setEntries(data.diaryEntries);
           }
 
-          if (data.timetable?.settings) {
-            setTimetableSettings(data.timetable.settings);
+          if (Array.isArray(data.specialDays)) {
+            setSpecialDays(data.specialDays);
+          }
+
+          if (data.diaryDayTitles && typeof data.diaryDayTitles === "object") {
+            setDiaryDayTitles(data.diaryDayTitles);
+          }
+
+          if (data.timetable) {
+            setTimetable(data.timetable);
+            if (data.timetable.settings) {
+              setTimetableSettings(data.timetable.settings);
+            }
           }
         }
       })
@@ -206,13 +318,17 @@ export default function TeacherDiaryPage() {
   }, []);
 
   // حفظ التعديلات على الخادم
-  const persistEntries = async (newEntries: DailyDiaryEntry[]) => {
+  const persistChanges = async (payload: {
+    diaryEntries?: DailyDiaryEntry[];
+    specialDays?: SpecialDayRecord[];
+    diaryDayTitles?: Record<string, string>;
+  }) => {
     setSaving(true);
     try {
       const res = await fetch("/api/lessons", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ diaryEntries: newEntries }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error("فشل حفظ التعديلات على الخادم");
       setMessage({ type: "ok", text: "تم تحديث الدفتر اليومي بنجاح 📒" });
@@ -236,14 +352,15 @@ export default function TeacherDiaryPage() {
     setFormPeriodTime("08:00 - 09:00");
     setIsCustomTimeInput(false);
     setCustomTimeValue("");
+    setFormNoteNumber("01 :رقم مذكرة");
+    setFormSessionType("درس");
     setFormField("أنشطة عددية");
     setIsCustomFieldInput(false);
     setCustomFieldValue("");
     setFormSection("");
     setFormLessonTitle("");
-    setFormObjectives("");
-    setFormActivities("");
-    setFormHomework("");
+    setFormConcepts("");
+    setFormStages(getDefaultStages());
     setFormNotes("");
     setFormIsPublic(true);
   }, [customClasses, tomorrowStr]);
@@ -257,10 +374,10 @@ export default function TeacherDiaryPage() {
     }, 80);
   }, []);
 
-  // فتح التحضير لحصة الغد مباشرة
-  const handlePrepareForTomorrow = () => {
+  // فتح التحضير لحصة الغد أو لتاريخ محدد
+  const handlePrepareForDate = (dateToPrepare: string) => {
     handleResetForm();
-    setFormDate(tomorrowStr);
+    setFormDate(dateToPrepare);
     if (selectedClassFilter !== "all") {
       setFormClass(selectedClassFilter);
     }
@@ -307,20 +424,55 @@ export default function TeacherDiaryPage() {
       setFormField("__custom__");
     }
 
+    setFormNoteNumber(entry.lessonNoteNumber || "01 :رقم مذكرة");
+    setFormSessionType(entry.sessionType || "درس");
     setFormSection(entry.section || "");
     setFormLessonTitle(entry.lessonTitle);
-    setFormObjectives(entry.objectives || "");
-    setFormActivities(entry.activities || "");
-    setFormHomework(entry.homework || "");
+    setFormConcepts(entry.concepts || "");
+
+    // المراحل
+    if (entry.stages && entry.stages.length > 0) {
+      setFormStages(entry.stages);
+    } else {
+      // ملء المراحل من الأهداف والأنشطة والواجب السابقة لتجنب فقدان أي بيانات قديمة
+      const initial = getDefaultStages();
+      if (entry.objectives) initial[0].content = entry.objectives;
+      if (entry.activities) initial[1].content = entry.activities;
+      if (entry.homework) initial[2].content = entry.homework;
+      setFormStages(initial);
+    }
+
     setFormNotes(entry.notes || "");
     setFormIsPublic(entry.isPublicForParents !== false);
 
     scrollToForm();
   };
 
-  // إلغاء وضع التعديل والعودة لحصة جديدة
-  const handleCancelEdit = () => {
-    handleResetForm();
+  // إضافة مرحلة مخصصة في سيرورة الحصة (تناسب أي مادة!)
+  const handleAddCustomStage = () => {
+    setFormStages((prev) => [
+      ...prev,
+      {
+        id: `stg_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        label: "",
+        content: "",
+        color: "purple",
+      },
+    ]);
+  };
+
+  // تحديث محتوى مرحلة
+  const handleUpdateStage = (index: number, patch: Partial<DiaryStage>) => {
+    setFormStages((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], ...patch };
+      return next;
+    });
+  };
+
+  // حذف مرحلة
+  const handleRemoveStage = (index: number) => {
+    setFormStages((prev) => prev.filter((_, i) => i !== index));
   };
 
   // حفظ الحصة (إضافة أو تعديل مباشر في الصفحة)
@@ -350,6 +502,11 @@ export default function TeacherDiaryPage() {
 
     const dayName = calculatedDayName;
 
+    // استخراج أهداف وأنشطة وواجبات الحصة من المراحل لتوافق كلي مع التطبيقات القديمة
+    const objectivesStage = formStages.find((s) => s.label.includes("تمهيدي") || s.label.includes("انطلاق"));
+    const activitiesStage = formStages.find((s) => s.label.includes("وسيطي") || s.label.includes("بناء"));
+    const homeworkStage = formStages.find((s) => s.label.includes("نهائي") || s.label.includes("واجب") || s.label.includes("تقويم"));
+
     let updated: DailyDiaryEntry[];
     if (editingEntry) {
       // تعديل الحصة القائمة
@@ -364,9 +521,13 @@ export default function TeacherDiaryPage() {
               field: actualField || undefined,
               section: formSection.trim() || undefined,
               lessonTitle: actualTitle,
-              objectives: formObjectives.trim() || undefined,
-              activities: formActivities.trim() || undefined,
-              homework: formHomework.trim() || undefined,
+              lessonNoteNumber: formNoteNumber.trim() || undefined,
+              sessionType: formSessionType || undefined,
+              concepts: formConcepts.trim() || undefined,
+              stages: formStages,
+              objectives: objectivesStage?.content || undefined,
+              activities: activitiesStage?.content || undefined,
+              homework: homeworkStage?.content || undefined,
               notes: formNotes.trim() || undefined,
               isPublicForParents: formIsPublic,
             }
@@ -383,9 +544,13 @@ export default function TeacherDiaryPage() {
         field: actualField || undefined,
         section: formSection.trim() || undefined,
         lessonTitle: actualTitle,
-        objectives: formObjectives.trim() || undefined,
-        activities: formActivities.trim() || undefined,
-        homework: formHomework.trim() || undefined,
+        lessonNoteNumber: formNoteNumber.trim() || undefined,
+        sessionType: formSessionType || undefined,
+        concepts: formConcepts.trim() || undefined,
+        stages: formStages,
+        objectives: objectivesStage?.content || undefined,
+        activities: activitiesStage?.content || undefined,
+        homework: homeworkStage?.content || undefined,
         notes: formNotes.trim() || undefined,
         isPublicForParents: formIsPublic,
         createdAt: new Date().toISOString(),
@@ -395,22 +560,19 @@ export default function TeacherDiaryPage() {
 
     setEntries(updated);
 
-    // إذا تم إدخال قسم مخصص غير مسجل، نضيفه للأفواج المقترحة
     if (actualClass && !customClasses.includes(actualClass)) {
-      setCustomClasses((prev) => [...prev, actualClass]);
+      setCustomClasses((prev) => sortClasses([...prev, actualClass]));
     }
 
-    await persistEntries(updated);
+    await persistChanges({ diaryEntries: updated });
 
-    // إعادة ضبط الحقول للاستعداد للحصة التالية وتسهيل التدوين المتتالي
     if (editingEntry) {
       handleResetForm();
     } else {
-      // الاحتفاظ بالتاريخ والفوج لتسريع تدوين عدة حصص لنفس اليوم أو الفوج
+      // الاحتفاظ بالتاريخ للتسريع وتجهيز الحصة الموالية
       setFormLessonTitle("");
-      setFormObjectives("");
-      setFormActivities("");
-      setFormHomework("");
+      setFormConcepts("");
+      setFormStages(getDefaultStages());
       setFormNotes("");
       titleInputRef.current?.focus();
     }
@@ -424,49 +586,262 @@ export default function TeacherDiaryPage() {
     if (editingEntry?.id === id) {
       handleResetForm();
     }
-    await persistEntries(updated);
+    await persistChanges({ diaryEntries: updated });
   };
 
-  // تصفية وترتيب الحصص
-  const filteredEntries = useMemo(() => {
-    return entries
-      .filter((e) => {
-        // فلتر الفوج
-        if (selectedClassFilter !== "all" && e.className !== selectedClassFilter) return false;
+  // التحقق مما إذا كان التاريخ عطلة أو غياباً أو ندوة
+  const getSpecialDayForDate = useCallback(
+    (dateStr: string): SpecialDayRecord | undefined => {
+      return specialDays.find((sd) => {
+        if (sd.date === dateStr) return true;
+        if (sd.endDate && sd.date <= dateStr && dateStr <= sd.endDate) return true;
+        return false;
+      });
+    },
+    [specialDays]
+  );
 
-        // فلتر التاريخ
-        if (dateFilter === "tomorrow" && e.date !== tomorrowStr) return false;
-        if (dateFilter === "today" && e.date !== todayStr) return false;
+  // فتح نافذة تعيين يوم خاص (عطلة أو غياب أو ندوة)
+  const handleOpenSpecialDayModal = (targetDate: string) => {
+    setSpecialDayTargetDate(targetDate);
+    const existing = getSpecialDayForDate(targetDate);
+    if (existing) {
+      setSpecialDayType(existing.type);
+      setSpecialDayTitle(existing.title);
+      setSpecialDayDesc(existing.description || "");
+      setSpecialDayEndDate(existing.endDate || "");
+    } else {
+      setSpecialDayType("holiday");
+      setSpecialDayTitle(SPECIAL_DAY_CONFIGS.holiday.defaultTitle);
+      setSpecialDayDesc(SPECIAL_DAY_CONFIGS.holiday.defaultDesc);
+      setSpecialDayEndDate("");
+    }
+    setIsSpecialDayModalOpen(true);
+  };
 
-        // فلتر البحث
-        if (searchQuery.trim()) {
-          const q = searchQuery.trim().toLowerCase();
+  // حفظ اليوم الخاص (عطلة أو غياب)
+  const handleSaveSpecialDay = async () => {
+    if (!specialDayTitle.trim()) {
+      alert("يرجى كتابة عنوان العطلة أو الحدث");
+      return;
+    }
+
+    const dayName = getArabicDayName(specialDayTargetDate);
+    const existingIdx = specialDays.findIndex(
+      (sd) => sd.date === specialDayTargetDate || (sd.endDate && sd.date <= specialDayTargetDate && specialDayTargetDate <= sd.endDate)
+    );
+
+    const newRecord: SpecialDayRecord = {
+      id: existingIdx >= 0 ? specialDays[existingIdx].id : `sp_${Date.now()}`,
+      date: specialDayTargetDate,
+      endDate: specialDayEndDate ? specialDayEndDate : undefined,
+      dayName,
+      type: specialDayType,
+      title: specialDayTitle.trim(),
+      description: specialDayDesc.trim() || undefined,
+      isOfficial: specialDayType === "holiday",
+      createdAt: new Date().toISOString(),
+    };
+
+    let updated: SpecialDayRecord[];
+    if (existingIdx >= 0) {
+      updated = [...specialDays];
+      updated[existingIdx] = newRecord;
+    } else {
+      updated = [newRecord, ...specialDays];
+    }
+
+    setSpecialDays(updated);
+    setIsSpecialDayModalOpen(false);
+    await persistChanges({ specialDays: updated });
+  };
+
+  // حذف أو إلغاء اليوم الخاص وإرجاعه ليوم دراسي عادي
+  const handleRemoveSpecialDay = async (dateStr: string) => {
+    const record = getSpecialDayForDate(dateStr);
+    if (!record) return;
+    if (!confirm(`هل تريد إلغاء "${record.title}" وإرجاع اليوم ليوم دراسي عادي؟`)) return;
+
+    const updated = specialDays.filter((s) => s.id !== record.id);
+    setSpecialDays(updated);
+    setIsSpecialDayModalOpen(false);
+    await persistChanges({ specialDays: updated });
+  };
+
+  // استيراد الحصص تلقائياً من جدول التوقيت الأسبوعي (Timetable Sync)
+  const handleSyncFromTimetable = async (targetDate: string) => {
+    if (!timetable || !Array.isArray(timetable.slots) || timetable.slots.length === 0) {
+      alert("لم يتم العثور على حصص مبرمجة في جدول التوقيت الأسبوعي. يمكنك ضبط جدولك من صفحة التوقيت الأسبوعي أولاً.");
+      return;
+    }
+
+    const dayName = getArabicDayName(targetDate);
+    const daySlots = timetable.slots.filter(
+      (s) => s.day === dayName && s.className && s.className !== "فراغ" && s.className !== "شاغرة"
+    );
+
+    if (daySlots.length === 0) {
+      alert(`لا توجد حصص مسندة في جدول التوقيت الأسبوعي ليوم (${dayName}).`);
+      return;
+    }
+
+    // فرز الحصص حسب توقيت البداية
+    daySlots.sort((a, b) => (a.start || "").localeCompare(b.start || ""));
+
+    const existingToday = entries.filter((e) => e.date === targetDate);
+    if (existingToday.length > 0) {
+      if (
+        !confirm(
+          `يوجد بالفعل ${existingToday.length} حصة مسجلة ليوم ${dayName} (${targetDate}). هل تريد إضافة واستيراد الـ (${daySlots.length}) حصص المبرمجة من جدول التوقيت؟`
+        )
+      ) {
+        return;
+      }
+    }
+
+    const newEntries: DailyDiaryEntry[] = daySlots.map((slot, idx) => {
+      let mappedType = "درس";
+      if (slot.sessionType === "td" || (slot.subgroup && slot.subgroup !== "القسم كامل")) mappedType = "أعمال موجهة";
+      if (slot.sessionType === "reception" || slot.className.includes("استقبال")) mappedType = "استقبال الأولياء";
+      if (slot.sessionType === "remedial" || slot.className.includes("استدراك")) mappedType = "استدراك ودعم";
+
+      const timeStr = `${slot.start} - ${slot.end}`;
+      const defaultField = "أنشطة عددية";
+
+      return {
+        id: `diary_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 6)}`,
+        date: targetDate,
+        day: dayName,
+        periodTime: timeStr,
+        className: slot.className,
+        sessionType: mappedType,
+        lessonNoteNumber: `${idx + 1 < 10 ? `0${idx + 1}` : idx + 1} :رقم مذكرة`,
+        field: defaultField,
+        lessonTitle: mappedType === "استقبال الأولياء" ? "استقبال ومرافقة أولياء التلاميذ" : `مورد تعليمي — فوج ${slot.className}`,
+        concepts: "",
+        stages: getDefaultStages(),
+        isPublicForParents: true,
+        createdAt: new Date().toISOString(),
+      };
+    });
+
+    const updated = [...newEntries, ...entries];
+    setEntries(updated);
+
+    // إضافة أي أفواج جديدة غير مسجلة
+    const newClassNames = daySlots.map((s) => s.className).filter(Boolean);
+    const combinedClasses = sortClasses(Array.from(new Set([...customClasses, ...newClassNames])));
+    setCustomClasses(combinedClasses);
+
+    await persistChanges({ diaryEntries: updated });
+    setMessage({
+      type: "ok",
+      text: `تم استيراد ${newEntries.length} حصة بنجاح من جدول التوقيت ليوم ${dayName}! ⚡`,
+    });
+  };
+
+  // حفظ عنوان اليوم العام (مثال: متابعة الكتابة العشرية والضرب في قوى 10)
+  const handleSaveDayTitle = async (dateStr: string) => {
+    const updated = { ...diaryDayTitles, [dateStr]: tempDayTitle.trim() };
+    if (!tempDayTitle.trim()) {
+      delete updated[dateStr];
+    }
+    setDiaryDayTitles(updated);
+    setEditingDayTitleDate(null);
+    setTempDayTitle("");
+    await persistChanges({ diaryDayTitles: updated });
+  };
+
+  // تجميع وتصفية الأيام والحصص
+  const groupedDays = useMemo(() => {
+    const allDatesSet = new Set<string>();
+
+    entries.forEach((e) => allDatesSet.add(e.date));
+    specialDays.forEach((sd) => {
+      allDatesSet.add(sd.date);
+      if (sd.endDate) {
+        allDatesSet.add(sd.endDate);
+      }
+    });
+
+    allDatesSet.add(todayStr);
+    allDatesSet.add(tomorrowStr);
+
+    let datesArr = Array.from(allDatesSet);
+
+    // تطبيق فلتر التبويب
+    if (dateFilterTab === "today") {
+      datesArr = datesArr.filter((d) => d === todayStr);
+    } else if (dateFilterTab === "tomorrow") {
+      datesArr = datesArr.filter((d) => d === tomorrowStr);
+    } else if (dateFilterTab === "future") {
+      datesArr = datesArr.filter((d) => d >= todayStr);
+    } else if (dateFilterTab === "custom" && customFilterDate) {
+      datesArr = datesArr.filter((d) => d === customFilterDate);
+    }
+
+    // ترتيب التواريخ تنازلياً (الأحدث فالأقدم)
+    datesArr.sort((a, b) => b.localeCompare(a));
+
+    return datesArr.map((dateStr) => {
+      const dayName = getArabicDayName(dateStr);
+      const specialDay = getSpecialDayForDate(dateStr);
+      let dayEntries = entries.filter((e) => e.date === dateStr);
+
+      // تصفية حسب الفوج
+      if (selectedClassFilter !== "all") {
+        dayEntries = dayEntries.filter((e) => e.className === selectedClassFilter);
+      }
+
+      // تصفية حسب البحث
+      if (searchQuery.trim()) {
+        const q = searchQuery.trim().toLowerCase();
+        dayEntries = dayEntries.filter((e) => {
           const matchTitle = e.lessonTitle.toLowerCase().includes(q);
           const matchField = (e.field || "").toLowerCase().includes(q);
           const matchClass = e.className.toLowerCase().includes(q);
           const matchSection = (e.section || "").toLowerCase().includes(q);
-          const matchHomework = (e.homework || "").toLowerCase().includes(q);
-          return matchTitle || matchField || matchClass || matchSection || matchHomework;
-        }
-        return true;
-      })
-      .sort((a, b) => b.date.localeCompare(a.date));
-  }, [entries, selectedClassFilter, dateFilter, searchQuery, tomorrowStr, todayStr]);
+          const matchConcepts = (e.concepts || "").toLowerCase().includes(q);
+          const matchNotes = (e.notes || "").toLowerCase().includes(q);
+          return matchTitle || matchField || matchClass || matchSection || matchConcepts || matchNotes;
+        });
+      }
+
+      // ترتيب الحصص داخل اليوم حسب التوقيت
+      dayEntries.sort((a, b) => (a.periodTime || "").localeCompare(b.periodTime || ""));
+
+      const customTitle = diaryDayTitles[dateStr];
+
+      return {
+        dateStr,
+        dayName,
+        specialDay,
+        entries: dayEntries,
+        customTitle,
+      };
+    });
+  }, [
+    entries,
+    specialDays,
+    diaryDayTitles,
+    todayStr,
+    tomorrowStr,
+    dateFilterTab,
+    customFilterDate,
+    selectedClassFilter,
+    searchQuery,
+    getSpecialDayForDate,
+  ]);
 
   // إحصائيات سريعة
-  const tomorrowLessons = useMemo(() => {
-    return entries.filter((e) => e.date === tomorrowStr);
-  }, [entries, tomorrowStr]);
+  const tomorrowLessons = useMemo(() => entries.filter((e) => e.date === tomorrowStr), [entries, tomorrowStr]);
+  const todayLessons = useMemo(() => entries.filter((e) => e.date === todayStr), [entries, todayStr]);
 
-  const todayLessons = useMemo(() => {
-    return entries.filter((e) => e.date === todayStr);
-  }, [entries, todayStr]);
-
-  // بيانات الترويسة للطباعة الرسمية (مستقاة من التوقيت والملف الشخصي)
-  const printTeacherName = timetableSettings?.teacherName || profile?.fullName || "الأستاذ(ة)";
-  const printSchoolName = timetableSettings?.schoolName || profile?.schoolCustomName || "المتوسطة";
+  // بيانات الترويسة للطباعة الرسمية
+  const printTeacherName = timetableSettings?.teacherName || profile?.fullName || "الأستاذ محمد عدايكة";
+  const printSchoolName = timetableSettings?.schoolName || profile?.schoolCustomName || "متوسطة المجاهد باهي علي — قمار";
   const printInspectorName = timetableSettings?.inspectorName || "السيد مفتش التعليم المتوسط";
-  const printPrincipalName = timetableSettings?.principalName || "السيد مدير المتوسطة";
+  const printPrincipalName = timetableSettings?.principalName || "السيد مدير المؤسسة";
   const printSubject = timetableSettings?.subjectName || profile?.subject || "الرياضيات";
   const printWilaya = timetableSettings?.wilayaName || "الوادي";
 
@@ -476,22 +851,24 @@ export default function TeacherDiaryPage() {
 
   return (
     <div className="min-h-screen bg-[#fafaf7] py-6 sm:py-8 px-3 sm:px-6 font-sans text-right" dir="rtl">
-      <div className="max-w-5xl mx-auto space-y-6">
+      <div className="max-w-6xl mx-auto space-y-6">
 
-        {/* ─── الترويسة الرسمية الخاصة بالطباعة (تظهر فقط عند طباعة الورقة A4) ─── */}
-        <div className="hidden print:block border-b-2 border-gray-900 pb-4 mb-6">
+        {/* ─── الترويسة الرسمية الخاصة بالطباعة الوزارية A4 ─── */}
+        <div className="hidden print:block border-b-2 border-gray-900 pb-3 mb-6">
           <div className="text-center space-y-1">
             <p className="text-xs font-bold text-gray-800">الجمهورية الجزائرية الديمقراطية الشعبية</p>
-            <p className="text-xs font-bold text-gray-800">وزارة التربية الوطنية — مديرية التربية لولاية {printWilaya}</p>
-            <h1 className="text-lg font-black text-gray-900 pt-1">
-              سجل دفتر النصوص الرسمي والتحضير اليومي
+            <p className="text-xs font-bold text-gray-800">
+              وزارة التربية الوطنية — مديرية التربية لولاية {printWilaya}
+            </p>
+            <h1 className="text-base sm:text-lg font-black text-gray-900 pt-0.5">
+              الدفتر اليومي البيداغوجي لـلأستـاذ (CAHIER JOURNAL PÉDAGOGIQUE)
             </h1>
             <p className="text-xs font-semibold text-gray-700">
-              مادة: <span className="font-black">{printSubject}</span> • السنة الدراسية: 2026 / 2027
+              مادة: <span className="font-black">{printSubject}</span> • الموسم الدراسي: 2026 / 2027 م
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 mt-3 text-xs text-gray-800 border-t border-gray-400 pt-2">
+          <div className="grid grid-cols-2 gap-4 mt-2 text-xs text-gray-800 border-t border-gray-400 pt-1.5">
             <div>
               <span>المؤسسة: </span>
               <strong className="text-black">{printSchoolName}</strong>
@@ -511,7 +888,7 @@ export default function TeacherDiaryPage() {
               لوحة الأستاذ
             </Link>
             <span>/</span>
-            <span className="text-gray-900 font-black">الدفتر اليومي ودفتر النصوص</span>
+            <span className="text-gray-900 font-black">الدفتر اليومي البيداغوجي</span>
           </div>
 
           <div className="flex items-center gap-2">
@@ -521,15 +898,15 @@ export default function TeacherDiaryPage() {
               className="px-3.5 py-1.5 rounded-xl border border-[#e8e8e0] bg-white text-xs font-bold text-gray-700 hover:bg-gray-50 transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
             >
               <Printer className="w-3.5 h-3.5 text-gray-500" />
-              <span>طباعة دفتر النصوص A4</span>
+              <span>طباعة الدفتر اليومي A4</span>
             </button>
             <button
-              onClick={handlePrepareForTomorrow}
+              onClick={() => handlePrepareForDate(tomorrowStr)}
               type="button"
               className="btn-primary text-xs px-3.5 py-1.5 flex items-center gap-1.5 shadow-sm cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>تحضير حصة جديدة (ماذا سأدرس غداً)</span>
+              <span>تحضير حصة جديدة 📝</span>
             </button>
           </div>
         </div>
@@ -538,10 +915,10 @@ export default function TeacherDiaryPage() {
         <div className="print:hidden">
           <PageExplainer
             pageId="diary"
-            title="الدفتر اليومي ودفتر النصوص (ماذا سأدرس غداً)"
-            teacherRoleExplanation="هنا تدون مباشرة وبسهولة تامة عناصر الحصة اليومية: المورد المعرفي، مؤشرات الكفاءة، سير الأنشطة، والواجبات المنزلية، دون أي نوافذ منبثقة، مع ميزة التوليد التلقائي لدفتر نصوص وزاري رسمي جاهز للطباعة."
-            parentRoleExplanation="يطلع الولي من صفحته على عناوين الدروس المقررة والواجبات المنزلية لمرافقة ابنه خطوة بخطوة."
-            inspectorExplanation="سجل رسمي مطابق للتدرج السنوي، يتيح للسيد المفتش التربوي معاينة وتيرة إنجاز البرنامج ودفتر النصوص الموثق."
+            title="الدفتر اليومي البيداغوجي (المعتمد رسمياً لدى المفتشية والإدارة)"
+            teacherRoleExplanation="وثيقة التخطيط المكتبي المسبق التي يعدها الأستاذ قبل لقاء تلاميذه، وتتضمن: الفوج، التوقيت، رقم المذكرة، الميدان والمورد المعرفي، وسيرورة الحصة بمقاطعها الثلاثة (تمهيدي، وسيطي، نهائي) أو بأي مراحل مخصصة تناسب خصوصية كل مادة، مع إمكانية تعيين أيام العطل الرسمية والغيابات والندوات بنقرة زر."
+            parentRoleExplanation="يطلع الأولياء على عناوين الدروس المقررة والواجبات المنزلية لمرافقة الأبناء بانتظام."
+            inspectorExplanation="سجل رسمي مطابق للتدرج السنوي والمعايير التفتيشية المعتمدة بمديرية التربية لولاية الوادي والمقاطعة التفتيشية."
           />
         </div>
 
@@ -563,426 +940,512 @@ export default function TeacherDiaryPage() {
           </div>
         )}
 
-        {/* ─── بطاقة الترويسة والإحصائيات ─── */}
-        <div className="bg-white rounded-3xl p-5 sm:p-7 border border-[#e8e8e0] shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-5 print:hidden">
-          <div className="space-y-1.5">
+        {/* ─── بطاقة الترويسة والإحصائيات والتحضير السريع ─── */}
+        <div className="bg-white rounded-3xl p-5 sm:p-7 border border-[#e8e8e0] shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-6 print:hidden">
+          <div className="space-y-2">
             <div className="inline-flex items-center gap-2 bg-[#e6f4ee] text-[#107a57] border border-[#107a57]/20 px-3 py-0.5 rounded-full text-xs font-bold">
               <BookOpen className="w-3.5 h-3.5" />
-              <span>الدفتر اليومي ودفتر النصوص الرسمي</span>
+              <span>الدفتر اليومي النموذجي — 2026 / 2027</span>
             </div>
             <h1 className="text-xl sm:text-2xl font-black text-gray-900">
-              سجل الحصص اليومية وتوثيق التعلمات
+              سجل التخطيط اليومي وسيرورة الحصص
             </h1>
-            <p className="text-xs text-gray-600 font-medium max-w-xl">
-              إدخال وتحضير حصص الغد واليوم مباشرة في الصفحة دون أي نافذة منبثقة، وتوثيق المورد المعرفي والواجبات والتوجيهات البيداغوجية.
+            <p className="text-xs text-gray-600 font-medium max-w-2xl leading-relaxed">
+              تخطيط الحصص للأيام القادمة، وتحديد الفوج والتوقيت والميدان والمورد وسيرورة الحصة مع دعم تام لجميع المواد الدراسية، وإدارة أيام العطل المدرسية الرسمية (مثل عطلة الخريف) ورخص الغياب والندوات التربوية.
             </p>
           </div>
 
-          {/* ودجت ما سأدرسه غداً */}
-          <div className="bg-[#fafaf7] border border-[#e8e8e0] rounded-2xl p-4 min-w-[220px] text-right space-y-1.5 shrink-0">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-black text-gray-500">ماذا ستدرس غداً؟</span>
-              <span className="text-[10px] font-mono text-gray-400">{tomorrowStr}</span>
+          {/* ودجت ما سأدرسه غداً وإمكانية تعيين العطلة */}
+          <div className="flex flex-wrap sm:flex-nowrap items-stretch gap-3 shrink-0">
+            <div className="bg-[#fafaf7] border border-[#e8e8e0] rounded-2xl p-4 min-w-[200px] text-right space-y-1.5 flex-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-black text-gray-500">حالة الغد</span>
+                <span className="text-[10px] font-mono text-gray-400">{tomorrowStr}</span>
+              </div>
+              {(() => {
+                const spTomorrow = getSpecialDayForDate(tomorrowStr);
+                if (spTomorrow) {
+                  return (
+                    <div className="space-y-1 pt-0.5">
+                      <span className="text-xs font-black text-amber-800 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200 block truncate">
+                        {spTomorrow.title}
+                      </span>
+                      <span className="text-[10px] text-gray-500 font-bold block">
+                        عطلة / غياب مسجل
+                      </span>
+                    </div>
+                  );
+                }
+                if (tomorrowLessons.length > 0) {
+                  return (
+                    <div className="space-y-1 pt-0.5">
+                      <span className="text-xs font-black text-[#107a57] block truncate" title={tomorrowLessons[0].lessonTitle}>
+                        {tomorrowLessons[0].lessonTitle}
+                      </span>
+                      <span className="text-[11px] text-gray-600 font-bold block">
+                        فوج {tomorrowLessons[0].className} • {tomorrowLessons.length} حصص مبرمجة
+                      </span>
+                    </div>
+                  );
+                }
+                return (
+                  <div className="space-y-1 pt-0.5">
+                    <span className="text-xs text-amber-700 bg-amber-50 px-2 py-0.5 rounded-lg font-medium inline-block">
+                      لم تدون بعد حصص الغد
+                    </span>
+                  </div>
+                );
+              })()}
             </div>
-            {tomorrowLessons.length > 0 ? (
-              <div className="space-y-1 pt-0.5">
-                <span className="text-xs font-black text-[#107a57] block truncate" title={tomorrowLessons[0].lessonTitle}>
-                  {tomorrowLessons[0].lessonTitle}
-                </span>
-                <span className="text-[11px] text-gray-600 font-bold block">
-                  فوج {tomorrowLessons[0].className} • {tomorrowLessons.length} حصة مسجلة للغد
-                </span>
-              </div>
-            ) : (
-              <div className="space-y-1.5 pt-0.5">
-                <span className="text-xs text-amber-700 bg-amber-50 px-2 py-0.5 rounded-lg font-medium inline-block">
-                  لم تدون بعد حصص الغد
-                </span>
-                <button
-                  type="button"
-                  onClick={handlePrepareForTomorrow}
-                  className="text-xs font-black text-[#107a57] hover:underline flex items-center gap-1 cursor-pointer"
-                >
-                  <Plus className="w-3 h-3" />
-                  <span>حضّر حصة الغد الآن</span>
-                </button>
-              </div>
-            )}
+
+            <div className="flex flex-col gap-2 justify-center">
+              <button
+                type="button"
+                onClick={() => handlePrepareForDate(tomorrowStr)}
+                className="btn-primary text-xs px-3.5 py-2 flex items-center gap-1.5 shadow-sm cursor-pointer whitespace-nowrap"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>تحضير حصة 📝</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleOpenSpecialDayModal(tomorrowStr)}
+                className="px-3.5 py-2 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-xs font-black text-amber-900 transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+              >
+                <Palmtree className="w-3.5 h-3.5 text-amber-700" />
+                <span>تعيين عطلة / غياب 🏖️</span>
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* ══════════════════════════════════════════════════════════════════════
-            استمارة التحضير المباشرة في الصفحة (بدون أي نافذة منبثقة)
-           ══════════════════════════════════════════════════════════════════════ */}
-        <div
-          ref={formRef}
-          className={`bg-white rounded-3xl border transition-all duration-300 print:hidden overflow-hidden ${
-            editingEntry
-              ? "border-amber-400 ring-4 ring-amber-400/10 shadow-lg"
-              : "border-[#107a57]/30 shadow-md ring-2 ring-[#107a57]/10"
-          }`}
-        >
-          {/* رأس استمارة التحضير المباشرة */}
+        {/* ─── استمارة التحضير المباشرة في الصفحة ─── */}
+        <div ref={formRef} className="bg-white rounded-3xl border border-[#e8e8e0] shadow-sm overflow-hidden print:hidden transition-all duration-300">
           <div
-            className={`p-4 sm:p-5 flex flex-wrap items-center justify-between gap-3 border-b transition ${
-              editingEntry
-                ? "bg-amber-50/80 border-amber-200"
-                : "bg-[#f4faf7] border-[#e2efe9]"
-            }`}
+            onClick={() => setIsFormExpanded(!isFormExpanded)}
+            className="p-4 sm:p-5 flex items-center justify-between cursor-pointer hover:bg-gray-50/80 transition select-none border-b border-[#e8e8e0]"
           >
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-3">
               <div
-                className={`w-9 h-9 rounded-2xl flex items-center justify-center shrink-0 ${
-                  editingEntry
-                    ? "bg-amber-500 text-white shadow-xs"
-                    : "bg-[#107a57] text-white shadow-xs"
+                className={`w-9 h-9 rounded-2xl flex items-center justify-center font-bold text-sm ${
+                  editingEntry ? "bg-amber-100 text-amber-800" : "bg-[#e6f4ee] text-[#107a57]"
                 }`}
               >
-                {editingEntry ? <Pencil className="w-4 h-4" /> : <BookOpen className="w-4 h-4" />}
+                {editingEntry ? <Pencil className="w-4 h-4" /> : <Plus className="w-5 h-5" />}
               </div>
               <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-sm sm:text-base font-black text-gray-900">
-                    {editingEntry ? "تعديل بيانات الحصة المسجلة" : "تحضير وتدوين حصة جديدة في الصفحة"}
-                  </h2>
-                  <span
-                    className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
-                      editingEntry
-                        ? "bg-amber-200 text-amber-900"
-                        : "bg-[#107a57]/15 text-[#107a57]"
-                    }`}
-                  >
-                    {editingEntry ? "وضع التعديل" : "إدخال مباشر بدون نوافذ منبثقة"}
-                  </span>
-                </div>
+                <h2 className="text-sm sm:text-base font-black text-gray-900 flex items-center gap-2">
+                  <span>{editingEntry ? "تعديل الحصة الحالية في الدفتر اليومي" : "استمارة تحضير حصة جديدة (ماذا سأدرس؟)"}</span>
+                  {editingEntry && (
+                    <span className="text-[10px] font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full border border-amber-300">
+                      وضع التعديل النشط
+                    </span>
+                  )}
+                </h2>
                 <p className="text-[11px] text-gray-500 font-medium">
-                  {editingEntry
-                    ? `أنت الآن تعدل الحصة: "${editingEntry.lessonTitle}"`
-                    : "اكتب عناصر الدرس وسير الأنشطة والواجب مباشرة وسيتم حفظها وتوثيقها فوراً"}
+                  تدوين الفوج، التوقيت، رقم المذكرة، الميدان، المورد، وسيرورة الحصة ومراحلها بحرية تامة
                 </p>
               </div>
             </div>
 
             <div className="flex items-center gap-2">
-              {editingEntry && (
-                <button
-                  type="button"
-                  onClick={handleCancelEdit}
-                  className="px-3 py-1.5 rounded-xl border border-amber-300 bg-white text-xs font-bold text-amber-800 hover:bg-amber-100/50 transition cursor-pointer flex items-center gap-1"
-                >
-                  <X className="w-3.5 h-3.5" />
-                  <span>إلغاء التعديل</span>
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => setIsFormExpanded((v) => !v)}
-                className="px-3 py-1.5 rounded-xl border border-[#e8e8e0] bg-white text-xs font-bold text-gray-600 hover:bg-gray-50 transition cursor-pointer flex items-center gap-1"
-                title={isFormExpanded ? "طي الاستمارة" : "فتح الاستمارة"}
-              >
-                <span>{isFormExpanded ? "طي الاستمارة" : "توسيع الاستمارة"}</span>
-                {isFormExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-              </button>
+              <span className="text-xs font-bold text-gray-400 hidden sm:inline">
+                {isFormExpanded ? "إخفاء الاستمارة" : "إظهار وتدوين الحصة"}
+              </span>
+              <div className="p-1 rounded-xl bg-gray-100 text-gray-500">
+                {isFormExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </div>
             </div>
           </div>
 
-          {/* محتوى الاستمارة */}
           {isFormExpanded && (
             <form onSubmit={handleSubmitEntry} className="p-5 sm:p-7 space-y-6">
-              {/* شريط الإدخال السريع للتاريخ واليوم */}
-              <div className="p-3.5 rounded-2xl bg-[#fafaf7] border border-[#e8e8e0] flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-[#107a57]" />
-                  <span className="text-xs font-black text-gray-800">اختيار سريع لليوم:</span>
-                  <div className="inline-flex rounded-xl p-0.5 bg-white border border-[#e8e8e0]">
-                    <button
-                      type="button"
-                      onClick={() => setFormDate(todayStr)}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
-                        formDate === todayStr ? "bg-[#107a57] text-white" : "text-gray-600 hover:text-gray-900"
-                      }`}
-                    >
-                      اليوم ({getArabicDayName(todayStr)})
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setFormDate(tomorrowStr)}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
-                        formDate === tomorrowStr ? "bg-[#107a57] text-white" : "text-gray-600 hover:text-gray-900"
-                      }`}
-                    >
-                      غداً ({getArabicDayName(tomorrowStr)}) ✨
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setFormDate(dayAfterTomorrowStr)}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
-                        formDate === dayAfterTomorrowStr ? "bg-[#107a57] text-white" : "text-gray-600 hover:text-gray-900"
-                      }`}
-                    >
-                      بعد غد ({getArabicDayName(dayAfterTomorrowStr)})
-                    </button>
-                  </div>
-                </div>
-
-                <div className="text-xs font-black text-gray-700 bg-white px-3 py-1 rounded-xl border border-[#e8e8e0]">
-                  اليوم المحدد: <span className="text-[#107a57]">{calculatedDayName} {formatArabicFullDate(formDate)}</span>
-                </div>
-              </div>
-
-              {/* ─── القسم 1: المعلومات التنظيمية (التاريخ، الفوج، التوقيت، الميدان) ─── */}
+              {/* السطر الأول: التاريخ، الفوج، التوقيت، ورقم المذكرة */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* 1. تاريخ الحصة */}
                 <div className="space-y-1.5">
-                  <label className="block text-xs font-black text-gray-800">
-                    تاريخ الحصة <span className="text-red-500">*</span>
+                  <label className="text-xs font-black text-gray-700 flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-gray-400" />
+                    <span>تاريخ الحصة:</span>
                   </label>
                   <input
                     type="date"
-                    required
                     value={formDate}
                     onChange={(e) => setFormDate(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-white border border-[#e8e8e0] text-xs font-mono text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57]"
+                    className="w-full px-3.5 py-2 rounded-xl bg-[#fafaf7] border border-[#e8e8e0] text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57]"
+                    required
                   />
+                  <div className="flex items-center justify-between text-[11px] text-gray-500 font-bold px-1">
+                    <span>يوم {calculatedDayName}</span>
+                    <button
+                      type="button"
+                      onClick={() => setFormDate(tomorrowStr)}
+                      className="text-[#107a57] hover:underline"
+                    >
+                      تحديد الغد
+                    </button>
+                  </div>
                 </div>
 
                 {/* 2. الفوج التربوي */}
                 <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="block text-xs font-black text-gray-800">
-                      الفوج التربوي <span className="text-red-500">*</span>
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => setIsCustomClassInput((v) => !v)}
-                      className="text-[10px] font-bold text-[#107a57] hover:underline cursor-pointer"
-                    >
-                      {isCustomClassInput ? "اختيار من القائمة" : "+ كتابة فوج مخصص"}
-                    </button>
-                  </div>
-                  {isCustomClassInput ? (
-                    <input
-                      type="text"
-                      required
-                      placeholder="مثال: 1م1 أو 3م4 أو استدراك"
-                      value={customClassName}
-                      onChange={(e) => setCustomClassName(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl bg-white border border-[#107a57] text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#107a57]/20"
-                    />
-                  ) : (
+                  <label className="text-xs font-black text-gray-700 flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5 text-gray-400" />
+                    <span>الفوج التربوي:</span>
+                  </label>
+                  {!isCustomClassInput ? (
                     <select
                       value={formClass}
                       onChange={(e) => {
-                        if (e.target.value === "__add_new__") {
+                        if (e.target.value === "__custom__") {
                           setIsCustomClassInput(true);
+                          setCustomClassName("");
                         } else {
                           setFormClass(e.target.value);
                         }
                       }}
-                      className="w-full px-3 py-2 rounded-xl bg-white border border-[#e8e8e0] text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57]"
+                      className="w-full px-3.5 py-2 rounded-xl bg-[#fafaf7] border border-[#e8e8e0] text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57]"
                     >
-                      {customClasses.length === 0 && <option value="">اختر الفوج</option>}
-                      {customClasses.map((c) => (
-                        <option key={c} value={c}>
-                          فوج {c}
+                      {customClasses.map((cls) => (
+                        <option key={cls} value={cls}>
+                          فوج {cls}
                         </option>
                       ))}
-                      <option value="__add_new__">+ إضافة فوج آخر مخصص...</option>
+                      <option value="__custom__">+ كتابة قسم آخر...</option>
                     </select>
+                  ) : (
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="text"
+                        value={customClassName}
+                        onChange={(e) => setCustomClassName(e.target.value)}
+                        placeholder="مثال: 1م3 أو 4م1"
+                        className="flex-1 px-3.5 py-2 rounded-xl bg-[#fafaf7] border border-[#e8e8e0] text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57]"
+                        autoFocus
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsCustomClassInput(false);
+                          setFormClass(customClasses[0] || "");
+                        }}
+                        className="p-2 rounded-xl border border-gray-200 text-gray-400 hover:text-gray-600"
+                        title="العودة للقائمة"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   )}
+                  <p className="text-[10px] text-gray-400">مرتبة تلقائياً حسب المستوى</p>
                 </div>
 
                 {/* 3. توقيت الحصة */}
                 <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="block text-xs font-black text-gray-800">توقيت الحصة</label>
-                    <button
-                      type="button"
-                      onClick={() => setIsCustomTimeInput((v) => !v)}
-                      className="text-[10px] font-bold text-[#107a57] hover:underline cursor-pointer"
-                    >
-                      {isCustomTimeInput ? "اختيار توقيت نمطي" : "+ كتابة توقيت مخصص"}
-                    </button>
-                  </div>
-                  {isCustomTimeInput ? (
-                    <input
-                      type="text"
-                      placeholder="مثال: 08:30 - 09:30"
-                      value={customTimeValue}
-                      onChange={(e) => setCustomTimeValue(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl bg-white border border-[#107a57] text-xs font-bold text-gray-900 focus:outline-none"
-                    />
-                  ) : (
+                  <label className="text-xs font-black text-gray-700 flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-gray-400" />
+                    <span>توقيت الحصة:</span>
+                  </label>
+                  {!isCustomTimeInput ? (
                     <select
                       value={formPeriodTime}
-                      onChange={(e) => setFormPeriodTime(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl bg-white border border-[#e8e8e0] text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57]"
+                      onChange={(e) => {
+                        if (e.target.value === "__custom__") {
+                          setIsCustomTimeInput(true);
+                          setCustomTimeValue("");
+                        } else {
+                          setFormPeriodTime(e.target.value);
+                        }
+                      }}
+                      className="w-full px-3.5 py-2 rounded-xl bg-[#fafaf7] border border-[#e8e8e0] text-xs font-mono font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57]"
                     >
-                      {STANDARD_PERIODS.map((period) => (
-                        <option key={period} value={period}>
-                          {period}
+                      {STANDARD_PERIODS.map((t) => (
+                        <option key={t} value={t}>
+                          {t}
                         </option>
                       ))}
+                      <option value="__custom__">+ توقيت مخصص...</option>
                     </select>
+                  ) : (
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="text"
+                        value={customTimeValue}
+                        onChange={(e) => setCustomTimeValue(e.target.value)}
+                        placeholder="مثال: 08:30 - 09:30"
+                        className="flex-1 px-3.5 py-2 rounded-xl bg-[#fafaf7] border border-[#e8e8e0] text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57]"
+                        autoFocus
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsCustomTimeInput(false);
+                          setFormPeriodTime("08:00 - 09:00");
+                        }}
+                        className="p-2 rounded-xl border border-gray-200 text-gray-400 hover:text-gray-600"
+                        title="العودة للقائمة"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   )}
+                  <p className="text-[10px] text-gray-400">التوقيت المعتمد للتعليم المتوسط</p>
                 </div>
 
-                {/* 4. الميدان التعلمي */}
+                {/* 4. رقم المذكرة والوثيقة */}
                 <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="block text-xs font-black text-gray-800">الميدان التعلمي</label>
-                    <button
-                      type="button"
-                      onClick={() => setIsCustomFieldInput((v) => !v)}
-                      className="text-[10px] font-bold text-[#107a57] hover:underline cursor-pointer"
-                    >
-                      {isCustomFieldInput ? "اختيار من الميادين" : "+ كتابة ميدان مخصص"}
-                    </button>
-                  </div>
-                  {isCustomFieldInput ? (
-                    <input
-                      type="text"
-                      placeholder="مثال: الحساب الحرفي أو الظواهر الميكانيكية"
-                      value={customFieldValue}
-                      onChange={(e) => setCustomFieldValue(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl bg-white border border-[#107a57] text-xs font-bold text-gray-900 focus:outline-none"
-                    />
-                  ) : (
+                  <label className="text-xs font-black text-gray-700 flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-gray-400" />
+                    <span>رقم المذكرة / الوثيقة:</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formNoteNumber}
+                    onChange={(e) => setFormNoteNumber(e.target.value)}
+                    placeholder="مثال: مذكرة رقم: 03 أو 01 تفويج"
+                    className="w-full px-3.5 py-2 rounded-xl bg-[#fafaf7] border border-[#e8e8e0] text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57]"
+                  />
+                  <p className="text-[10px] text-gray-400">يظهر أسفل الفوج في الجدول</p>
+                </div>
+              </div>
+
+              {/* السطر الثاني: نوع الحصة، الميدان، والمقطع البيداغوجي */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {/* نوع الحصة */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-black text-gray-700 flex items-center gap-1.5">
+                    <Tag className="w-3.5 h-3.5 text-gray-400" />
+                    <span>نوع الحصة البيداغوجية:</span>
+                  </label>
+                  <select
+                    value={formSessionType}
+                    onChange={(e) => setFormSessionType(e.target.value)}
+                    className="w-full px-3.5 py-2 rounded-xl bg-[#fafaf7] border border-[#e8e8e0] text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57]"
+                  >
+                    {SESSION_TYPES.map((st) => (
+                      <option key={st} value={st}>
+                        {st}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* الميدان / المجال المعرفي */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-black text-gray-700 flex items-center gap-1.5">
+                    <Compass className="w-3.5 h-3.5 text-gray-400" />
+                    <span>الميدان / المجال:</span>
+                  </label>
+                  {!isCustomFieldInput ? (
                     <select
                       value={formField}
                       onChange={(e) => {
                         if (e.target.value === "__custom__") {
                           setIsCustomFieldInput(true);
+                          setCustomFieldValue("");
                         } else {
                           setFormField(e.target.value);
                         }
                       }}
-                      className="w-full px-3 py-2 rounded-xl bg-white border border-[#e8e8e0] text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57]"
+                      className="w-full px-3.5 py-2 rounded-xl bg-[#fafaf7] border border-[#e8e8e0] text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57]"
                     >
                       {COMMON_FIELDS.map((f) => (
                         <option key={f} value={f}>
                           {f}
                         </option>
                       ))}
-                      <option value="الحساب الحرفي">الحساب الحرفي</option>
-                      <option value="الدوال وتنظيم المعطيات">الدوال وتنظيم المعطيات</option>
-                      <option value="أخرى / مراجعة">أخرى / مراجعة واختبارات</option>
-                      <option value="__custom__">+ كتابة ميدان مخصص...</option>
+                      <option value="أخرى / مراجعة">أخرى / مراجعة</option>
+                      <option value="__custom__">+ كتابة ميدان لمادة أخرى...</option>
                     </select>
+                  ) : (
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="text"
+                        value={customFieldValue}
+                        onChange={(e) => setCustomFieldValue(e.target.value)}
+                        placeholder="مثال: القراءة والنصوص، المادة وتحولاتها..."
+                        className="flex-1 px-3.5 py-2 rounded-xl bg-[#fafaf7] border border-[#e8e8e0] text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57]"
+                        autoFocus
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsCustomFieldInput(false);
+                          setFormField("أنشطة عددية");
+                        }}
+                        className="p-2 rounded-xl border border-gray-200 text-gray-400 hover:text-gray-600"
+                        title="العودة للقائمة"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   )}
                 </div>
-              </div>
 
-              {/* ─── القسم 2: عنوان المورد والمقطع البيداغوجي ─── */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="md:col-span-2 space-y-1.5">
-                  <label className="block text-xs font-black text-gray-800">
-                    عنوان المورد المعرفي / الدرس <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    ref={titleInputRef}
-                    type="text"
-                    required
-                    value={formLessonTitle}
-                    onChange={(e) => setFormLessonTitle(e.target.value)}
-                    placeholder="مثال: ضرب وقسمة كسرين • أو خاصية طالس وحساب الأطوال • أو الحساب الحرفي"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#e8e8e0] text-xs sm:text-sm font-black text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57]"
-                  />
-                </div>
-
+                {/* المقطع التعلمي */}
                 <div className="space-y-1.5">
-                  <label className="block text-xs font-black text-gray-800">المقطع البيداغوجي (اختياري)</label>
+                  <label className="text-xs font-black text-gray-700 flex items-center gap-1.5">
+                    <Layers className="w-3.5 h-3.5 text-gray-400" />
+                    <span>المقطع التعلمي (اختياري):</span>
+                  </label>
                   <input
                     type="text"
                     value={formSection}
                     onChange={(e) => setFormSection(e.target.value)}
-                    placeholder="مثال: المقطع 1: العمليات على الأعداد الطبيعية"
-                    className="w-full px-3 py-2.5 rounded-xl bg-white border border-[#e8e8e0] text-xs font-bold text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57]"
+                    placeholder="مثال: المقطع 01: العمليات على الأعداد الطبيعية والعشرية"
+                    className="w-full px-3.5 py-2 rounded-xl bg-[#fafaf7] border border-[#e8e8e0] text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57]"
                   />
                 </div>
               </div>
 
-              {/* ─── القسم 3: مؤشرات الكفاءة ومراحل سير الأنشطة ─── */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* السطر الثالث: عنوان المورد المعرفي والمفاهيم الأساسية */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="block text-xs font-black text-gray-800">
-                      🎯 مؤشرات الكفاءة والأهداف التعلمية
-                    </label>
-                    <span className="text-[10px] text-gray-400">للتفتيش والمتابعة</span>
-                  </div>
-                  <textarea
-                    rows={3}
-                    value={formObjectives}
-                    onChange={(e) => setFormObjectives(e.target.value)}
-                    placeholder="مثال: أن يتعرف المتعلم على قاعدة جداء كسرين، وأن يوظف القاعدة في اختزال العبارات الجبرية وحل مسائل يومية..."
-                    className="w-full px-3 py-2.5 rounded-xl bg-white border border-[#e8e8e0] text-xs text-gray-900 leading-relaxed placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57]"
+                  <label className="text-xs font-black text-gray-900 flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-[#107a57]" />
+                    <span>المورد المعرفي (عنوان الدرس الرئيسي) <span className="text-red-500">*</span>:</span>
+                  </label>
+                  <input
+                    ref={titleInputRef}
+                    type="text"
+                    value={formLessonTitle}
+                    onChange={(e) => setFormLessonTitle(e.target.value)}
+                    placeholder="مثال: استعمال الكتابة العشرية (المورد 03)"
+                    className="w-full px-4 py-2.5 rounded-2xl bg-white border-2 border-[#107a57]/40 text-sm font-black text-gray-900 focus:outline-none focus:border-[#107a57] focus:ring-4 focus:ring-[#107a57]/10"
+                    required
                   />
+                  <p className="text-[10px] text-gray-500">العنوان البارز الذي يظهر في الخانة الرئيسية للدرس</p>
                 </div>
 
                 <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="block text-xs font-black text-gray-800">
-                      📝 مراحل وسير الأنشطة في الحصة
-                    </label>
-                    <span className="text-[10px] text-gray-400">وضعية الانطلاق • بناء التعلمات • الحوصلة</span>
-                  </div>
-                  <textarea
-                    rows={3}
-                    value={formActivities}
-                    onChange={(e) => setFormActivities(e.target.value)}
-                    placeholder="مثال: 1. وضعية الانطلاق: نشاط 2 ص 14 (10 د) • 2. بناء التعلمات واستنتاج القاعدة (25 د) • 3. الحوصلة وتطبيق فوري (15 د)..."
-                    className="w-full px-3 py-2.5 rounded-xl bg-white border border-[#e8e8e0] text-xs text-gray-900 leading-relaxed placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57]"
-                  />
-                </div>
-              </div>
-
-              {/* ─── القسم 4: الواجب المنزلي وملاحظات المعالجة ─── */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-black text-amber-900">
-                    📌 الواجب المنزلي والتوجيهات (يظهر للأولياء)
+                  <label className="text-xs font-black text-gray-700 flex items-center gap-1.5">
+                    <FileCheck className="w-3.5 h-3.5 text-gray-400" />
+                    <span>المفاهيم والمحتوى الأساسي المستهدف:</span>
                   </label>
                   <input
                     type="text"
-                    value={formHomework}
-                    onChange={(e) => setFormHomework(e.target.value)}
-                    placeholder="مثال: حل التمرين 14 و 15 ص 30 في كراس المحاولات"
-                    className="w-full px-3 py-2.5 rounded-xl bg-amber-50/40 border border-amber-200 text-xs font-bold text-amber-950 placeholder:text-amber-800/40 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                    value={formConcepts}
+                    onChange={(e) => setFormConcepts(e.target.value)}
+                    placeholder="مثال: تفكيك الأعداد العشرية والقراءة السليمة للأعشار"
+                    className="w-full px-3.5 py-2.5 rounded-2xl bg-[#fafaf7] border border-[#e8e8e0] text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57]"
                   />
+                  <p className="text-[10px] text-gray-400">المفاهيم والعمليات المعرفية المتضمنة في الحصة</p>
+                </div>
+              </div>
+
+              {/* ─── سيرورة الحصة وسندات الكتاب المدرسي (مرونة عامة لجميع المواد) ─── */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-[#fafaf7] border border-[#e8e8e0] space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e8e8e0] pb-3">
+                  <div>
+                    <h3 className="text-xs sm:text-sm font-black text-gray-900 flex items-center gap-1.5">
+                      <span>سيرورة الحصة وسندات الكتاب المدرسي</span>
+                      <span className="text-[10px] font-bold text-gray-400">(عامة تناسب الرياضيات وجميع المواد)</span>
+                    </h3>
+                    <p className="text-[11px] text-gray-500">
+                      يمكنك كتابة عناصر ومقاطع الحصة، أو إضافة عناوين مخصصة بحرية تامة لمطابقة أي تخصص.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleAddCustomStage}
+                    className="px-3 py-1.5 rounded-xl border border-dashed border-[#107a57] bg-white hover:bg-[#e6f4ee] text-[#107a57] text-xs font-black flex items-center gap-1.5 transition cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>+ إضافة عنوان / مرحلة مخصصة</span>
+                  </button>
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-black text-gray-800">
-                    💡 ملاحظات المعالجة البيداغوجية والاستدراك (خاص بالأستاذ)
+                <div className="space-y-3">
+                  {formStages.map((stage, idx) => (
+                    <div
+                      key={stage.id || `stg_${idx}`}
+                      className="p-3.5 rounded-xl bg-white border border-[#e8e8e0] flex flex-col md:flex-row md:items-start gap-3"
+                    >
+                      {/* تسمية المرحلة / العنوان */}
+                      <div className="w-full md:w-44 shrink-0 space-y-1">
+                        <label className="text-[10px] font-bold text-gray-500">عنوان المرحلة / الشارة:</label>
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="text"
+                            value={stage.label}
+                            onChange={(e) => handleUpdateStage(idx, { label: e.target.value })}
+                            placeholder="مثال: تمهيدي أو سندات"
+                            className="w-full px-2.5 py-1.5 rounded-lg bg-gray-50 border border-gray-200 text-xs font-black text-gray-900 focus:outline-none focus:border-[#107a57]"
+                          />
+                        </div>
+                      </div>
+
+                      {/* محتوى المرحلة وسيرورتها */}
+                      <div className="flex-1 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[10px] font-bold text-gray-500">تفاصيل وسيرورة هذه المرحلة وسندات الكتاب:</label>
+                          {formStages.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveStage(idx)}
+                              className="text-gray-400 hover:text-red-500 p-0.5 rounded transition"
+                              title="حذف هذه المرحلة"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                        <textarea
+                          rows={2}
+                          value={stage.content}
+                          onChange={(e) => handleUpdateStage(idx, { content: e.target.value })}
+                          placeholder={
+                            stage.label.includes("تمهيدي")
+                              ? "وضعية انطلاق سريعة ومكتسبات قبلية وتهيئة حافزة..."
+                              : stage.label.includes("وسيطي")
+                              ? "نشاط بناء التعلم مع الإشارة لرقم النشاط وصفحة الكتاب وصياغة المورد..."
+                              : stage.label.includes("نهائي")
+                              ? "تقويم تحصيلي فوري، تطبيق صفي وتكليف بالواجب المنزلي..."
+                              : "اكتب تفاصيل وسيرورة هذا المقطع..."
+                          }
+                          className="w-full p-2.5 rounded-lg bg-gray-50 border border-gray-200 text-xs font-medium text-gray-900 focus:outline-none focus:border-[#107a57] leading-relaxed"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* الملاحظات وإعدادات الظهور للأولياء */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div className="lg:col-span-2 space-y-1.5">
+                  <label className="text-xs font-black text-gray-700 flex items-center gap-1.5">
+                    <Info className="w-3.5 h-3.5 text-gray-400" />
+                    <span>الملاحظات البيداغوجية والتقويمية (اختياري):</span>
                   </label>
                   <input
                     type="text"
                     value={formNotes}
                     onChange={(e) => setFormNotes(e.target.value)}
-                    placeholder="مثال: تسجيل صعوبة في اختزال الكسور، تبرمج معالجة في حصة الدعم"
-                    className="w-full px-3 py-2.5 rounded-xl bg-white border border-[#e8e8e0] text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57]"
+                    placeholder="ملاحظات حول استجابة التلاميذ، معالجة صعوبات، أو توجيهات إضافية..."
+                    className="w-full px-3.5 py-2 rounded-xl bg-[#fafaf7] border border-[#e8e8e0] text-xs font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57]"
                   />
+                </div>
+
+                <div className="flex flex-col justify-center space-y-2 pt-2">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={formIsPublic}
+                      onChange={(e) => setFormIsPublic(e.target.checked)}
+                      className="w-4 h-4 text-[#107a57] rounded border-gray-300 focus:ring-[#107a57]"
+                    />
+                    <span className="text-xs font-bold text-gray-700">إتاحة عنوان الدرس للولي والتلميذ</span>
+                  </label>
+                  <p className="text-[10px] text-gray-400">يظهر عنوان المورد فقط دون التدوينات الخاصة بالأستاذ</p>
                 </div>
               </div>
 
-              {/* ─── القسم 5: الإتاحة للأولياء وأزرار الحفظ ─── */}
-              <div className="pt-2 border-t border-[#e8e8e0] flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="inPageIsPublicCheck"
-                    checked={formIsPublic}
-                    onChange={(e) => setFormIsPublic(e.target.checked)}
-                    className="w-4 h-4 rounded text-[#107a57] focus:ring-[#107a57] cursor-pointer"
-                  />
-                  <label
-                    htmlFor="inPageIsPublicCheck"
-                    className="text-xs font-bold text-gray-800 cursor-pointer select-none flex items-center gap-1.5"
-                  >
-                    <Globe className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>إتاحة عنوان الدرس والواجب في فضاء الأولياء للاطلاع المباشر</span>
-                  </label>
+              {/* أزرار العمليات للاستمارة */}
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#e8e8e0] pt-4">
+                <div className="text-[11px] text-gray-500 font-bold">
+                  <span>سيتم حفظ الحصة في دفتر: </span>
+                  <span className="text-gray-900 font-black">{formDate} ({calculatedDayName})</span>
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -990,10 +1453,10 @@ export default function TeacherDiaryPage() {
                     <>
                       <button
                         type="button"
-                        onClick={handleCancelEdit}
-                        className="px-4 py-2 rounded-xl border border-[#e8e8e0] text-xs font-bold text-gray-600 hover:bg-gray-100 transition cursor-pointer"
+                        onClick={handleResetForm}
+                        className="px-3.5 py-2 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-100 transition cursor-pointer"
                       >
-                        إلغاء التعديل
+                        إلغاء وضع التعديل
                       </button>
                       <button
                         type="submit"
@@ -1030,198 +1493,140 @@ export default function TeacherDiaryPage() {
           )}
         </div>
 
-        {/* ─── شريط الفلترة والبحث والأفواج ─── */}
+        {/* ─── شريط الفلترة واختيار الأيام والبحث والأفواج ─── */}
         <div className="space-y-3 print:hidden">
           <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-[#e8e8e0]">
-            {/* أزرار الأفواج */}
+            {/* تبويبات الأيام والتاريخ */}
             <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-xs font-bold text-gray-500 ml-1">تصفية حسب الفوج:</span>
+              <span className="text-xs font-bold text-gray-500 ml-1">عرض الأيام:</span>
               <button
                 type="button"
-                onClick={() => setSelectedClassFilter("all")}
+                onClick={() => setDateFilterTab("all")}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
-                  selectedClassFilter === "all"
-                    ? "bg-[#107a57] text-white shadow-xs"
-                    : "bg-gray-50 text-gray-600 hover:bg-gray-100 border border-[#e8e8e0]"
+                  dateFilterTab === "all" ? "bg-gray-900 text-white shadow-xs" : "bg-gray-50 text-gray-600 hover:bg-gray-100 border border-[#e8e8e0]"
                 }`}
               >
-                الكل ({entries.length})
-              </button>
-              {customClasses.map((cls) => {
-                const count = entries.filter((e) => e.className === cls).length;
-                return (
-                  <button
-                    key={cls}
-                    type="button"
-                    onClick={() => setSelectedClassFilter(cls)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                      selectedClassFilter === cls
-                        ? "bg-[#107a57] text-white shadow-xs"
-                        : "bg-gray-50 text-gray-600 hover:bg-gray-100 border border-[#e8e8e0]"
-                    }`}
-                  >
-                    <span>فوج {cls}</span>
-                    <span
-                      className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
-                        selectedClassFilter === cls ? "bg-white/20 text-white" : "bg-gray-200 text-gray-700"
-                      }`}
-                    >
-                      {count}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* فلتر التاريخ واليوم */}
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => setDateFilter("all")}
-                className={`px-2.5 py-1 rounded-xl text-xs font-bold transition cursor-pointer ${
-                  dateFilter === "all" ? "bg-gray-900 text-white" : "text-gray-500 hover:bg-gray-100"
-                }`}
-              >
-                جميع التواريخ
+                جميع الأيام
               </button>
               <button
                 type="button"
-                onClick={() => setDateFilter("tomorrow")}
-                className={`px-2.5 py-1 rounded-xl text-xs font-bold transition cursor-pointer ${
-                  dateFilter === "tomorrow" ? "bg-[#107a57] text-white" : "text-gray-500 hover:bg-gray-100"
+                onClick={() => setDateFilterTab("tomorrow")}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                  dateFilterTab === "tomorrow" ? "bg-[#107a57] text-white shadow-xs" : "bg-gray-50 text-gray-600 hover:bg-gray-100 border border-[#e8e8e0]"
                 }`}
               >
                 حصص الغد ({tomorrowLessons.length})
               </button>
               <button
                 type="button"
-                onClick={() => setDateFilter("today")}
-                className={`px-2.5 py-1 rounded-xl text-xs font-bold transition cursor-pointer ${
-                  dateFilter === "today" ? "bg-amber-600 text-white" : "text-gray-500 hover:bg-gray-100"
+                onClick={() => setDateFilterTab("today")}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                  dateFilterTab === "today" ? "bg-blue-600 text-white shadow-xs" : "bg-gray-50 text-gray-600 hover:bg-gray-100 border border-[#e8e8e0]"
                 }`}
               >
                 حصص اليوم ({todayLessons.length})
               </button>
+              <button
+                type="button"
+                onClick={() => setDateFilterTab("future")}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                  dateFilterTab === "future" ? "bg-purple-700 text-white shadow-xs" : "bg-gray-50 text-gray-600 hover:bg-gray-100 border border-[#e8e8e0]"
+                }`}
+              >
+                الأيام القادمة ✨
+              </button>
+            </div>
+
+            {/* اختيار تاريخ محدد مباشرة */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-gray-500">الانتقال لتاريخ:</span>
+              <input
+                type="date"
+                value={customFilterDate}
+                onChange={(e) => {
+                  setCustomFilterDate(e.target.value);
+                  setDateFilterTab("custom");
+                }}
+                className="px-2.5 py-1 rounded-xl bg-gray-50 border border-gray-200 text-xs font-bold text-gray-800"
+              />
             </div>
           </div>
 
-          {/* حقل البحث وإحصاء النتائج */}
+          {/* أزرار تصفية الأفواج والبحث */}
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="relative flex-1 min-w-[240px]">
-              <Search className="w-4 h-4 text-gray-400 absolute right-3.5 top-1/2 -translate-y-1/2" />
+            {/* فلتر الفوج */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-xs font-bold text-gray-500 ml-1">تصفية حسب الفوج:</span>
+              <button
+                type="button"
+                onClick={() => setSelectedClassFilter("all")}
+                className={`px-2.5 py-1 rounded-xl text-xs font-bold transition cursor-pointer ${
+                  selectedClassFilter === "all" ? "bg-[#107a57] text-white" : "text-gray-600 bg-white border border-[#e8e8e0] hover:bg-gray-50"
+                }`}
+              >
+                الكل
+              </button>
+              {customClasses.map((cls) => {
+                const count = entries.filter((e) => e.className === cls).length;
+                const classTheme = getClassColors(cls, customClasses, timetableSettings?.colorMode || "distinct", timetableSettings?.classColors);
+                return (
+                  <button
+                    key={cls}
+                    type="button"
+                    onClick={() => setSelectedClassFilter(cls)}
+                    className={`px-2.5 py-1 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                      selectedClassFilter === cls
+                        ? "bg-[#107a57] text-white shadow-xs"
+                        : "bg-white text-gray-700 hover:bg-gray-50 border border-[#e8e8e0]"
+                    }`}
+                  >
+                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: classTheme.hex }}></span>
+                    <span>فوج {cls}</span>
+                    <span className="text-[10px] font-mono opacity-80">({count})</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* البحث في الدروس والمحتوى */}
+            <div className="relative min-w-[240px]">
+              <Search className="w-3.5 h-3.5 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="ابحث في عنوان المورد، الميدان، المقطع، أو الواجب المنزلي..."
-                className="w-full pr-10 pl-3.5 py-2 rounded-2xl bg-white border border-[#e8e8e0] text-xs font-medium text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57]"
+                placeholder="ابحث في عنوان المورد، الميدان، أو المفاهيم..."
+                className="w-full pr-8 pl-3 py-1.5 rounded-xl bg-white border border-[#e8e8e0] text-xs font-medium text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-[#107a57]"
               />
               {searchQuery && (
                 <button
                   type="button"
                   onClick={() => setSearchQuery("")}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
               )}
             </div>
-
-            <div className="flex items-center gap-2 text-xs font-bold text-gray-500">
-              <span>الحصص المعروضة:</span>
-              <span className="font-mono text-gray-900 bg-white px-2.5 py-1 rounded-xl border border-[#e8e8e0]">
-                {filteredEntries.length} من أصل {entries.length}
-              </span>
-            </div>
           </div>
         </div>
 
-        {/* ─── جدول الطباعة الرسمي المخصص للتفتيش والإدارة A4 (يظهر عند الطباعة فقط) ─── */}
-        <div className="hidden print:block">
-          <table className="w-full border-collapse border border-gray-900 text-[11px] leading-tight">
-            <thead>
-              <tr className="bg-gray-200 text-gray-900">
-                <th className="border border-gray-900 p-2 w-[14%]">اليوم والتاريخ</th>
-                <th className="border border-gray-900 p-2 w-[10%]">التوقيت</th>
-                <th className="border border-gray-900 p-2 w-[8%]">الفوج</th>
-                <th className="border border-gray-900 p-2 w-[14%]">الميدان والمقطع</th>
-                <th className="border border-gray-900 p-2 w-[22%]">المورد المعرفي (عنوان الحصة)</th>
-                <th className="border border-gray-900 p-2 w-[18%]">مؤشرات الكفاءة وسير الأنشطة</th>
-                <th className="border border-gray-900 p-2 w-[14%]">الواجب المنزلي والتوجيهات</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredEntries.map((item) => (
-                <tr key={`print_${item.id}`} className="break-inside-avoid">
-                  <td className="border border-gray-900 p-1.5 font-bold text-center">
-                    <div>{item.day}</div>
-                    <div className="font-mono text-[10px] text-gray-700">{item.date}</div>
-                  </td>
-                  <td className="border border-gray-900 p-1.5 text-center font-mono text-[10px]">
-                    {item.periodTime || "—"}
-                  </td>
-                  <td className="border border-gray-900 p-1.5 text-center font-bold">
-                    {item.className}
-                  </td>
-                  <td className="border border-gray-900 p-1.5">
-                    <div className="font-bold">{item.field || "—"}</div>
-                    {item.section && <div className="text-[10px] text-gray-600">{item.section}</div>}
-                  </td>
-                  <td className="border border-gray-900 p-1.5 font-bold">
-                    {item.lessonTitle}
-                  </td>
-                  <td className="border border-gray-900 p-1.5 text-[10px]">
-                    {item.objectives && <div className="mb-1"><strong>الهدف:</strong> {item.objectives}</div>}
-                    {item.activities && <div><strong>الأنشطة:</strong> {item.activities}</div>}
-                    {!item.objectives && !item.activities && "—"}
-                  </td>
-                  <td className="border border-gray-900 p-1.5 text-[10px]">
-                    {item.homework || "—"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          {/* تأشيرات الإدارة والمفتش في ذيل الصفحة المطبوعة */}
-          <div className="grid grid-cols-3 gap-4 mt-8 pt-4 border-t-2 border-gray-900 text-xs text-center font-bold break-inside-avoid">
-            <div>
-              <p>إمضاء الأستاذ(ة)</p>
-              <div className="h-16"></div>
-              <p className="text-[11px] text-gray-700">{printTeacherName}</p>
-            </div>
-            <div>
-              <p>تأشيرة السيد مدير المؤسسة</p>
-              <div className="h-16"></div>
-              <p className="text-[11px] text-gray-700">{printPrincipalName}</p>
-            </div>
-            <div>
-              <p>تأشيرة السيد مفتش التعليم المتوسط</p>
-              <div className="h-16"></div>
-              <p className="text-[11px] text-gray-700">{printInspectorName}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* ─── قائمة بطاقات الحصص في الدفتر اليومي (العرض على الشاشة) ─── */}
-        <div className="print:hidden">
+        {/* ─── عرض الجداول اليومية البيداغوجية النموذجية (مطابقة لملف PDF والصورة المرفقة) ─── */}
+        <div className="space-y-8">
           {loading ? (
             <div className="py-20 text-center text-xs text-gray-500 space-y-2 bg-white rounded-3xl border border-[#e8e8e0]">
               <Loader2 className="w-6 h-6 animate-spin mx-auto text-[#107a57]" />
               <p>جارٍ تحميل الدفتر اليومي...</p>
             </div>
-          ) : filteredEntries.length === 0 ? (
+          ) : groupedDays.length === 0 ? (
             <div className="py-16 text-center text-xs text-gray-500 space-y-3 bg-white rounded-3xl border border-[#e8e8e0]">
               <div className="w-12 h-12 rounded-2xl bg-gray-50 border border-gray-200 text-gray-400 flex items-center justify-center mx-auto">
                 <BookOpen className="w-6 h-6" />
               </div>
               <p className="font-bold text-gray-700">لا توجد حصص مسجلة تطابق التصفية الحالية</p>
-              <p className="text-[11px] text-gray-400 max-w-sm mx-auto">
-                استخدم استمارة التحضير أعلاه لإضافة حصة جديدة في الدفتر اليومي بسهولة.
-              </p>
               <button
                 type="button"
-                onClick={handlePrepareForTomorrow}
+                onClick={() => handlePrepareForDate(tomorrowStr)}
                 className="btn-primary text-xs px-4 py-2 inline-flex items-center gap-1.5 cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
@@ -1229,156 +1634,562 @@ export default function TeacherDiaryPage() {
               </button>
             </div>
           ) : (
-            <div className="space-y-4">
-              {filteredEntries.map((item) => {
-                const isTomorrow = item.date === tomorrowStr;
-                const isToday = item.date === todayStr;
-                const isCurrentlyEditing = editingEntry?.id === item.id;
+            groupedDays.map(({ dateStr, dayName, specialDay, entries: dayEntries, customTitle }) => {
+              const isTomorrow = dateStr === tomorrowStr;
+              const isToday = dateStr === todayStr;
 
+              // في حال كان اليوم يوماً خاصاً (عطلة رسمية، غياب مبرر، ندوة تكوينية)
+              if (specialDay) {
+                const conf = SPECIAL_DAY_CONFIGS[specialDay.type] || SPECIAL_DAY_CONFIGS.custom;
                 return (
                   <div
-                    key={item.id}
-                    className={`bg-white rounded-3xl p-5 sm:p-6 border transition-all duration-200 space-y-4 ${
-                      isCurrentlyEditing
-                        ? "border-amber-400 ring-4 ring-amber-400/20 shadow-md bg-amber-50/20"
-                        : isTomorrow
-                        ? "border-[#107a57] ring-2 ring-[#107a57]/15 shadow-md"
-                        : "border-[#e8e8e0] shadow-sm hover:border-gray-300"
-                    }`}
+                    key={`day_${dateStr}`}
+                    className="bg-white rounded-3xl border border-[#e8e8e0] shadow-sm overflow-hidden break-inside-avoid"
                   >
-                    {/* شريط رأس البطاقة */}
-                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e8e8e0] pb-3">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {isCurrentlyEditing && (
-                          <span className="text-[10px] font-black text-amber-900 bg-amber-200 px-2.5 py-0.5 rounded-full">
-                            قيد التعديل الآن ✏️
-                          </span>
-                        )}
-                        {isTomorrow && (
-                          <span className="text-[10px] font-black text-[#107a57] bg-[#e6f4ee] px-2.5 py-0.5 rounded-full border border-[#107a57]/20">
-                            حصة الغد ✨
-                          </span>
-                        )}
-                        {isToday && (
-                          <span className="text-[10px] font-black text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">
-                            حصة اليوم 📅
-                          </span>
-                        )}
-                        <span className="text-xs font-black text-gray-900 bg-[#fafaf7] px-2.5 py-1 rounded-xl border border-[#e8e8e0]">
-                          {item.day} {formatArabicFullDate(item.date)}
-                        </span>
-                        {item.periodTime && (
-                          <span className="text-xs font-mono text-gray-600 bg-gray-50 px-2 py-0.5 rounded-lg border border-gray-200 flex items-center gap-1">
-                            <Clock className="w-3 h-3 text-gray-400" />
-                            <span>{item.periodTime}</span>
-                          </span>
-                        )}
-                        <span className="text-xs font-bold text-[#107a57] bg-[#e6f4ee] px-2.5 py-0.5 rounded-lg border border-[#107a57]/20">
-                          فوج {item.className}
-                        </span>
-                        {item.field && (
-                          <span className="text-xs text-gray-600 bg-gray-100 px-2.5 py-0.5 rounded-lg">
-                            {item.field}
+                    {/* شريط عنوان اليوم الرسمي */}
+                    <div className="bg-[#1e293b] text-white p-3.5 sm:p-4 flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-2 flex-wrap font-black text-xs sm:text-sm">
+                        <span>📌 يوم {dayName}: {formatArabicFullDate(dateStr)} م</span>
+                        <span className="text-gray-400 font-normal">—</span>
+                        <span className="text-amber-300">{specialDay.title}</span>
+                        {specialDay.endDate && (
+                          <span className="text-[11px] text-gray-300 font-normal">
+                            (إلى غاية: {formatArabicFullDate(specialDay.endDate)})
                           </span>
                         )}
                       </div>
 
-                      {/* أزرار الإجراءات للبطاقة */}
-                      <div className="flex items-center gap-2">
-                        {item.isPublicForParents ? (
-                          <span
-                            title="ظاهر للأولياء في صفحة الأستاذ"
-                            className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-xl border border-emerald-200"
-                          >
-                            <Globe className="w-3 h-3" />
-                            <span>متاح للأولياء</span>
-                          </span>
-                        ) : (
-                          <span
-                            title="خاص بالأستاذ فقط"
-                            className="inline-flex items-center gap-1 text-[11px] font-bold text-gray-500 bg-gray-100 px-2.5 py-1 rounded-xl border border-gray-200"
-                          >
-                            <Lock className="w-3 h-3" />
-                            <span>خاص بالأستاذ</span>
-                          </span>
-                        )}
-
+                      <div className="flex items-center gap-2 print:hidden">
                         <button
                           type="button"
-                          onClick={() => handleStartEdit(item)}
-                          className={`p-1.5 rounded-xl border transition cursor-pointer flex items-center gap-1 text-xs font-bold ${
-                            isCurrentlyEditing
-                              ? "bg-amber-500 text-white border-amber-600"
-                              : "border-[#e8e8e0] text-gray-600 hover:text-amber-700 hover:bg-amber-50"
-                          }`}
-                          title="تعديل الحصة مباشرة في الصفحة"
+                          onClick={() => handleOpenSpecialDayModal(dateStr)}
+                          className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[11px] font-bold transition flex items-center gap-1 cursor-pointer"
                         >
-                          <Pencil className="w-3.5 h-3.5" />
-                          <span className="hidden sm:inline">تعديل</span>
+                          <Pencil className="w-3 h-3" />
+                          <span>تعديل البيان</span>
                         </button>
-
                         <button
                           type="button"
-                          onClick={() => handleDeleteEntry(item.id, item.lessonTitle)}
-                          className="p-1.5 rounded-xl border border-[#e8e8e0] text-gray-400 hover:text-red-600 hover:bg-red-50 transition cursor-pointer"
-                          title="حذف الحصة"
+                          onClick={() => handleRemoveSpecialDay(dateStr)}
+                          className="px-2.5 py-1 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-200 text-[11px] font-bold transition flex items-center gap-1 cursor-pointer"
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          <RotateCcw className="w-3 h-3" />
+                          <span>تحويل ليوم دراسي عادي</span>
                         </button>
                       </div>
                     </div>
 
-                    {/* عنوان الدرس والمقطع */}
-                    <div className="space-y-1">
-                      <h3 className="text-base sm:text-lg font-black text-gray-900 leading-snug">
-                        {item.lessonTitle}
+                    {/* بطاقة العطلة / الغياب الرسمية المعتمدة (مطابقة لصفحة 3 و 7 في الـ PDF) */}
+                    <div className="p-8 sm:p-12 text-center space-y-4 bg-gradient-to-b from-[#fafaf7] to-white">
+                      <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-black shadow-xs border bg-amber-50 text-amber-900 border-amber-300">
+                        <span className="text-base">{conf.icon}</span>
+                        <span>{conf.label}</span>
+                        <span className="text-base">{conf.icon}</span>
+                      </div>
+
+                      <h3 className="text-lg sm:text-xl font-black text-gray-900 max-w-xl mx-auto">
+                        {specialDay.title}
                       </h3>
-                      {item.section && (
-                        <p className="text-xs font-bold text-gray-500 flex items-center gap-1">
-                          <Layers className="w-3 h-3 text-gray-400" />
-                          <span>المقطع البيداغوجي: {item.section}</span>
+
+                      {specialDay.description && (
+                        <p className="text-xs sm:text-sm text-gray-600 font-medium max-w-2xl mx-auto leading-relaxed whitespace-pre-line border-t border-b border-gray-200 py-3">
+                          {specialDay.description}
                         </p>
                       )}
-                    </div>
 
-                    {/* التفاصيل البيداغوجية للحصة */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                      {item.objectives && (
-                        <div className="p-3.5 rounded-2xl bg-[#fafaf7] border border-[#e8e8e0] space-y-1">
-                          <span className="font-black text-gray-800 block">🎯 مؤشرات الكفاءة والأهداف:</span>
-                          <p className="text-gray-600 whitespace-pre-line leading-relaxed">{item.objectives}</p>
-                        </div>
-                      )}
-
-                      {item.activities && (
-                        <div className="p-3.5 rounded-2xl bg-[#fafaf7] border border-[#e8e8e0] space-y-1">
-                          <span className="font-black text-gray-800 block">📝 سير الأنشطة ومراحل التعلم:</span>
-                          <p className="text-gray-600 whitespace-pre-line leading-relaxed">{item.activities}</p>
-                        </div>
-                      )}
-
-                      {item.homework && (
-                        <div className="p-3.5 rounded-2xl bg-amber-50/70 border border-amber-200 space-y-1 md:col-span-2">
-                          <span className="font-black text-amber-900 block flex items-center gap-1.5">
-                            <span>📌 الواجب المنزلي والتوجيهات:</span>
-                          </span>
-                          <p className="text-amber-950 font-bold whitespace-pre-line leading-relaxed">{item.homework}</p>
-                        </div>
-                      )}
-
-                      {item.notes && (
-                        <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 space-y-1 md:col-span-2">
-                          <span className="font-bold text-slate-700 block">💡 ملاحظات المعالجة البيداغوجية:</span>
-                          <p className="text-slate-600 whitespace-pre-line leading-relaxed">{item.notes}</p>
-                        </div>
-                      )}
+                      <div className="text-[11px] text-gray-400 font-bold pt-2">
+                        <span>سجل رسمي معتمد وموثق في الدفتر اليومي للأستاذ</span>
+                      </div>
                     </div>
                   </div>
                 );
-              })}
-            </div>
+              }
+
+              // في حال كان يوماً دراسياً عادياً
+              return (
+                <div
+                  key={`day_${dateStr}`}
+                  className="bg-white rounded-3xl border border-[#e8e8e0] shadow-sm overflow-hidden break-inside-avoid space-y-0"
+                >
+                  {/* شريط عنوان اليوم الرسمي (المطابق تماماً للصورة والـ PDF) */}
+                  <div className="bg-[#1e293b] text-white p-3.5 sm:p-4 flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <span className="text-xs sm:text-sm font-black flex items-center gap-1.5">
+                        <span>📌</span>
+                        <span>يوم {dayName}: {formatArabicFullDate(dateStr)} م</span>
+                      </span>
+
+                      <span className="text-gray-400 font-normal">—</span>
+
+                      {/* عنوان اليوم العام */}
+                      {editingDayTitleDate === dateStr ? (
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="text"
+                            value={tempDayTitle}
+                            onChange={(e) => setTempDayTitle(e.target.value)}
+                            placeholder="مثال: متابعة الكتابة العشرية والضرب في قوى 10"
+                            className="px-2 py-0.5 rounded-lg bg-slate-800 text-white text-xs border border-slate-600 focus:outline-none focus:border-amber-400"
+                            autoFocus
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleSaveDayTitle(dateStr)}
+                            className="p-1 rounded bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold"
+                          >
+                            حفظ
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingDayTitleDate(null)}
+                            className="p-1 rounded bg-slate-700 text-gray-300"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingDayTitleDate(dateStr);
+                            setTempDayTitle(customTitle || "");
+                          }}
+                          className="text-xs sm:text-sm font-black text-sky-300 hover:text-white transition flex items-center gap-1 group cursor-pointer"
+                          title="اضغط لتعديل عنوان هذا اليوم"
+                        >
+                          <span>{customTitle || "متابعة تدرج التعلمات وإنجاز الموارد"}</span>
+                          <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-100 transition text-amber-300" />
+                        </button>
+                      )}
+
+                      <span className="text-[11px] font-black bg-white/10 text-white px-2.5 py-0.5 rounded-full border border-white/15">
+                        {dayEntries.length} حصص مبرمجة
+                      </span>
+
+                      {isTomorrow && (
+                        <span className="text-[10px] font-black bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-400/30">
+                          حصة الغد ✨
+                        </span>
+                      )}
+                      {isToday && (
+                        <span className="text-[10px] font-black bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full border border-blue-400/30">
+                          حصة اليوم 📅
+                        </span>
+                      )}
+                    </div>
+
+                    {/* أزرار العمليات لليوم */}
+                    <div className="flex items-center gap-2 print:hidden flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => handleSyncFromTimetable(dateStr)}
+                        className="px-2.5 py-1 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 text-xs font-black transition flex items-center gap-1 cursor-pointer border border-amber-400/30"
+                        title="استيراد كل حصص هذا اليوم من جدول التوقيت الأسبوعي"
+                      >
+                        <Zap className="w-3.5 h-3.5 text-amber-400" />
+                        <span>استيراد من التوقيت ⚡</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handlePrepareForDate(dateStr)}
+                        className="px-2.5 py-1 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                        title="إضافة حصة جديدة في هذا اليوم"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>إضافة حصة</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleOpenSpecialDayModal(dateStr)}
+                        className="px-2.5 py-1 rounded-xl bg-white/10 hover:bg-white/20 text-amber-200 text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                        title="تعيين هذا اليوم كعطلة أو غياب"
+                      >
+                        <Palmtree className="w-3.5 h-3.5" />
+                        <span>تعيين عطلة/غياب</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* جدول الحصص اليومي بالأعمدة الأربعة (المطابق للصورة المرفوعة والـ PDF) */}
+                  {dayEntries.length === 0 ? (
+                    <div className="p-8 text-center text-xs text-gray-400 space-y-2">
+                      <p>لا توجد حصص مسجلة في هذا اليوم بعد.</p>
+                      <div className="flex items-center justify-center gap-2 pt-1 print:hidden">
+                        <button
+                          type="button"
+                          onClick={() => handleSyncFromTimetable(dateStr)}
+                          className="btn-primary text-xs px-3 py-1.5 flex items-center gap-1 cursor-pointer"
+                        >
+                          <Zap className="w-3.5 h-3.5" />
+                          <span>استيراد حصص {dayName} من التوقيت الأسبوعي</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handlePrepareForDate(dateStr)}
+                          className="px-3 py-1.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-700 hover:bg-gray-50 transition cursor-pointer"
+                        >
+                          + تحضير حصة يدوياً
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse text-right text-xs">
+                        <thead>
+                          <tr className="bg-[#0f172a] text-white text-[11px] font-black border-b border-gray-300">
+                            <th className="p-3 w-[18%] border-l border-slate-700 text-center">التوقيت والفوج</th>
+                            <th className="p-3 w-[31%] border-l border-slate-700">الميدان والمورد (الدرس)</th>
+                            <th className="p-3 w-[37%] border-l border-slate-700">سيرورة الحصة وسندات الكتاب المدرسي</th>
+                            <th className="p-3 w-[14%] text-center">الملاحظات</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200 bg-white">
+                          {dayEntries.map((item, idx) => {
+                            const classTheme = getClassColors(
+                              item.className,
+                              customClasses,
+                              timetableSettings?.colorMode || "distinct",
+                              timetableSettings?.classColors
+                            );
+
+                            return (
+                              <tr
+                                key={item.id}
+                                className={`group hover:bg-[#fbfbf9] transition-colors duration-150 relative ${
+                                  idx % 2 === 1 ? "bg-[#fafaf7]/50" : "bg-white"
+                                }`}
+                              >
+                                {/* 1. التوقيت والفوج ورقم المذكرة */}
+                                <td className="p-3.5 align-top border-l border-gray-200 text-center space-y-1.5">
+                                  <div className="font-mono font-black text-xs sm:text-sm text-gray-900">
+                                    {item.periodTime || "08:00 - 09:00"}
+                                  </div>
+
+                                  <div>
+                                    <span
+                                      className="inline-block px-2.5 py-0.5 rounded-full text-xs font-black shadow-2xs"
+                                      style={{
+                                        backgroundColor: classTheme.hex,
+                                        color: "#ffffff",
+                                      }}
+                                    >
+                                      {item.className.includes("متوسط") ? item.className : `${item.className} متوسط`}
+                                    </span>
+                                  </div>
+
+                                  {item.lessonNoteNumber && (
+                                    <div className="text-[10px] font-bold text-gray-500 font-mono">
+                                      {item.lessonNoteNumber}
+                                    </div>
+                                  )}
+                                </td>
+
+                                {/* 2. الميدان والمورد (الدرس) */}
+                                <td className="p-3.5 align-top border-l border-gray-200 space-y-1.5">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-black text-[#107a57] bg-[#e6f4ee] px-2 py-0.5 rounded-md border border-[#107a57]/20">
+                                      <span>{item.field || "أنشطة عددية"}</span>
+                                      <span>|</span>
+                                      <span>{item.sessionType || "درس"}</span>
+                                    </span>
+                                  </div>
+
+                                  <div className="text-xs sm:text-sm font-black text-gray-900 leading-snug">
+                                    {item.lessonTitle}
+                                  </div>
+
+                                  {item.concepts && (
+                                    <div className="text-[11px] text-gray-600 font-medium leading-relaxed">
+                                      {item.concepts}
+                                    </div>
+                                  )}
+
+                                  {item.section && (
+                                    <div className="text-[10px] font-bold text-gray-400">
+                                      {item.section}
+                                    </div>
+                                  )}
+                                </td>
+
+                                {/* 3. سيرورة الحصة وسندات الكتاب المدرسي */}
+                                <td className="p-3.5 align-top border-l border-gray-200 space-y-2">
+                                  {/* عرض المراحل بشاراتها المتناسقة (تمهيدي، وسيطي، نهائي، ومراحل مخصصة) */}
+                                  {item.stages && item.stages.length > 0 ? (
+                                    item.stages.map((stg, sIdx) => {
+                                      // تحديد لون الشارة
+                                      let badgeStyle = "bg-sky-100 text-sky-800 border-sky-300";
+                                      if (stg.label.includes("وسيطي") || stg.label.includes("بناء")) {
+                                        badgeStyle = "bg-emerald-100 text-emerald-800 border-emerald-300";
+                                      } else if (stg.label.includes("نهائي") || stg.label.includes("تقويم")) {
+                                        badgeStyle = "bg-amber-100 text-amber-800 border-amber-300";
+                                      } else if (stg.color === "purple") {
+                                        badgeStyle = "bg-purple-100 text-purple-800 border-purple-300";
+                                      }
+
+                                      return (
+                                        <div key={sIdx} className="flex items-start gap-2 text-xs">
+                                          <span
+                                            className={`shrink-0 text-[10px] font-black px-1.5 py-0.5 rounded border ${badgeStyle}`}
+                                          >
+                                            {stg.label ? `${stg.label}:` : "مرحلة:"}
+                                          </span>
+                                          <div className="flex-1 text-[11px] text-gray-700 leading-relaxed font-medium">
+                                            {stg.content ? (
+                                              stg.content
+                                            ) : (
+                                              <span className="text-gray-300 tracking-wider font-mono">
+                                                ....................................................................................
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+                                      );
+                                    })
+                                  ) : (
+                                    // النمط الافتراضي الثلاثي المنقط المطابق لملف الأستاذ محمد عدايكة
+                                    <div className="space-y-2">
+                                      <div className="flex items-start gap-2">
+                                        <span className="shrink-0 text-[10px] font-black px-1.5 py-0.5 rounded bg-sky-100 text-sky-800 border border-sky-300">
+                                          تمهيدي:
+                                        </span>
+                                        <span className="text-gray-300 tracking-wider font-mono text-xs flex-1">
+                                          ....................................................................................
+                                        </span>
+                                      </div>
+                                      <div className="flex items-start gap-2">
+                                        <span className="shrink-0 text-[10px] font-black px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                          وسيطي:
+                                        </span>
+                                        <span className="text-gray-300 tracking-wider font-mono text-xs flex-1">
+                                          ....................................................................................
+                                        </span>
+                                      </div>
+                                      <div className="flex items-start gap-2">
+                                        <span className="shrink-0 text-[10px] font-black px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300">
+                                          نهائي:
+                                        </span>
+                                        <span className="text-gray-300 tracking-wider font-mono text-xs flex-1">
+                                          ....................................................................................
+                                        </span>
+                                      </div>
+                                    </div>
+                                  )}
+                                </td>
+
+                                {/* 4. الملاحظات */}
+                                <td className="p-3.5 align-top text-xs space-y-1">
+                                  {item.notes ? (
+                                    <div className="text-[11px] text-gray-700 font-medium whitespace-pre-line leading-relaxed">
+                                      {item.notes}
+                                    </div>
+                                  ) : (
+                                    <div className="text-gray-300 tracking-wider font-mono text-[11px] space-y-1">
+                                      <div>........................</div>
+                                      <div>........................</div>
+                                      <div>........................</div>
+                                    </div>
+                                  )}
+
+                                  {/* أزرار الإجراءات السريعة للحصة */}
+                                  <div className="flex items-center justify-end gap-1 pt-2 opacity-0 group-hover:opacity-100 transition print:hidden">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleStartEdit(item)}
+                                      className="p-1 rounded-lg bg-gray-100 hover:bg-amber-100 text-gray-600 hover:text-amber-800 text-[10px] font-bold transition cursor-pointer flex items-center gap-0.5"
+                                      title="تعديل الحصة"
+                                    >
+                                      <Pencil className="w-3 h-3" />
+                                      <span>تعديل</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteEntry(item.id, item.lessonTitle)}
+                                      className="p-1 rounded-lg bg-gray-100 hover:bg-red-100 text-gray-400 hover:text-red-700 text-[10px] transition cursor-pointer"
+                                      title="حذف الحصة"
+                                    >
+                                      <Trash2 className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              );
+            })
           )}
         </div>
+
+        {/* ─── تأشيرات الإدارة والمفتش في ذيل الصفحة المطبوعة A4 ─── */}
+        <div className="hidden print:block pt-8 border-t-2 border-gray-900 break-inside-avoid">
+          <div className="grid grid-cols-3 gap-4 text-xs text-center font-black">
+            <div className="border border-gray-900 p-3 rounded-lg h-28 flex flex-col justify-between">
+              <p>إمضاء الأستاذ(ة)</p>
+              <p className="text-[10px] text-gray-700 font-bold">{printTeacherName}</p>
+            </div>
+            <div className="border border-gray-900 p-3 rounded-lg h-28 flex flex-col justify-between">
+              <p>تأشيرة السيد مدير المؤسسة</p>
+              <p className="text-[10px] text-gray-700 font-bold">{printPrincipalName}</p>
+            </div>
+            <div className="border border-gray-900 p-3 rounded-lg h-28 flex flex-col justify-between">
+              <p>تأشيرة السيد مفتش التربية الوطنية</p>
+              <p className="text-[10px] text-gray-700 font-bold">{printInspectorName}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* ─── نافذة منبثقة: تعيين عطلة رسمية أو غياب مبرر أو ندوة تربوية ─── */}
+        {isSpecialDayModalOpen && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <div
+              className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-[#e8e8e0] space-y-5 animate-in zoom-in-95 duration-200 text-right"
+              dir="rtl"
+            >
+              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-2xl bg-amber-100 text-amber-900 flex items-center justify-center">
+                    <Palmtree className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-gray-900">
+                      تعيين يوم خاص في الدفتر اليومي
+                    </h3>
+                    <p className="text-xs text-gray-500 font-medium">
+                      عطلة الخريف، عطل رسمية، غياب مبرر قانوناً، أو ندوة تكوينية
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsSpecialDayModalOpen(false)}
+                  className="p-1 rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-100"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4 text-xs">
+                {/* 1. نوع اليوم الخاص */}
+                <div className="space-y-1.5">
+                  <label className="font-black text-gray-700 block">نوع اليوم أو المناسبة:</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {(Object.keys(SPECIAL_DAY_CONFIGS) as SpecialDayType[]).map((tKey) => {
+                      const cfg = SPECIAL_DAY_CONFIGS[tKey];
+                      const isSelected = specialDayType === tKey;
+                      return (
+                        <button
+                          key={tKey}
+                          type="button"
+                          onClick={() => {
+                            setSpecialDayType(tKey);
+                            setSpecialDayTitle(cfg.defaultTitle);
+                            setSpecialDayDesc(cfg.defaultDesc);
+                          }}
+                          className={`p-3 rounded-2xl border text-right transition flex items-center gap-2 cursor-pointer ${
+                            isSelected
+                              ? "border-[#107a57] bg-[#e6f4ee] font-black text-[#107a57] shadow-xs"
+                              : "border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100"
+                          }`}
+                        >
+                          <span className="text-base">{cfg.icon}</span>
+                          <span className="text-[11px] leading-tight">{cfg.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 2. التاريخ وفترة العطلة إن كانت تمتد لعدة أيام */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="font-black text-gray-700 block">تاريخ البداية (اليوم):</label>
+                    <input
+                      type="date"
+                      value={specialDayTargetDate}
+                      onChange={(e) => setSpecialDayTargetDate(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-gray-50 border border-gray-200 text-xs font-bold text-gray-900"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-black text-gray-700 block">إلى غاية تاريخ (اختياري للعطل):</label>
+                    <input
+                      type="date"
+                      value={specialDayEndDate}
+                      onChange={(e) => setSpecialDayEndDate(e.target.value)}
+                      placeholder="اختياري"
+                      className="w-full px-3 py-2 rounded-xl bg-gray-50 border border-gray-200 text-xs font-bold text-gray-900"
+                    />
+                  </div>
+                </div>
+
+                {/* 3. عنوان العطلة أو الحدث */}
+                <div className="space-y-1">
+                  <label className="font-black text-gray-700 block">عنوان العطلة أو البيان:</label>
+                  <input
+                    type="text"
+                    value={specialDayTitle}
+                    onChange={(e) => setSpecialDayTitle(e.target.value)}
+                    placeholder="مثال: عطلة الخريف 2026 أو طلب عطلة رسمية (غياب مبرر)"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-xs font-black text-gray-900 focus:outline-none focus:border-[#107a57]"
+                  />
+                </div>
+
+                {/* 4. تفاصيل وبيان العطلة أو الرخصة */}
+                <div className="space-y-1">
+                  <label className="font-black text-gray-700 block">التفاصيل والبيان البيداغوجي/الإداري:</label>
+                  <textarea
+                    rows={3}
+                    value={specialDayDesc}
+                    onChange={(e) => setSpecialDayDesc(e.target.value)}
+                    placeholder="اكتب بيان العطلة أو توضيحات الإدارة والتفتيش..."
+                    className="w-full p-2.5 rounded-xl bg-gray-50 border border-gray-200 text-xs font-medium text-gray-900 focus:outline-none focus:border-[#107a57] leading-relaxed"
+                  />
+                </div>
+              </div>
+
+              {/* أزرار العمليات للنافذة */}
+              <div className="flex items-center justify-between gap-3 border-t border-gray-100 pt-4">
+                {getSpecialDayForDate(specialDayTargetDate) ? (
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveSpecialDay(specialDayTargetDate)}
+                    className="px-3 py-2 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 text-xs font-bold transition cursor-pointer"
+                  >
+                    حذف وإرجاع ليوم دراسي عادي
+                  </button>
+                ) : (
+                  <div></div>
+                )}
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsSpecialDayModalOpen(false)}
+                    className="px-3.5 py-2 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-100 transition cursor-pointer"
+                  >
+                    إلغاء
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveSpecialDay}
+                    disabled={saving}
+                    className="btn-primary text-xs px-5 py-2 flex items-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50"
+                  >
+                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                    <span>اعتماد وتثبيت في الدفتر 🏖️</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
       </div>
     </div>

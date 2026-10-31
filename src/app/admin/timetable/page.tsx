@@ -96,7 +96,7 @@ export const CLASS_PALETTE: ClassColorTheme[] = [
   { id: "slate", name: "رمادي احترافي", hex: "#64748b", bg: "bg-slate-100", border: "border-slate-300", text: "text-slate-900", badge: "bg-slate-700 text-white", lightBadge: "bg-slate-200 text-slate-900 border-slate-300" },
 ];
 
-function getClassColors(
+export function getClassColors(
   className: string,
   customClasses: string[],
   colorMode: "distinct" | "unified" = "distinct",

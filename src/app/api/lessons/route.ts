@@ -50,6 +50,8 @@ export async function GET(
       customClasses: sortClasses(data.customClasses || []),
       timetable: data.timetable || null,
       diaryEntries: data.diaryEntries || [],
+      specialDays: data.specialDays || [],
+      diaryDayTitles: data.diaryDayTitles || {},
       studentRoster: data.studentRoster || [],
       featureFlags: data.featureFlags || null,
       subject: data.subject || null,
@@ -153,6 +155,8 @@ export async function PUT(req: NextRequest) {
       body.studentRoster !== undefined ||
       body.customClasses !== undefined ||
       body.diaryEntries !== undefined ||
+      body.specialDays !== undefined ||
+      body.diaryDayTitles !== undefined ||
       body.customNotebooks !== undefined ||
       body.boardNomenclature !== undefined ||
       body.featureFlags !== undefined
@@ -161,6 +165,8 @@ export async function PUT(req: NextRequest) {
       if (body.studentRoster !== undefined) data.studentRoster = body.studentRoster;
       if (body.customClasses !== undefined) data.customClasses = body.customClasses;
       if (body.diaryEntries !== undefined) data.diaryEntries = body.diaryEntries;
+      if (body.specialDays !== undefined) data.specialDays = body.specialDays;
+      if (body.diaryDayTitles !== undefined) data.diaryDayTitles = body.diaryDayTitles;
       if (body.customNotebooks !== undefined) data.customNotebooks = body.customNotebooks;
       if (body.boardNomenclature !== undefined) data.boardNomenclature = body.boardNomenclature;
       if (body.featureFlags !== undefined) data.featureFlags = body.featureFlags;
@@ -170,6 +176,8 @@ export async function PUT(req: NextRequest) {
         studentRoster: data.studentRoster,
         customClasses: data.customClasses,
         diaryEntries: data.diaryEntries,
+        specialDays: data.specialDays,
+        diaryDayTitles: data.diaryDayTitles,
         customNotebooks: data.customNotebooks,
         boardNomenclature: data.boardNomenclature,
         featureFlags: data.featureFlags,

@@ -227,6 +227,27 @@ export type StudentRosterItem = {
   createdAt?: string;
 };
 
+export type DiaryStage = {
+  id?: string;
+  label: string; // مثل "تمهيدي" أو "وسيطي" أو "نهائي" أو أي عنوان يكتبه الأستاذ
+  content: string; // نص المحتوى وسيرورة الحصة
+  color?: "sky" | "emerald" | "amber" | "purple" | "rose" | "indigo" | "gray"; // لون الشارة
+};
+
+export type SpecialDayType = "holiday" | "absence" | "seminar" | "exams" | "custom";
+
+export type SpecialDayRecord = {
+  id: string;
+  date: string;               // YYYY-MM-DD
+  endDate?: string;           // تاريخ نهاية العطلة إن كانت تمتد لعدة أيام (مثل عطلة الخريف)
+  dayName: string;            // الأحد، الإثنين...
+  type: SpecialDayType;       // holiday, absence, seminar, exams...
+  title: string;              // مثل: "عطلة الخريف 2026", "غياب مبرر قانوناً لدى إدارة المؤسسة", "ندوة بيداغوجية لمقاطعة التفتيش"
+  description?: string;       // تفاصيل وبيان العطلة أو محاور الندوة
+  isOfficial?: boolean;       // عطلة رسمية عامة
+  createdAt?: string;
+};
+
 export type DailyDiaryEntry = {
   id: string;
   date: string;               // تاريخ الحصة: YYYY-MM-DD
@@ -237,6 +258,10 @@ export type DailyDiaryEntry = {
   field?: string;             // الميدان (أنشطة عددية...)
   section?: string;           // المقطع التعلمي
   lessonTitle: string;        // عنوان المورد / الحصة
+  lessonNoteNumber?: string;  // رقم المذكرة أو الوثيقة (مثال: مذكرة رقم: 03، 01 تفويج، بطاقة دخول...)
+  sessionType?: string;       // نوع الحصة: درس، أعمال موجهة، تقويم، إدماج، معالجة، استدراك، استقبال أولياء...
+  concepts?: string;          // المحتوى والمفاهيم الأساسية المستهدفة
+  stages?: DiaryStage[];      // سيرورة ومراحل الحصة (تمهيدي، وسيطي، نهائي، أو عناوين مخصصة)
   objectives?: string;        // مؤشرات الكفاءة والأهداف التعلمية
   activities?: string;        // سير الأنشطة ومراحل الدرس
   homework?: string;          // الواجب المنزلي
@@ -331,6 +356,8 @@ export type LessonsData = {
   customClasses?: string[];
   timetable?: TeacherTimetable;
   diaryEntries?: DailyDiaryEntry[];
+  specialDays?: SpecialDayRecord[]; // أيام العطل والغيابات والندوات الرسمية
+  diaryDayTitles?: Record<string, string>; // عنوان اليوم العام: تاريخ YYYY-MM-DD -> عنوان اليوم
   customNotebooks?: CustomNotebook[];
   boardNomenclature?: BoardNomenclature;
   evaluationSettings?: Record<string, ClassEvaluationSettings>;
