@@ -155,7 +155,7 @@ export function DesktopSidebar() {
 
       if (flags.continuousAssessment !== false) {
         followupItems.push({
-          label: "ميثاق التقويم (20/20)",
+          label: "سجل التنقيط والتقويم المستمر",
           href: "/eval",
           icon: Scale,
         });

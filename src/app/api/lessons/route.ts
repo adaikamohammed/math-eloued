@@ -54,6 +54,7 @@ export async function GET(
       specialDays: data.specialDays || [],
       diaryDayTitles: data.diaryDayTitles || {},
       studentRoster: data.studentRoster || [],
+      gradebookRecords: data.gradebookRecords || [],
       featureFlags: data.featureFlags || null,
       subject: data.subject || null,
       customNotebooks: data.customNotebooks || null,
@@ -159,6 +160,7 @@ export async function PUT(req: NextRequest) {
       body.cahierTextesEntries !== undefined ||
       body.specialDays !== undefined ||
       body.diaryDayTitles !== undefined ||
+      body.gradebookRecords !== undefined ||
       body.customNotebooks !== undefined ||
       body.boardNomenclature !== undefined ||
       body.featureFlags !== undefined
@@ -166,6 +168,7 @@ export async function PUT(req: NextRequest) {
       const data = await getLessonsData(ctx);
       if (body.studentRoster !== undefined) data.studentRoster = body.studentRoster;
       if (body.customClasses !== undefined) data.customClasses = body.customClasses;
+      if (body.gradebookRecords !== undefined) data.gradebookRecords = body.gradebookRecords;
       if (body.diaryEntries !== undefined) data.diaryEntries = body.diaryEntries;
       if (body.cahierTextesEntries !== undefined) data.cahierTextesEntries = body.cahierTextesEntries;
       if (body.specialDays !== undefined) data.specialDays = body.specialDays;
@@ -178,6 +181,7 @@ export async function PUT(req: NextRequest) {
         success: true,
         studentRoster: data.studentRoster,
         customClasses: data.customClasses,
+        gradebookRecords: data.gradebookRecords,
         diaryEntries: data.diaryEntries,
         cahierTextesEntries: data.cahierTextesEntries,
         specialDays: data.specialDays,

@@ -364,10 +364,77 @@ export const MIDDLE_SCHOOL_SUBJECTS = [
   { id: "history_geo", name: "التاريخ والجغرافيا", icon: "🗺️", codePrefix: "HIS" },
   { id: "islamic", name: "التربية الإسلامية", icon: "🕌", codePrefix: "ISL" },
   { id: "civics", name: "التربية المدنية", icon: "⚖️", codePrefix: "CIV" },
+  { id: "computer", name: "الإعلام الآلي والتكنولوجيا", icon: "💻", codePrefix: "INF" },
+  { id: "art", name: "التربية التشكيلية / الموسيقية", icon: "🎨", codePrefix: "ART" },
   { id: "pe", name: "التربية البدنية والرياضية", icon: "🏃", codePrefix: "EPS" },
+  { id: "amazigh", name: "اللغة الأمازيغية", icon: "ⵣ", codePrefix: "AMZ" },
 ] as const;
 
 export type SubjectId = (typeof MIDDLE_SCHOOL_SUBJECTS)[number]["id"];
+
+// معاملات المواد في مرحلة التعليم المتوسط الجزائرية المعتمدة رسمياً (1م، 2م، 3م، 4م)
+export const OFFICIAL_SUBJECT_COEFFICIENTS: Record<string, Record<number, number>> = {
+  mathematics: { 1: 2, 2: 3, 3: 3, 4: 4 },
+  arabic: { 1: 2, 2: 3, 3: 3, 4: 5 },
+  english: { 1: 1, 2: 3, 3: 3, 4: 3 },
+  french: { 1: 1, 2: 2, 3: 2, 4: 3 },
+  history_geo: { 1: 2, 2: 2, 3: 2, 4: 3 },
+  science: { 1: 1, 2: 2, 3: 2, 4: 2 },
+  physics: { 1: 1, 2: 2, 3: 2, 4: 2 },
+  islamic: { 1: 1, 2: 1, 3: 1, 4: 2 },
+  civics: { 1: 1, 2: 1, 3: 1, 4: 1 },
+  computer: { 1: 1, 2: 1, 3: 1, 4: 1 },
+  art: { 1: 1, 2: 1, 3: 1, 4: 1 },
+  pe: { 1: 1, 2: 1, 3: 1, 4: 1 },
+  amazigh: { 1: 2, 2: 2, 3: 2, 4: 2 },
+};
+
+// دالة ذكية لحساب معامل المادة حسب المستوى
+export function getOfficialSubjectCoefficient(subjectNameOrId: string, levelNum: number): number {
+  const norm = (subjectNameOrId || "").trim().toLowerCase();
+  const found = MIDDLE_SCHOOL_SUBJECTS.find(
+    (s) => s.id === norm || s.name.includes(norm) || norm.includes(s.name)
+  );
+  const subjId = found?.id || "mathematics";
+  const map = OFFICIAL_SUBJECT_COEFFICIENTS[subjId];
+  if (!map) return 2;
+  return map[levelNum] || map[1] || 2;
+}
+
+// استخراج رقم المستوى من اسم القسم (مثلاً: "1م1" -> 1، "2م3" -> 2)
+export function getLevelFromClassName(className: string): number {
+  if (!className) return 1;
+  const match = className.match(/([1-4])/);
+  if (match) return parseInt(match[1], 10);
+  return 1;
+}
+
+// سجل الرصد والتنقيط الفصلي الرسمي
+export type OfficialGradeRecord = {
+  id?: string;
+  studentName: string;
+  className: string;
+  groupName?: string;
+  trimester: 1 | 2 | 3;
+  // علامة التقويم المستمر الإجمالية (من 20)
+  continuousScore: number;
+  // التفصيل البيداغوجي لعناصر التقويم (اختياري مرن):
+  behaviorScore?: number;    // المشاركة والسلوك (من 4)
+  notebook1Score?: number;   // كراس التلميذ: مقطع 1 (من 2)
+  notebook2Score?: number;   // كراس التلميذ: مقطع 2 (من 2)
+  homework1Score?: number;   // وظيفة 1 (من 2)
+  homework2Score?: number;   // وظيفة 2 (من 2)
+  quiz1Score?: number;       // استجواب 1 (من 4)
+  quiz2Score?: number;       // استجواب 2 (من 4)
+  // الفروض
+  test1Score?: number;       // الفرض الأول (من 20)
+  test2Score?: number;       // الفرض الثاني (اختياري، من 20)
+  // الاختبار الفصلي
+  examScore?: number;        // الاختبار الفصلي (من 20)
+  // ملاحظات وتوجيهات الأستاذ
+  notes?: string;
+  updatedAt?: string;
+};
 
 export type LessonsData = {
   lessons: Lesson[];
@@ -375,6 +442,7 @@ export type LessonsData = {
   honors?: HonorStudent[];
   penalties?: Penalty[];
   evaluations?: StudentEvaluation[];
+  gradebookRecords?: OfficialGradeRecord[]; // سجل التنقيط والتقويم المستمر الفصلي
   inspectionSessions?: InspectionSession[];
   studentRoster?: StudentRosterItem[];
   announcements?: Announcement[];

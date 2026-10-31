@@ -79,7 +79,7 @@ export function synchronizeStudents(data: LessonsData): LessonsData {
 // ما يراه الأولياء والتلاميذ
 const PUBLIC_KEYS = ["lessons", "honors", "announcements", "summons", "featureFlags", "subject", "customClasses", "timetable", "customNotebooks", "boardNomenclature"] as const;
 // ما يبقى خاصاً بالأستاذ وحده
-const PRIVATE_KEYS = ["evaluations", "penalties", "inspectionSessions", "studentRoster", "anonymousMessages", "diaryEntries", "cahierTextesEntries", "specialDays", "diaryDayTitles"] as const;
+const PRIVATE_KEYS = ["evaluations", "gradebookRecords", "penalties", "inspectionSessions", "studentRoster", "anonymousMessages", "diaryEntries", "cahierTextesEntries", "specialDays", "diaryDayTitles"] as const;
 
 export function normalizeData(json: any): LessonsData {
   return {
@@ -88,6 +88,7 @@ export function normalizeData(json: any): LessonsData {
     honors: Array.isArray(json?.honors) ? json.honors : [],
     penalties: Array.isArray(json?.penalties) ? json.penalties : [],
     evaluations: Array.isArray(json?.evaluations) ? json.evaluations : [],
+    gradebookRecords: Array.isArray(json?.gradebookRecords) ? json.gradebookRecords : [],
     inspectionSessions: Array.isArray(json?.inspectionSessions) ? json.inspectionSessions : [],
     studentRoster: Array.isArray(json?.studentRoster) ? json.studentRoster : [],
     announcements: Array.isArray(json?.announcements) ? json.announcements : [],
