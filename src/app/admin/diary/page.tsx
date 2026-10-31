@@ -10,6 +10,8 @@ import {
   Pencil,
   Trash2,
   Printer,
+  Download,
+  Copy,
   CheckCircle2,
   AlertCircle,
   Loader2,
@@ -48,6 +50,10 @@ import {
   TeacherTimetable,
 } from "@/lib/types";
 import { getClassColors } from "@/app/admin/timetable/page";
+import {
+  printLandscapeDiaryReport,
+  downloadLandscapeDiaryPDF,
+} from "@/lib/pdfReportGenerator";
 
 // توقيتات الحصص المعتمدة في التعليم المتوسط الجزائري
 const STANDARD_PERIODS = [
@@ -616,6 +622,212 @@ export default function TeacherDiaryPage() {
     }
   };
 
+  // استخراج قائمة الدروس السابقة تلقائياً لاسترجاعها وتكرارها بنقرة واحدة
+  const previousLessons = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        title: string;
+        field: string;
+        section: string;
+        sessionType: string;
+        concepts: string;
+        stages: DiaryStage[];
+        notes?: string;
+      }
+    >();
+
+    entries.forEach((e) => {
+      const cleanTitle = (e.lessonTitle || "").trim();
+      if (cleanTitle) {
+        const key = `${cleanTitle}___${e.field || ""}___${e.section || ""}`;
+        if (!map.has(key)) {
+          map.set(key, {
+            title: cleanTitle,
+            field: e.field || "أنشطة عددية",
+            section: e.section || "",
+            sessionType: e.sessionType || "درس",
+            concepts: e.concepts || "",
+            stages: Array.isArray(e.stages) && e.stages.length > 0 ? e.stages : getDefaultStages(),
+            notes: e.notes || "",
+          });
+        }
+      }
+    });
+
+    return Array.from(map.values());
+  }, [entries]);
+
+  // استرجاع وتعبئة درس سابق فوراً في الاستمارة
+  const handleApplyPreviousLesson = (lesson: {
+    title: string;
+    field: string;
+    section: string;
+    sessionType: string;
+    concepts: string;
+    stages: DiaryStage[];
+    notes?: string;
+  }) => {
+    setFormLessonTitle(lesson.title);
+    const fVal = lesson.field || "أنشطة عددية";
+    if (COMMON_FIELDS.includes(fVal as any) || fVal === "أخرى / مراجعة") {
+      setFormField(fVal);
+      setIsCustomFieldInput(false);
+      setCustomFieldValue("");
+    } else {
+      setIsCustomFieldInput(true);
+      setCustomFieldValue(fVal);
+      setFormField("__custom__");
+    }
+    setFormSection(lesson.section);
+    setFormSessionType(lesson.sessionType || "درس");
+    setFormConcepts(lesson.concepts || "");
+    setFormStages(JSON.parse(JSON.stringify(lesson.stages)));
+    if (lesson.notes) setFormNotes(lesson.notes);
+
+    setMessage({
+      type: "ok",
+      text: `تم استرجاع محتوى درس "${lesson.title}" بنجاح! اختر الفوج واضغط حفظ 📝`,
+    });
+    setTimeout(() => setMessage(null), 3500);
+  };
+
+  // تكرار حصة مسجلة في الجدول لفوج آخر فوراً
+  const handleDuplicateForAnotherClass = (entry: DailyDiaryEntry) => {
+    setIsFormExpanded(true);
+    setEditingEntry(null);
+    setFormDate(entry.date);
+
+    // اقتراح الفوج التالي تلقائياً
+    const currentIdx = customClasses.indexOf(entry.className);
+    let nextClass = entry.className;
+    if (currentIdx >= 0 && currentIdx + 1 < customClasses.length) {
+      nextClass = customClasses[currentIdx + 1];
+    } else if (customClasses.length > 0) {
+      nextClass = customClasses[0];
+    }
+
+    setFormClass(nextClass);
+    setIsCustomClassInput(false);
+
+    // حساب التوقيت التلقائي للحصة الموالية لذلك اليوم
+    const existingToday = entries.filter((e) => e.date === entry.date);
+    setFormPeriodTime(getNextPeriodTime(existingToday));
+
+    // رقم المذكرة للفوج الجديد
+    setFormNoteNumber(getNextNoteNumber(nextClass, entries));
+
+    // نسخ كامل محتوى الدرس
+    const fVal = entry.field || "أنشطة عددية";
+    if (COMMON_FIELDS.includes(fVal as any) || fVal === "أخرى / مراجعة") {
+      setFormField(fVal);
+      setIsCustomFieldInput(false);
+      setCustomFieldValue("");
+    } else {
+      setIsCustomFieldInput(true);
+      setCustomFieldValue(fVal);
+      setFormField("__custom__");
+    }
+    setFormSection(entry.section || "");
+    setFormLessonTitle(entry.lessonTitle);
+    setFormSessionType(entry.sessionType || "درس");
+    setFormConcepts(entry.concepts || "");
+    setFormStages(
+      entry.stages && entry.stages.length > 0 ? JSON.parse(JSON.stringify(entry.stages)) : getDefaultStages()
+    );
+    setFormNotes(entry.notes || "");
+
+    setTimeout(() => {
+      formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      titleInputRef.current?.focus();
+    }, 80);
+
+    setMessage({
+      type: "ok",
+      text: `تم نسخ بيانات الدرس! تم اقتراح الفوج (${nextClass}) والتوقيت التالي. اضغط حفظ لتأكيده 🚀`,
+    });
+    setTimeout(() => setMessage(null), 4000);
+  };
+
+  // حفظ الحصة وتجهيز نفس الدرس مباشرة للفوج الموالي بنقرة واحدة!
+  const handleSubmitAndRepeat = async () => {
+    const actualTitle = formLessonTitle.trim();
+    if (!actualTitle) {
+      alert("يرجى كتابة عنوان المورد / الدرس أولاً");
+      titleInputRef.current?.focus();
+      return;
+    }
+
+    const actualClass = isCustomClassInput ? customClassName.trim() : formClass;
+    if (!actualClass) {
+      alert("يرجى اختيار أو كتابة الفوج");
+      return;
+    }
+
+    const actualTime = isCustomTimeInput ? customTimeValue.trim() : formPeriodTime;
+    const actualField = isCustomFieldInput ? customFieldValue.trim() : formField;
+    const dayName = calculatedDayName;
+
+    const objectivesStage = formStages.find((s) => s.label.includes("تمهيدي") || s.label.includes("أهداف"));
+    const activitiesStage = formStages.find((s) => s.label.includes("وسيطي") || s.label.includes("أنشطة"));
+    const homeworkStage = formStages.find((s) => s.label.includes("نهائي") || s.label.includes("واجب"));
+
+    const newEntry: DailyDiaryEntry = {
+      id: `diary_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      date: formDate,
+      day: dayName,
+      periodTime: actualTime || undefined,
+      className: actualClass,
+      field: actualField || undefined,
+      section: formSection.trim() || undefined,
+      lessonTitle: actualTitle,
+      lessonNoteNumber: formNoteNumber.trim() || undefined,
+      sessionType: formSessionType || undefined,
+      concepts: formConcepts.trim() || undefined,
+      stages: formStages,
+      objectives: objectivesStage?.content || undefined,
+      activities: activitiesStage?.content || undefined,
+      homework: homeworkStage?.content || undefined,
+      notes: formNotes.trim() || undefined,
+      isPublicForParents: false,
+      createdAt: new Date().toISOString(),
+    };
+
+    const updated = [newEntry, ...entries];
+    setEntries(updated);
+
+    if (actualClass && !customClasses.includes(actualClass)) {
+      setCustomClasses((prev) => sortClasses([...prev, actualClass]));
+    }
+
+    await persistChanges({ diaryEntries: updated });
+
+    // الانتقال التلقائي للفوج التالي!
+    const currentIdx = customClasses.indexOf(actualClass);
+    let nextClass = actualClass;
+    if (currentIdx >= 0 && currentIdx + 1 < customClasses.length) {
+      nextClass = customClasses[currentIdx + 1];
+    } else if (customClasses.length > 0) {
+      nextClass = customClasses[0];
+    }
+
+    setFormClass(nextClass);
+    setIsCustomClassInput(false);
+
+    // حساب التوقيت التالي لنفس اليوم
+    const currentLessons = updated.filter((en) => en.date === formDate);
+    setFormPeriodTime(getNextPeriodTime(currentLessons));
+
+    // حساب رقم المذكرة للفوج الجديد
+    setFormNoteNumber(getNextNoteNumber(nextClass, updated));
+
+    // نحتفظ بالعنوان والميدان والمقطع والمفاهيم والسيرورة كاملة كما هي لتسهيل إعادة استخدامها!
+    setMessage({
+      type: "ok",
+      text: `تم حفظ الحصة لفوج (${actualClass}) بنجاح! تم تجهيز نفس الدرس مباشرة لفوج (${nextClass}). اضغط حفظ لتأكيده 🚀`,
+    });
+  };
+
   // حذف حصة
   const handleDeleteEntry = async (id: string, title: string) => {
     if (!confirm(`هل أنت متأكد من حذف الحصة "${title}" من الدفتر اليومي؟`)) return;
@@ -874,12 +1086,73 @@ export default function TeacherDiaryPage() {
   const printSubject = timetableSettings?.subjectName || profile?.subject || "الرياضيات";
   const printWilaya = timetableSettings?.wilayaName || "الوادي";
 
+  // خريطة ألوان الأفواج للتقرير المطبوع
+  const classColorsMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    customClasses.forEach((cls) => {
+      const theme = getClassColors(
+        cls,
+        customClasses,
+        timetableSettings?.colorMode || "distinct",
+        timetableSettings?.classColors
+      );
+      map[cls] = theme.hex;
+    });
+    return map;
+  }, [customClasses, timetableSettings]);
+
+  // تشغيل محرك الطباعة الأفقي A4 Landscape
+  const handlePrintLandscape = () => {
+    printLandscapeDiaryReport({
+      teacherName: printTeacherName,
+      schoolName: printSchoolName,
+      inspectorName: printInspectorName,
+      principalName: printPrincipalName,
+      subjectName: printSubject,
+      wilayaName: printWilaya,
+      days: groupedDays,
+      customClasses,
+      timetableSettings,
+      classColorsMap,
+    });
+  };
+
+  // تشغيل تحميل الـ PDF الأفقي المباشر
+  const handleDownloadLandscapePDF = () => {
+    downloadLandscapeDiaryPDF({
+      teacherName: printTeacherName,
+      schoolName: printSchoolName,
+      inspectorName: printInspectorName,
+      principalName: printPrincipalName,
+      subjectName: printSubject,
+      wilayaName: printWilaya,
+      days: groupedDays,
+      customClasses,
+      timetableSettings,
+      classColorsMap,
+    });
+  };
+
   if (authenticated === false) {
     return <LoginRequired next="/admin/diary" title="الدفتر اليومي ودفتر النصوص" />;
   }
 
   return (
     <div className="min-h-screen bg-[#fafaf7] py-6 sm:py-8 px-3 sm:px-6 font-sans text-right" dir="rtl">
+      {/* فرض التوجيه الأفقي A4 Landscape في الطباعة المباشرة من المتصفح أيضاً */}
+      <style jsx global>{`
+        @page {
+          size: A4 landscape;
+          margin: 8mm 10mm;
+        }
+        @media print {
+          body {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+        }
+      `}</style>
+
       <div className="max-w-6xl mx-auto space-y-6">
 
         {/* ─── الترويسة الرسمية الخاصة بالطباعة الوزارية A4 ─── */}
@@ -920,14 +1193,24 @@ export default function TeacherDiaryPage() {
             <span className="text-gray-900 font-black">الدفتر اليومي البيداغوجي</span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <button
-              onClick={() => window.print()}
+              onClick={handlePrintLandscape}
               type="button"
-              className="px-3.5 py-1.5 rounded-xl border border-[#e8e8e0] bg-white text-xs font-bold text-gray-700 hover:bg-gray-50 transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
+              className="px-3.5 py-1.5 rounded-xl border border-gray-300 bg-white text-xs font-bold text-gray-800 hover:bg-gray-50 transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
+              title="طباعة الدفتر اليومي بيداغوجياً بمقاس A4 أفقي رسمي"
             >
-              <Printer className="w-3.5 h-3.5 text-gray-500" />
-              <span>طباعة الدفتر اليومي A4</span>
+              <Printer className="w-3.5 h-3.5 text-[#107a57]" />
+              <span>طباعة أفقياً A4 🖨️</span>
+            </button>
+            <button
+              onClick={handleDownloadLandscapePDF}
+              type="button"
+              className="px-3.5 py-1.5 rounded-xl border border-[#107a57]/30 bg-[#e6f4ee] text-xs font-black text-[#107a57] hover:bg-[#d8efe5] transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
+              title="حفظ وتنزيل الدفتر اليومي كملف PDF أفقي"
+            >
+              <Download className="w-3.5 h-3.5 text-[#107a57]" />
+              <span>تحميل PDF أفقياً 📄</span>
             </button>
             <button
               onClick={() => handlePrepareForDate(tomorrowStr)}
@@ -1044,6 +1327,51 @@ export default function TeacherDiaryPage() {
 
           {isFormExpanded && (
             <form onSubmit={handleSubmitEntry} className="p-5 sm:p-6 space-y-5">
+              {/* ─── شريط استرجاع وتكرار درس سابق بنقرة واحدة (للأفواج المتوازية مثل 1م1، 1م2، 1م3) ─── */}
+              {previousLessons.length > 0 && !editingEntry && (
+                <div className="p-3.5 rounded-2xl bg-[#f0f9f4] border border-[#107a57]/30 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-2xs">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-[#107a57] text-white flex items-center justify-center shrink-0 shadow-2xs">
+                      <Sparkles className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-black text-[#107a57] flex items-center gap-1.5">
+                        <span>⚡ استرجاع وتكرار درس سابق لفوج آخر</span>
+                        <span className="text-[10px] font-bold bg-[#107a57]/15 text-[#107a57] px-2 py-0.2 rounded-full">
+                          توفير الوقت
+                        </span>
+                      </h4>
+                      <p className="text-[11px] text-gray-600 font-medium">
+                        أعددت الدرس لفوج وتريد تطبيقه على فوج ثانٍ؟ اختره لتعبئة المورد والسيرورة فوراً دون إعادة كتابتها!
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="md:w-80 shrink-0">
+                    <select
+                      defaultValue=""
+                      onChange={(e) => {
+                        const selected = previousLessons.find((l) => l.title === e.target.value);
+                        if (selected) {
+                          handleApplyPreviousLesson(selected);
+                          e.target.value = "";
+                        }
+                      }}
+                      className="w-full px-3 py-2 rounded-xl bg-white border-2 border-[#107a57]/40 text-xs font-black text-gray-900 focus:outline-none focus:border-[#107a57] shadow-2xs cursor-pointer"
+                    >
+                      <option value="" disabled>
+                        -- ⚡ اختر درساً سابقاً لتعبئته بنقرة واحدة --
+                      </option>
+                      {previousLessons.map((l, i) => (
+                        <option key={i} value={l.title}>
+                          {l.title} ({l.field})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+
               {/* السطر الأول: التاريخ، الفوج، التوقيت، ورقم المذكرة */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
                 {/* 1. التاريخ */}
@@ -1422,6 +1750,16 @@ export default function TeacherDiaryPage() {
                         <span>تفريغ الحقول</span>
                       </button>
                       <button
+                        type="button"
+                        disabled={saving}
+                        onClick={handleSubmitAndRepeat}
+                        className="px-4 py-2 rounded-xl bg-[#107a57]/10 hover:bg-[#107a57]/20 border border-[#107a57]/30 text-[#107a57] text-xs font-black flex items-center gap-1.5 transition cursor-pointer shadow-2xs disabled:opacity-50"
+                        title="حفظ هذا الدرس للفوج الحالي، وتجهيز نفس محتوى الدرس مباشرة للفوج الموالي"
+                      >
+                        <Copy className="w-3.5 h-3.5 text-[#107a57]" />
+                        <span>حفظ وتكرار الدرس لفوج ثانٍ ⚡</span>
+                      </button>
+                      <button
                         type="submit"
                         disabled={saving}
                         className="btn-primary text-xs px-5 py-2 flex items-center gap-2 cursor-pointer shadow-sm disabled:opacity-50"
@@ -1647,7 +1985,9 @@ export default function TeacherDiaryPage() {
               return (
                 <div
                   key={`day_${dateStr}`}
-                  className="bg-white rounded-3xl border border-[#e8e8e0] shadow-sm overflow-hidden break-inside-avoid space-y-0"
+                  className={`bg-white rounded-3xl border border-[#e8e8e0] shadow-sm overflow-hidden break-inside-avoid space-y-0 ${
+                    dayEntries.length === 0 ? "print:hidden" : ""
+                  }`}
                 >
                   {/* شريط عنوان اليوم الرسمي */}
                   <div className="bg-[#1e293b] text-white p-3.5 sm:p-4 flex flex-wrap items-center justify-between gap-3">
@@ -1925,7 +2265,16 @@ export default function TeacherDiaryPage() {
                                     </div>
                                   )}
 
-                                  <div className="flex items-center justify-end gap-1 pt-2 opacity-0 group-hover:opacity-100 transition print:hidden">
+                                  <div className="flex items-center justify-end gap-1.5 pt-2 opacity-0 group-hover:opacity-100 transition print:hidden flex-wrap">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDuplicateForAnotherClass(item)}
+                                      className="px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-[10px] font-black transition cursor-pointer flex items-center gap-1 border border-emerald-200"
+                                      title="تكرار وتدريس هذا الدرس لفوج آخر فوراً"
+                                    >
+                                      <Copy className="w-3 h-3 text-emerald-600" />
+                                      <span>تكرار لفوج آخر</span>
+                                    </button>
                                     <button
                                       type="button"
                                       onClick={() => handleStartEdit(item)}
