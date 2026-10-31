@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getLessonsData, saveLessonsData, deleteImageFile } from "@/lib/storage";
 import { requireTeacher, resolveReader } from "@/lib/auth";
-import { Lesson, NotebookType, hideUnpublishedSolution } from "@/lib/types";
+import { Lesson, NotebookType, hideUnpublishedSolution, sortClasses } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -47,7 +47,7 @@ export async function GET(
   return NextResponse.json(
     {
       lessons,
-      customClasses: data.customClasses || [],
+      customClasses: sortClasses(data.customClasses || []),
       timetable: data.timetable || null,
       diaryEntries: data.diaryEntries || [],
       studentRoster: data.studentRoster || [],

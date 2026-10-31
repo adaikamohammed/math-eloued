@@ -26,10 +26,12 @@ import {
   Square,
   Filter,
   ArrowRightLeft,
+  ChevronUp,
+  ChevronDown,
 } from "lucide-react";
 import { LoginRequired } from "@/components/LoginRequired";
 import { PageExplainer } from "@/components/PageExplainer";
-import { StudentRosterItem, LessonsData } from "@/lib/types";
+import { StudentRosterItem, LessonsData, sortClasses } from "@/lib/types";
 
 const LOCAL_STORAGE_CLASSES_KEY = "last_active_classes";
 const LOCAL_STORAGE_STUDENTS_KEY = "math_teacher_students_cache";
@@ -107,8 +109,9 @@ export default function StudentsManagementPage() {
         if (storedClasses) {
           const parsed = JSON.parse(storedClasses);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            cachedCls = parsed;
-            setCustomClasses(parsed);
+            const sorted = sortClasses(parsed);
+            cachedCls = sorted;
+            setCustomClasses(sorted);
           }
         }
       } catch (e) {
@@ -152,10 +155,11 @@ export default function StudentsManagementPage() {
         setAuthenticated(authData?.authenticated === true);
 
         if (lessonsData) {
-          const teacherClasses =
+          const teacherClasses = sortClasses(
             Array.isArray(lessonsData.customClasses) && lessonsData.customClasses.length > 0
               ? lessonsData.customClasses
-              : cachedCls;
+              : cachedCls
+          );
 
           setCustomClasses(teacherClasses);
 
@@ -608,7 +612,7 @@ export default function StudentsManagementPage() {
 
     let updatedClasses = customClasses.includes(finalTarget)
       ? [...customClasses]
-      : [...customClasses, finalTarget];
+      : sortClasses([...customClasses, finalTarget]);
 
     if (deleteSourceClassAfterMove) {
       updatedClasses = updatedClasses.filter((c) => c !== selectedClass);
@@ -679,7 +683,7 @@ export default function StudentsManagementPage() {
 
     const updatedClasses = customClasses.includes(finalTarget)
       ? [...customClasses]
-      : [...customClasses, finalTarget];
+      : sortClasses([...customClasses, finalTarget]);
 
     let updatedStudents = [...students];
     const count = selectedIds.size;
@@ -765,6 +769,29 @@ export default function StudentsManagementPage() {
       setSelectedClass(updatedClasses[0] || "all");
     }
     await persistChanges(students, updatedClasses);
+  };
+
+  // ترتيب الأفواج تلقائياً حسب المستوى ورقم الفوج (1م1، 1م2، 1م3... ثم 2م...)
+  const handleAutoSortClasses = async () => {
+    const sorted = sortClasses(customClasses);
+    setCustomClasses(sorted);
+    await persistChanges(students, sorted);
+    setMessage({ type: "ok", text: "تم ترتيب الأفواج حسب المستوى ورقم الفوج بنجاح ✨" });
+  };
+
+  // تقديم أو تأخير ترتيب فوج معين
+  const handleReorderClass = async (cls: string, direction: "up" | "down") => {
+    const index = customClasses.indexOf(cls);
+    if (index === -1) return;
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= customClasses.length) return;
+
+    const newClasses = [...customClasses];
+    const [removed] = newClasses.splice(index, 1);
+    newClasses.splice(targetIndex, 0, removed);
+
+    setCustomClasses(newClasses);
+    await persistChanges(students, newClasses);
   };
 
   /* ─────────────────────────────────────────────────────────────
@@ -1766,23 +1793,57 @@ export default function StudentsManagementPage() {
               </form>
 
               <div className="space-y-2 pt-2 border-t border-[#e8e8e0] overflow-y-auto flex-1">
-                <label className="block text-xs font-bold text-gray-600">الأفواج الحالية لديك ({customClasses.length}):</label>
-                <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
-                  {customClasses.map((cls) => {
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-gray-700">الأفواج الحالية لديك ({customClasses.length}):</label>
+                  <button
+                    type="button"
+                    onClick={handleAutoSortClasses}
+                    className="px-2.5 py-1 text-[11px] font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 rounded-lg border border-emerald-200 transition cursor-pointer flex items-center gap-1 shadow-2xs active:scale-95"
+                    title="ترتيب الأفواج حسب المستوى ورقم الفوج (1م1، 1م2، 1م3... ثم 2م...)"
+                  >
+                    <span>🔄 ترتيب تلقائي</span>
+                  </button>
+                </div>
+
+                <div className="space-y-1.5 max-h-56 overflow-y-auto pr-0.5">
+                  {customClasses.map((cls, idx) => {
                     const count = students.filter((s) => s.className === cls).length;
+                    const isFirst = idx === 0;
+                    const isLast = idx === customClasses.length - 1;
                     return (
                       <div
                         key={cls}
-                        className="flex items-center justify-between p-2 rounded-xl bg-[#fafaf7] border border-[#e8e8e0] text-xs font-bold"
+                        className="flex items-center justify-between p-2 rounded-xl bg-[#fafaf7] border border-[#e8e8e0] text-xs font-bold hover:bg-white transition shadow-2xs"
                       >
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-2">
+                          {/* أسهم الترتيب للأعلى والأسفل */}
+                          <div className="flex items-center border border-gray-200 rounded-lg bg-white overflow-hidden shadow-2xs">
+                            <button
+                              type="button"
+                              onClick={() => handleReorderClass(cls, "up")}
+                              disabled={isFirst}
+                              className="p-1 hover:bg-gray-100 text-gray-500 disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed"
+                              title="تقديم الترتيب لأعلى"
+                            >
+                              <ChevronUp className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleReorderClass(cls, "down")}
+                              disabled={isLast}
+                              className="p-1 hover:bg-gray-100 text-gray-500 disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed border-r border-gray-200"
+                              title="تأخير الترتيب لأسفل"
+                            >
+                              <ChevronDown className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                           <span className="text-[#107a57]">فوج {cls}</span>
-                          <span className="text-[10px] text-gray-400 font-mono">({count})</span>
+                          <span className="text-[10px] text-gray-400 font-mono">({count} تلميذ)</span>
                         </div>
                         <button
                           type="button"
                           onClick={() => handleDeleteClass(cls)}
-                          className="text-gray-400 hover:text-red-600 p-1 rounded-md cursor-pointer"
+                          className="text-gray-400 hover:text-red-600 p-1 rounded-md cursor-pointer transition hover:bg-red-50"
                           title="حذف الفوج"
                         >
                           <Trash2 className="w-3.5 h-3.5" />

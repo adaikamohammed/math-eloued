@@ -82,9 +82,46 @@ export type HonorClass = string;
 
 export const DEFAULT_CLASSES: readonly string[] = [];
 
+/**
+ * دالة فرز وترتيب ذكية للأفواج التربوية حسب المستوى الدراسي ثم رقم الفوج:
+ * 1م1، 1م2، 1م3، 2م1، 2م2، 2م3، 3م1...
+ */
+export function sortClasses(classes: string[]): string[] {
+  if (!Array.isArray(classes)) return [];
+  return [...classes].sort((a, b) => {
+    const normalize = (str: string) => (str || "").trim().replace(/\s+/g, "");
+    const cleanA = normalize(a);
+    const cleanB = normalize(b);
+
+    // مطابقة نمط: رقم ثم حروف ثم رقم (مثل 1م3 أو 1 م 3 أو 2AS1 أو 1ع2)
+    const matchA = cleanA.match(/^(\d+)(.*?)(\d+)?$/);
+    const matchB = cleanB.match(/^(\d+)(.*?)(\d+)?$/);
+
+    if (matchA && matchB) {
+      const levelA = parseInt(matchA[1], 10);
+      const levelB = parseInt(matchB[1], 10);
+      if (levelA !== levelB) {
+        return levelA - levelB;
+      }
+      const midA = matchA[2] || "";
+      const midB = matchB[2] || "";
+      if (midA !== midB) {
+        return midA.localeCompare(midB, "ar");
+      }
+      const numA = matchA[3] ? parseInt(matchA[3], 10) : 0;
+      const numB = matchB[3] ? parseInt(matchB[3], 10) : 0;
+      if (numA !== numB) {
+        return numA - numB;
+      }
+    }
+
+    return cleanA.localeCompare(cleanB, "ar", { numeric: true, sensitivity: "base" });
+  });
+}
+
 export function getTeacherClasses(data?: LessonsData | null): string[] {
   if (data?.customClasses && Array.isArray(data.customClasses) && data.customClasses.length > 0) {
-    return data.customClasses;
+    return sortClasses(data.customClasses);
   }
   return [];
 }
@@ -481,6 +518,7 @@ export interface TimetableSettings {
   principalName?: string; // اسم السيد المدير
   wilayaName?: string; // اسم الولاية (مثل: الوادي)
   subjectName?: string; // المادة (مثل: الرياضيات)
+  classColors?: Record<string, string>; // ألوان مخصصة لكل فوج (معرف اللون من CLASS_PALETTE أو كود سداسي)
 }
 
 export interface TeacherTimetable {

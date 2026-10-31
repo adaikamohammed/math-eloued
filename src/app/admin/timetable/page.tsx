@@ -25,6 +25,9 @@ import {
   Palette,
   Eye,
   FileText,
+  ChevronUp,
+  ChevronDown,
+  ArrowUpDown,
 } from "lucide-react";
 import { LoginRequired } from "@/components/LoginRequired";
 import {
@@ -33,6 +36,7 @@ import {
   TimetableSettings,
   LessonsData,
   StudentRosterItem,
+  sortClasses,
 } from "@/lib/types";
 
 // مفاتيح التخزين المحلي لضمان المزامنة الفورية بدون تأخير
@@ -66,28 +70,43 @@ const DEFAULT_SETTINGS: TimetableSettings = {
 };
 
 // لوحة ألوان منسقة ومتناغمة لكل فوج لسهولة التمييز البصري
-export const CLASS_PALETTE = [
-  { bg: "bg-emerald-50", border: "border-emerald-300", text: "text-emerald-950", badge: "bg-emerald-700 text-white", lightBadge: "bg-emerald-100 text-emerald-900 border-emerald-300" },
-  { bg: "bg-blue-50", border: "border-blue-300", text: "text-blue-950", badge: "bg-blue-700 text-white", lightBadge: "bg-blue-100 text-blue-900 border-blue-300" },
-  { bg: "bg-purple-50", border: "border-purple-300", text: "text-purple-950", badge: "bg-purple-700 text-white", lightBadge: "bg-purple-100 text-purple-900 border-purple-300" },
-  { bg: "bg-amber-50", border: "border-amber-300", text: "text-amber-950", badge: "bg-amber-700 text-white", lightBadge: "bg-amber-100 text-amber-900 border-amber-300" },
-  { bg: "bg-rose-50", border: "border-rose-300", text: "text-rose-950", badge: "bg-rose-700 text-white", lightBadge: "bg-rose-100 text-rose-900 border-rose-300" },
-  { bg: "bg-teal-50", border: "border-teal-300", text: "text-teal-950", badge: "bg-teal-700 text-white", lightBadge: "bg-teal-100 text-teal-900 border-teal-300" },
-  { bg: "bg-indigo-50", border: "border-indigo-300", text: "text-indigo-950", badge: "bg-indigo-700 text-white", lightBadge: "bg-indigo-100 text-indigo-900 border-indigo-300" },
-  { bg: "bg-orange-50", border: "border-orange-300", text: "text-orange-950", badge: "bg-orange-700 text-white", lightBadge: "bg-orange-100 text-orange-900 border-orange-300" },
-  { bg: "bg-cyan-50", border: "border-cyan-300", text: "text-cyan-950", badge: "bg-cyan-700 text-white", lightBadge: "bg-cyan-100 text-cyan-900 border-cyan-300" },
-  { bg: "bg-fuchsia-50", border: "border-fuchsia-300", text: "text-fuchsia-950", badge: "bg-fuchsia-700 text-white", lightBadge: "bg-fuchsia-100 text-fuchsia-900 border-fuchsia-300" },
-  { bg: "bg-lime-50", border: "border-lime-300", text: "text-lime-950", badge: "bg-lime-700 text-white", lightBadge: "bg-lime-100 text-lime-900 border-lime-300" },
-  { bg: "bg-slate-100", border: "border-slate-300", text: "text-slate-900", badge: "bg-slate-700 text-white", lightBadge: "bg-slate-200 text-slate-900 border-slate-300" },
+export interface ClassColorTheme {
+  id: string;
+  name: string;
+  hex: string;
+  bg: string;
+  border: string;
+  text: string;
+  badge: string;
+  lightBadge: string;
+}
+
+export const CLASS_PALETTE: ClassColorTheme[] = [
+  { id: "emerald", name: "أخضر زمردي", hex: "#10b981", bg: "bg-emerald-50", border: "border-emerald-300", text: "text-emerald-950", badge: "bg-emerald-700 text-white", lightBadge: "bg-emerald-100 text-emerald-900 border-emerald-300" },
+  { id: "blue", name: "أزرق سماوي", hex: "#3b82f6", bg: "bg-blue-50", border: "border-blue-300", text: "text-blue-950", badge: "bg-blue-700 text-white", lightBadge: "bg-blue-100 text-blue-900 border-blue-300" },
+  { id: "purple", name: "بنفسجي ملكي", hex: "#8b5cf6", bg: "bg-purple-50", border: "border-purple-300", text: "text-purple-950", badge: "bg-purple-700 text-white", lightBadge: "bg-purple-100 text-purple-900 border-purple-300" },
+  { id: "amber", name: "ذهبي عنبري", hex: "#f59e0b", bg: "bg-amber-50", border: "border-amber-300", text: "text-amber-950", badge: "bg-amber-700 text-white", lightBadge: "bg-amber-100 text-amber-900 border-amber-300" },
+  { id: "rose", name: "وردي ياقوتي", hex: "#f43f5e", bg: "bg-rose-50", border: "border-rose-300", text: "text-rose-950", badge: "bg-rose-700 text-white", lightBadge: "bg-rose-100 text-rose-900 border-rose-300" },
+  { id: "teal", name: "بحري تيل", hex: "#14b8a6", bg: "bg-teal-50", border: "border-teal-300", text: "text-teal-950", badge: "bg-teal-700 text-white", lightBadge: "bg-teal-100 text-teal-900 border-teal-300" },
+  { id: "indigo", name: "نيلي داكن", hex: "#6366f1", bg: "bg-indigo-50", border: "border-indigo-300", text: "text-indigo-950", badge: "bg-indigo-700 text-white", lightBadge: "bg-indigo-100 text-indigo-900 border-indigo-300" },
+  { id: "orange", name: "برتقالي حيوي", hex: "#f97316", bg: "bg-orange-50", border: "border-orange-300", text: "text-orange-950", badge: "bg-orange-700 text-white", lightBadge: "bg-orange-100 text-orange-900 border-orange-300" },
+  { id: "cyan", name: "تركواز فيروزي", hex: "#06b6d4", bg: "bg-cyan-50", border: "border-cyan-300", text: "text-cyan-950", badge: "bg-cyan-700 text-white", lightBadge: "bg-cyan-100 text-cyan-900 border-cyan-300" },
+  { id: "fuchsia", name: "فوشيا زهري", hex: "#d946ef", bg: "bg-fuchsia-50", border: "border-fuchsia-300", text: "text-fuchsia-950", badge: "bg-fuchsia-700 text-white", lightBadge: "bg-fuchsia-100 text-fuchsia-900 border-fuchsia-300" },
+  { id: "lime", name: "تفاحي ليموني", hex: "#84cc16", bg: "bg-lime-50", border: "border-lime-300", text: "text-lime-950", badge: "bg-lime-700 text-white", lightBadge: "bg-lime-100 text-lime-900 border-lime-300" },
+  { id: "slate", name: "رمادي احترافي", hex: "#64748b", bg: "bg-slate-100", border: "border-slate-300", text: "text-slate-900", badge: "bg-slate-700 text-white", lightBadge: "bg-slate-200 text-slate-900 border-slate-300" },
 ];
 
 function getClassColors(
   className: string,
   customClasses: string[],
-  colorMode: "distinct" | "unified" = "distinct"
-) {
+  colorMode: "distinct" | "unified" = "distinct",
+  classColorsMap?: Record<string, string>
+): ClassColorTheme {
   if (colorMode === "unified") {
     return {
+      id: "unified",
+      name: "موحد",
+      hex: "#10b981",
       bg: "bg-emerald-50",
       border: "border-emerald-300",
       text: "text-emerald-950",
@@ -95,6 +114,14 @@ function getClassColors(
       lightBadge: "bg-emerald-100 text-emerald-900 border-emerald-300",
     };
   }
+
+  // إذا تم تخصيص لون لهذا الفوج من طرف الأستاذ
+  if (classColorsMap && classColorsMap[className]) {
+    const chosen = classColorsMap[className];
+    const found = CLASS_PALETTE.find((p) => p.id === chosen);
+    if (found) return found;
+  }
+
   const idx = customClasses.indexOf(className);
   if (idx >= 0) {
     return CLASS_PALETTE[idx % CLASS_PALETTE.length];
@@ -213,6 +240,10 @@ export default function TeacherTimetablePage() {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [presetType, setPresetType] = useState<string>("national_1");
 
+  // نافذة وقائمة تخصيص ألوان الأفواج وترتيبها
+  const [isColorPaletteModalOpen, setIsColorPaletteModalOpen] = useState(false);
+  const [activeClassForQuickColor, setActiveClassForQuickColor] = useState<string | null>(null);
+
   // نافذة معاينة وضبط الطباعة الرسمية A4
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [printFormData, setPrintFormData] = useState({
@@ -252,8 +283,9 @@ export default function TeacherTimetablePage() {
         }
 
         if (loadedClasses.length > 0) {
-          setCustomClasses(loadedClasses);
-          setSelectedClass(loadedClasses[0]);
+          const sorted = sortClasses(loadedClasses);
+          setCustomClasses(sorted);
+          setSelectedClass(sorted[0]);
         } else {
           setCustomClasses(DEFAULT_MIDDLE_SCHOOL_CLASSES);
           setSelectedClass(DEFAULT_MIDDLE_SCHOOL_CLASSES[0]);
@@ -316,12 +348,13 @@ export default function TeacherTimetablePage() {
           }
 
           if (candidateClasses.length > 0) {
-            setCustomClasses(candidateClasses);
-            setSelectedClass((prev) => (candidateClasses.includes(prev) ? prev : candidateClasses[0]));
+            const sorted = sortClasses(candidateClasses);
+            setCustomClasses(sorted);
+            setSelectedClass((prev) => (sorted.includes(prev) ? prev : sorted[0]));
             if (typeof window !== "undefined") {
               LOCAL_STORAGE_CLASSES_KEYS.forEach((k) => {
                 try {
-                  localStorage.setItem(k, JSON.stringify(candidateClasses));
+                  localStorage.setItem(k, JSON.stringify(sorted));
                 } catch {}
               });
             }
@@ -361,7 +394,11 @@ export default function TeacherTimetablePage() {
   }, []);
 
   // قفل تمرير الصفحة أثناء فتح النوافذ المنبثقة
-  const anyModalOpen = isSlotModalOpen || isSettingsModalOpen || isPrintModalOpen;
+  const anyModalOpen =
+    isSlotModalOpen ||
+    isSettingsModalOpen ||
+    isPrintModalOpen ||
+    isColorPaletteModalOpen;
   useEffect(() => {
     if (anyModalOpen) {
       const orig = document.body.style.overflow;
@@ -435,6 +472,64 @@ export default function TeacherTimetablePage() {
     const updated = { ...settings, colorMode: nextMode };
     setSettings(updated);
     persistTimetable(slots, updated);
+  };
+
+  // تخصيص لون الفوج وحفظه فوراً
+  const handleSetClassColor = async (className: string, colorId: string) => {
+    const updatedColors = {
+      ...(settings.classColors || {}),
+      [className]: colorId,
+    };
+    const updatedSettings: TimetableSettings = {
+      ...settings,
+      classColors: updatedColors,
+    };
+    setSettings(updatedSettings);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("math_timetable_class_colors", JSON.stringify(updatedColors));
+      } catch {}
+    }
+    await persistTimetable(slots, updatedSettings, officialImagePath, customClasses);
+  };
+
+  // إعادة ضبط الألوان التلقائية
+  const handleResetClassColors = async () => {
+    const updatedSettings: TimetableSettings = {
+      ...settings,
+      classColors: {},
+    };
+    setSettings(updatedSettings);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.removeItem("math_timetable_class_colors");
+      } catch {}
+    }
+    await persistTimetable(slots, updatedSettings, officialImagePath, customClasses);
+    setMessage({ type: "ok", text: "تمت إعادة ضبط الألوان التلقائية للأفواج 🎨" });
+  };
+
+  // ترتيب الأفواج تلقائياً حسب المستوى ورقم الفوج (1م1، 1م2، 1م3... ثم 2م...)
+  const handleAutoSortClasses = async () => {
+    const sorted = sortClasses(customClasses);
+    setCustomClasses(sorted);
+    await persistTimetable(slots, settings, officialImagePath, sorted);
+    setMessage({ type: "ok", text: "تم ترتيب الأفواج حسب المستوى ورقم الفوج بنجاح ✨" });
+  };
+
+  // تقديم أو تأخير ترتيب فوج معين
+  const handleReorderClass = async (cls: string, direction: "up" | "down") => {
+    const index = customClasses.indexOf(cls);
+    if (index === -1) return;
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= customClasses.length) return;
+
+    const newClasses = [...customClasses];
+    const [removed] = newClasses.splice(index, 1);
+    newClasses.splice(targetIndex, 0, removed);
+
+    setCustomClasses(newClasses);
+    await persistTimetable(slots, settings, officialImagePath, newClasses);
   };
 
   // فتح نافذة لحصة محددة في الشبكة
@@ -857,45 +952,126 @@ export default function TeacherTimetablePage() {
                 <School className="w-4 h-4 text-emerald-700" />
                 <span>الأفواج المسندة (انقر على أي فوج لتفعيل التوزيع السريع ⚡):</span>
               </span>
-              <span className="text-[11px] text-gray-400">
-                (النصاب الرسمي: عادة 18 إلى 20 ساعة أسبوعياً)
-              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsColorPaletteModalOpen(true)}
+                  className="px-2.5 py-1 rounded-xl border border-purple-200 bg-purple-50 hover:bg-purple-100 text-purple-900 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs active:scale-95"
+                  title="تخصيص لون لكل فوج وترتيب الأفواج حسب الرغبة"
+                >
+                  <Palette className="w-3.5 h-3.5 text-purple-600" />
+                  <span>تخصيص ألوان وترتيب الأفواج 🎨</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAutoSortClasses}
+                  className="px-2.5 py-1 rounded-xl border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs active:scale-95"
+                  title="ترتيب الأفواج حسب المستوى الدراسي ورقم الفوج (1م1، 1م2، 1م3... ثم 2م...)"
+                >
+                  <ArrowUpDown className="w-3.5 h-3.5 text-emerald-700" />
+                  <span>ترتيب تلقائي</span>
+                </button>
+                <span className="text-[11px] text-gray-400 hidden md:inline">
+                  (النصاب: 18-20 سا)
+                </span>
+              </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-2 pt-0.5">
               {customClasses.map((cls) => {
                 const stat = classHoursSummary.classesSummary[cls] || { total: 0, normal: 0, td: 0, remedial: 0 };
                 const isSelectedForStamp = quickStampClass === cls;
-                const colors = getClassColors(cls, customClasses, settings.colorMode);
+                const colors = getClassColors(cls, customClasses, settings.colorMode, settings.classColors);
 
                 return (
-                  <button
-                    key={cls}
-                    type="button"
-                    onClick={() => setQuickStampClass(isSelectedForStamp ? null : cls)}
-                    className={`rounded-xl px-3.5 py-2 text-xs font-black transition cursor-pointer flex items-center gap-2 border ${
-                      isSelectedForStamp
-                        ? `${colors.badge} shadow-md ring-2 ring-emerald-400 scale-105`
-                        : `${colors.bg} ${colors.text} ${colors.border} hover:opacity-90`
-                    }`}
-                    title={isSelectedForStamp ? "انقر لإلغاء وضع التوزيع السريع" : `تفعيل التوزيع السريع لفوج ${cls}`}
-                  >
-                    <span>فوج {cls}</span>
-                    <span
-                      className={`font-mono text-xs px-2 py-0.5 rounded-md ${
+                  <div key={cls} className="relative inline-flex items-center">
+                    <button
+                      type="button"
+                      onClick={() => setQuickStampClass(isSelectedForStamp ? null : cls)}
+                      className={`rounded-xl px-3 py-1.5 text-xs font-black transition cursor-pointer flex items-center gap-1.5 border ${
                         isSelectedForStamp
-                          ? "bg-white text-gray-900"
-                          : colors.lightBadge
+                          ? `${colors.badge} shadow-md ring-2 ring-emerald-400 scale-105`
+                          : `${colors.bg} ${colors.text} ${colors.border} hover:opacity-90`
                       }`}
+                      title={isSelectedForStamp ? "انقر لإلغاء وضع التوزيع السريع" : `تفعيل التوزيع السريع لفوج ${cls}`}
                     >
-                      {stat.total} سا
-                    </span>
-                    {stat.td > 0 && (
-                      <span className="text-[10px] font-bold px-1.5 py-0.2 rounded border bg-white/80">
-                        {stat.td} تفويج
+                      <span>فوج {cls}</span>
+                      <span
+                        className={`font-mono text-xs px-2 py-0.5 rounded-md ${
+                          isSelectedForStamp
+                            ? "bg-white text-gray-900"
+                            : colors.lightBadge
+                        }`}
+                      >
+                        {stat.total} سا
                       </span>
+                      {stat.td > 0 && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.2 rounded border bg-white/80">
+                          {stat.td} تفويج
+                        </span>
+                      )}
+                    </button>
+
+                    {/* زر تغيير لون هذا الفوج مباشرة بنقرة واحدة */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveClassForQuickColor(activeClassForQuickColor === cls ? null : cls);
+                      }}
+                      className="p-1 -mr-2 rounded-full hover:bg-black/10 transition cursor-pointer z-10"
+                      title={`تغيير لون فوج ${cls}`}
+                    >
+                      <span
+                        className="w-3.5 h-3.5 rounded-full border border-black/20 block shadow-xs hover:scale-125 transition"
+                        style={{ backgroundColor: colors.hex }}
+                      />
+                    </button>
+
+                    {/* قائمة منبثقة لاختيار اللون السريع */}
+                    {activeClassForQuickColor === cls && (
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        className="absolute top-full mt-2 right-0 z-50 bg-white rounded-2xl p-3 shadow-2xl border border-slate-200 min-w-[220px] animate-in fade-in zoom-in-95 duration-100"
+                      >
+                        <div className="flex items-center justify-between pb-2 mb-2 border-b border-gray-100 text-xs font-black text-gray-900">
+                          <span className="flex items-center gap-1">
+                            <Palette className="w-3.5 h-3.5 text-purple-600" />
+                            <span>اختر لون فوج {cls}:</span>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setActiveClassForQuickColor(null)}
+                            className="text-gray-400 hover:text-gray-700 p-0.5"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-3 gap-1.5 max-h-48 overflow-y-auto">
+                          {CLASS_PALETTE.map((p) => {
+                            const isCurrent = (settings.classColors?.[cls] || colors.id) === p.id;
+                            return (
+                              <button
+                                key={p.id}
+                                type="button"
+                                onClick={() => {
+                                  handleSetClassColor(cls, p.id);
+                                  setActiveClassForQuickColor(null);
+                                }}
+                                className={`flex items-center gap-1.5 p-1.5 rounded-xl text-[11px] font-bold border transition cursor-pointer hover:scale-102 ${
+                                  isCurrent ? "ring-2 ring-emerald-500 border-emerald-500 bg-emerald-50" : "border-slate-200 hover:bg-slate-50"
+                                }`}
+                                title={p.name}
+                              >
+                                <span className="w-3.5 h-3.5 rounded-full shrink-0 shadow-2xs" style={{ backgroundColor: p.hex }} />
+                                <span className="truncate text-gray-800 text-[10px]">{p.name.split(" ")[0]}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
                     )}
-                  </button>
+                  </div>
                 );
               })}
 
@@ -1097,6 +1273,7 @@ export default function TeacherTimetablePage() {
                   settings.breakEnd;
                 const isTueRest = isTuesdayAfternoonSlot(mobileActiveDay, slotDef.period);
                 const s = getSlotFor(mobileActiveDay as (typeof SCHOOL_DAYS)[number], slotDef.start, slotDef.end);
+                const sColors = s ? getClassColors(s.className, customClasses, settings.colorMode, settings.classColors) : null;
 
                 return (
                   <div
@@ -1113,8 +1290,8 @@ export default function TeacherTimetablePage() {
                           ? "bg-sky-50 border-sky-300"
                           : s.sessionType === "remedial"
                           ? "bg-orange-50 border-orange-300"
-                          : s.sessionType === "td"
-                          ? "bg-purple-50 border-purple-300"
+                          : sColors
+                          ? `${sColors.bg} ${sColors.border}`
                           : "bg-white border-emerald-300 shadow-xs"
                         : "bg-white border-dashed border-gray-300"
                     }`}
@@ -1328,6 +1505,7 @@ export default function TeacherTimetablePage() {
                                   slot={s}
                                   customClasses={customClasses}
                                   colorMode={settings.colorMode}
+                                  classColorsMap={settings.classColors}
                                   onDelete={(e) => handleQuickDeleteSlot(e, day, t.start, t.end)}
                                 />
                               ) : (
@@ -1376,6 +1554,7 @@ export default function TeacherTimetablePage() {
                                   slot={s}
                                   customClasses={customClasses}
                                   colorMode={settings.colorMode}
+                                  classColorsMap={settings.classColors}
                                   onDelete={(e) => handleQuickDeleteSlot(e, day, t.start, t.end)}
                                 />
                               ) : (
@@ -1428,6 +1607,7 @@ export default function TeacherTimetablePage() {
                                   slot={s}
                                   customClasses={customClasses}
                                   colorMode={settings.colorMode}
+                                  classColorsMap={settings.classColors}
                                   onDelete={(e) => handleQuickDeleteSlot(e, day, t.start, t.end)}
                                 />
                               ) : (
@@ -1488,6 +1668,7 @@ export default function TeacherTimetablePage() {
                                   slot={s}
                                   customClasses={customClasses}
                                   colorMode={settings.colorMode}
+                                  classColorsMap={settings.classColors}
                                   onDelete={(e) => handleQuickDeleteSlot(e, day, t.start, t.end)}
                                 />
                               ) : (
@@ -1690,7 +1871,7 @@ export default function TeacherTimetablePage() {
 
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                       {customClasses.map((c) => {
-                        const colors = getClassColors(c, customClasses, settings.colorMode);
+                        const colors = getClassColors(c, customClasses, settings.colorMode, settings.classColors);
                         const isSelected = selectedClass === c;
                         return (
                           <button
@@ -2378,6 +2559,142 @@ export default function TeacherTimetablePage() {
           </div>,
           document.body
         )}
+
+        {/* ─── Modal تخصيص ألوان الأفواج وترتيبها ─── */}
+        {mounted && isColorPaletteModalOpen && createPortal(
+          <div className="fixed inset-0 z-[999999] bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150" dir="rtl">
+            <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-lg w-full border border-slate-200 shadow-2xl space-y-5 my-auto max-h-[92vh] flex flex-col overflow-y-auto animate-in zoom-in-95 duration-150">
+              <div className="flex items-center justify-between border-b border-[#e8e8e0] pb-3 shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center shadow-xs">
+                    <Palette className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-gray-900">تخصيص ألوان وترتيب الأفواج</h3>
+                    <p className="text-[11px] text-gray-500">اختر اللون المناسب لكل فوج وتحكم في ترتيب ظهورها بالجدول</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsColorPaletteModalOpen(false)}
+                  className="p-1.5 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* أزرار الإجراءات السريعة في أعلى النافذة */}
+              <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-purple-50/70 rounded-2xl border border-purple-100 text-xs">
+                <button
+                  type="button"
+                  onClick={handleAutoSortClasses}
+                  className="px-3 py-1.5 rounded-xl bg-white text-emerald-800 font-bold border border-emerald-200 hover:bg-emerald-50 transition cursor-pointer flex items-center gap-1.5 shadow-2xs active:scale-95"
+                  title="ترتيب الأفواج حسب المستوى ورقم الفوج (1م1، 1م2، 1م3... ثم 2م...)"
+                >
+                  <ArrowUpDown className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>ترتيب تلقائي (1م... ثم 2م...)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleResetClassColors}
+                  className="px-3 py-1.5 rounded-xl bg-white text-gray-700 font-bold border border-gray-200 hover:bg-gray-50 transition cursor-pointer flex items-center gap-1.5 shadow-2xs active:scale-95"
+                  title="إعادة الألوان الافتراضية"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 text-gray-500" />
+                  <span>إعادة الألوان التلقائية</span>
+                </button>
+              </div>
+
+              {/* قائمة الأفواج مع المعاينة الحية واختيار الألوان والترتيب */}
+              <div className="space-y-3 overflow-y-auto flex-1 pr-1">
+                {customClasses.map((cls, idx) => {
+                  const currentColor = getClassColors(cls, customClasses, settings.colorMode, settings.classColors);
+                  const isFirst = idx === 0;
+                  const isLast = idx === customClasses.length - 1;
+
+                  return (
+                    <div
+                      key={cls}
+                      className="p-3.5 rounded-2xl border border-slate-200 bg-[#fafaf7] hover:bg-white transition shadow-2xs space-y-2.5"
+                    >
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        {/* أزرار تقديم وتأخير الترتيب */}
+                        <div className="flex items-center gap-1.5">
+                          <div className="flex items-center border border-gray-200 rounded-lg bg-white overflow-hidden shadow-2xs">
+                            <button
+                              type="button"
+                              onClick={() => handleReorderClass(cls, "up")}
+                              disabled={isFirst}
+                              className="p-1 hover:bg-gray-100 text-gray-600 disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed"
+                              title="تقديم الترتيب لأعلى"
+                            >
+                              <ChevronUp className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleReorderClass(cls, "down")}
+                              disabled={isLast}
+                              className="p-1 hover:bg-gray-100 text-gray-600 disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed border-r border-gray-200"
+                              title="تأخير الترتيب لأسفل"
+                            >
+                              <ChevronDown className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                          <span className="text-[11px] font-mono text-gray-400 font-bold">#{idx + 1}</span>
+                        </div>
+
+                        {/* معاينة حية لشكل الفوج باللون المختار */}
+                        <div
+                          className={`px-3 py-1 rounded-xl border text-xs font-black shadow-2xs flex items-center gap-2 ${currentColor.bg} ${currentColor.border} ${currentColor.text}`}
+                        >
+                          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: currentColor.hex }} />
+                          <span>فوج {cls}</span>
+                          <span className={`text-[10px] px-1.5 py-0.2 rounded ${currentColor.lightBadge}`}>
+                            {currentColor.name}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* شريط باليت الألوان الـ 12 للاختيار */}
+                      <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-gray-100">
+                        {CLASS_PALETTE.map((p) => {
+                          const isSelected = (settings.classColors?.[cls] || currentColor.id) === p.id;
+                          return (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => handleSetClassColor(cls, p.id)}
+                              className={`w-7 h-7 rounded-xl flex items-center justify-center transition cursor-pointer hover:scale-115 ${
+                                isSelected ? "ring-2 ring-offset-2 ring-gray-900 shadow-md scale-110" : "opacity-80 hover:opacity-100 shadow-2xs"
+                              }`}
+                              style={{ backgroundColor: p.hex }}
+                              title={p.name}
+                            >
+                              {isSelected && <Check className="w-4 h-4 text-white stroke-[3]" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* أزرار الإغلاق */}
+              <div className="pt-2 flex items-center justify-end gap-2 border-t border-[#e8e8e0] shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsColorPaletteModalOpen(false)}
+                  className="btn-primary w-full py-2.5 text-xs font-black flex items-center justify-center gap-2 cursor-pointer shadow-md active:scale-95"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>تم واعتماد التعديلات ✨</span>
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
       </div>
     </div>
   );
@@ -2388,11 +2705,13 @@ function SlotBadge({
   slot,
   customClasses,
   colorMode,
+  classColorsMap,
   onDelete,
 }: {
   slot: TimetableSlot;
   customClasses: string[];
   colorMode?: "distinct" | "unified";
+  classColorsMap?: Record<string, string>;
   onDelete: (e: React.MouseEvent) => void;
 }) {
   const isFree = slot.sessionType === "free" || slot.className === "فراغ";
@@ -2425,7 +2744,7 @@ function SlotBadge({
   }
 
   // حساب الألوان حسب نمط التلوين
-  const colors = getClassColors(slot.className, customClasses, colorMode);
+  const colors = getClassColors(slot.className, customClasses, colorMode, classColorsMap);
 
   let bgClass = `${colors.bg} ${colors.border} ${colors.text}`;
   if (isReception) bgClass = "bg-sky-50 border-sky-300 text-sky-950";

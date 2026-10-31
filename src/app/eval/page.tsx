@@ -48,6 +48,7 @@ import {
   type StudentEvaluation,
   type EvaluationCriterion,
   type ClassEvaluationSettings,
+  sortClasses,
 } from "@/lib/types";
 import { PrintModal } from "@/components/print/PrintModal";
 import {
@@ -259,8 +260,9 @@ function EvaluationDashboard({
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data?.customClasses && Array.isArray(data.customClasses) && data.customClasses.length > 0) {
-          setTeacherClasses(data.customClasses);
-          setSelectedClass((prev) => (prev ? prev : data.customClasses[0]));
+          const sorted = sortClasses(data.customClasses);
+          setTeacherClasses(sorted);
+          setSelectedClass((prev) => (prev ? prev : sorted[0]));
         }
         if (data?.teacherProfile) {
           setTeacherProfile({
