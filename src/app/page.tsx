@@ -13,7 +13,6 @@ import {
 } from "lucide-react";
 import TeacherWallet from "@/components/TeacherWallet";
 import { LandingHeader } from "@/components/LandingHeader";
-import { SaveOfflineButton } from "@/components/OfflineIndicator";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -39,14 +38,14 @@ export default function WilayaHomePage() {
             </div>
 
             {/* العنوان الموجه لولي الأمر والتلميذ */}
-            <div className="space-y-2">
-              <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-tight leading-tight text-gray-900">
+            <div className="space-y-4">
+              <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-tight text-gray-900 leading-snug sm:leading-tight">
                 فضاء الأولياء والتلاميذ
-                <span className="text-[#107a57] block mt-1.5 text-xl sm:text-3xl lg:text-4xl">
+                <span className="text-[#107a57] block mt-3.5 text-xl sm:text-3xl lg:text-4xl font-black leading-relaxed sm:leading-normal">
                   تابع كراس القسم، السبورات اليومية، ونقاط ابنك
                 </span>
               </h1>
-              <p className="text-gray-600 text-xs sm:text-sm max-w-xl mx-auto leading-relaxed font-medium">
+              <p className="text-gray-600 text-xs sm:text-base max-w-2xl mx-auto leading-loose font-medium pt-1">
                 المنصة الرقمية الموحدة لكافة مواد التعليم المتوسط. أدخل كود الأستاذ المسلم لابنك في الكراس للاطلاع الفوري على الدروس والواجبات ونقاط التقويم.
               </p>
             </div>
@@ -76,10 +75,6 @@ export default function WilayaHomePage() {
               <div className="flex items-center justify-center gap-2 text-xs text-gray-500 mt-3 font-medium">
                 <span className="text-[#107a57]">💡</span>
                 <span>يمنح الأستاذ الكود لولي الأمر في الكراس المدرسي. لا يلزم أي تسجيل حساب للولي.</span>
-              </div>
-
-              <div className="flex items-center justify-center mt-4">
-                <SaveOfflineButton className="shadow-xs hover:shadow-md" />
               </div>
             </div>
           </div>

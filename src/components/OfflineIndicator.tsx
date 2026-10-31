@@ -1,86 +1,74 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { WifiOff, Download, CheckCircle, RefreshCw, X } from "lucide-react";
+import { WifiOff, X } from "lucide-react";
 
 export function OfflineIndicator() {
   const [isOffline, setIsOffline] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [savedSuccess, setSavedSuccess] = useState(false);
   const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
-    // التحقق من حالة الاتصال الأولية
-    if (typeof window !== "undefined") {
-      setIsOffline(!navigator.onLine);
+    if (typeof window === "undefined") return;
 
-      const handleOnline = () => setIsOffline(false);
-      const handleOffline = () => {
-        setIsOffline(true);
-        setDismissed(false);
-      };
+    // 1. التحقق من حالة الاتصال
+    setIsOffline(!navigator.onLine);
 
-      window.addEventListener("online", handleOnline);
-      window.addEventListener("offline", handleOffline);
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => {
+      setIsOffline(true);
+      setDismissed(false);
+    };
 
-      return () => {
-        window.removeEventListener("online", handleOnline);
-        window.removeEventListener("offline", handleOffline);
-      };
-    }
-  }, []);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
 
-  // دالة تحميل وحفظ الخط والصفحات للعمل دون إنترنت
-  const handleSaveForOffline = async () => {
-    if (!("caches" in window)) {
-      alert("متصفحك لا يدعم خاصية التخزين المؤقت المحلي.");
-      return;
-    }
-
-    setIsSaving(true);
-    setSavedSuccess(false);
-
-    try {
-      const cache = await caches.open("jusoor-offline-v1");
-      const urlsToCache = [
-        "/",
-        "/offline",
-        "/eval",
-        "/t/search",
-        "/assessment",
-        "/manifest.json",
-        "/icon.svg",
-        "/icons/icon-192.png",
-        "/icons/icon-512.png",
-        "/icons/apple-touch-icon.png",
-        "/fonts/alexandria-arabic.woff2",
-        "/fonts/alexandria-latin.woff2",
-      ];
-
-      // تحميل كل ملف وتخزينه في الكاش
-      for (const url of urlsToCache) {
+    // 2. تحميل وحفظ الخط والصفحات تلقائياً في الخلفية بدون أي أزرار وبدون إزعاج المستخدم
+    let timer: NodeJS.Timeout | null = null;
+    if ("caches" in window && navigator.onLine) {
+      timer = setTimeout(async () => {
         try {
-          const response = await fetch(url, { cache: "reload" });
-          if (response.ok) {
-            await cache.put(url, response);
+          const cache = await caches.open("jusoor-offline-v1");
+          const urlsToCache = [
+            "/",
+            "/offline",
+            "/eval",
+            "/t/search",
+            "/assessment",
+            "/manifest.json",
+            "/icon.svg",
+            "/icons/icon-192.png",
+            "/icons/icon-512.png",
+            "/fonts/alexandria-arabic.woff2",
+            "/fonts/alexandria-latin.woff2",
+          ];
+
+          for (const url of urlsToCache) {
+            try {
+              const matched = await cache.match(url);
+              if (!matched) {
+                const response = await fetch(url);
+                if (response.ok) {
+                  await cache.put(url, response);
+                }
+              }
+            } catch {
+              // تجاهل بصمت للحفاظ على تجربة المستخدم
+            }
           }
         } catch {
-          // تجاهل الأخطاء الفردية للاستمرار في حفظ باقي الملفات
+          // تجاهل أي خطأ في بيئة المتصفح
         }
-      }
-
-      setSavedSuccess(true);
-      setTimeout(() => {
-        setSavedSuccess(false);
-      }, 5000);
-    } catch (err) {
-      console.warn("Error caching for offline:", err);
-    } finally {
-      setIsSaving(false);
+      }, 2000);
     }
-  };
 
-  // شريط التنبيه عند انقطاع الإنترنت
+    return () => {
+      if (timer) clearTimeout(timer);
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+
+  // شريط التنبيه اللطيف فقط عند انقطاع الإنترنت الفعلي
   if (isOffline && !dismissed) {
     return (
       <aside aria-label="تنبيه حالة الاتصال" className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:max-w-md z-50 animate-bounce-in" dir="rtl">
@@ -90,9 +78,9 @@ export function OfflineIndicator() {
               <WifiOff className="w-4 h-4 text-amber-200" />
             </div>
             <div className="text-right">
-              <p className="text-xs font-black">أنت تتصفح في وضع الأوفلاين (بدون إنترنت)</p>
+              <p className="text-xs font-black">وضع العمل دون إنترنت (أوفلاين)</p>
               <p className="text-[11px] text-amber-100">
-                الخط والصفحات محفوظة محلياً في جهازك
+                الصفحات والخطوط محملة ومحفوظة تلقائياً في جهازك
               </p>
             </div>
           </div>
@@ -108,93 +96,10 @@ export function OfflineIndicator() {
     );
   }
 
-  // عند نجاح الحفظ اليدوي للأوفلاين
-  if (savedSuccess) {
-    return (
-      <aside aria-label="تأكيد حفظ البيانات محلياً" className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:max-w-sm z-50" dir="rtl">
-        <div className="bg-emerald-700 text-white px-4 py-3 rounded-2xl shadow-xl flex items-center gap-3 border border-emerald-500/40">
-          <CheckCircle className="w-5 h-5 text-emerald-200 shrink-0" />
-          <div className="text-right flex-1">
-            <p className="text-xs font-black">تم الحفظ بنجاح على جهازك!</p>
-            <p className="text-[11px] text-emerald-100">
-              الخط والصفحات جاهزة الآن للعمل بدون إنترنت
-            </p>
-          </div>
-        </div>
-      </aside>
-    );
-  }
-
   return null;
 }
 
-// زر تفاعلي يمكن وضعه في القائمة أو الشريط الجانبي لحفظ المنصة
-export function SaveOfflineButton({ className = "" }: { className?: string }) {
-  const [saving, setSaving] = useState(false);
-  const [done, setDone] = useState(false);
-
-  const handleSave = async () => {
-    if (!("caches" in window)) {
-      alert("خاصية التخزين المحلي غير مدعومة في هذا المتصفح.");
-      return;
-    }
-
-    setSaving(true);
-    setDone(false);
-
-    try {
-      const cache = await caches.open("jusoor-offline-v1");
-      const urls = [
-        "/",
-        "/offline",
-        "/eval",
-        "/t/search",
-        "/assessment",
-        "/manifest.json",
-        "/icon.svg",
-        "/icons/icon-192.png",
-        "/icons/icon-512.png",
-        "/fonts/alexandria-arabic.woff2",
-        "/fonts/alexandria-latin.woff2",
-      ];
-
-      for (const u of urls) {
-        try {
-          const res = await fetch(u, { cache: "reload" });
-          if (res.ok) await cache.put(u, res);
-        } catch {
-          // ignore individual asset failure
-        }
-      }
-
-      setDone(true);
-      setTimeout(() => setDone(false), 4000);
-    } catch {
-      // ignore
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <button
-      onClick={handleSave}
-      disabled={saving}
-      className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
-        done
-          ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
-          : "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200"
-      } ${className}`}
-      title="تحميل الخط والصفحات لحفظها في ذاكرة الهاتف أو الحاسوب"
-    >
-      {saving ? (
-        <RefreshCw className="w-3.5 h-3.5 animate-spin text-emerald-600" />
-      ) : done ? (
-        <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
-      ) : (
-        <Download className="w-3.5 h-3.5 text-slate-500" />
-      )}
-      <span>{saving ? "جاري الحفظ للجهاز..." : done ? "محفوظ في جهازك أوفلاين" : "حفظ المنصة للعمل أوفلاين"}</span>
-    </button>
-  );
+// دالة لا ترسم أي زر (لأن التحميل يتم تلقائياً في الخلفية)
+export function SaveOfflineButton(_props: { className?: string }) {
+  return null;
 }

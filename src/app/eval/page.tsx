@@ -54,7 +54,6 @@ import {
   EvaluationRosterPrintDoc,
   type ExtendedStudentEvaluation,
 } from "@/components/print/EvaluationRosterPrintDoc";
-import { SaveOfflineButton } from "@/components/OfflineIndicator";
 
 const DEFAULT_CRITERIA: EvaluationCriterion[] = [
   {
@@ -917,8 +916,6 @@ function EvaluationDashboard({
               <Printer className="w-4 h-4 text-emerald-700" />
               <span>طباعة الميثاق (PDF)</span>
             </button>
-
-            <SaveOfflineButton className="shadow-2xs text-xs py-2.5 px-3.5" />
 
             <div className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-600">
               {isOnline ? (

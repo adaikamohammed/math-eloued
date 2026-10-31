@@ -51,14 +51,23 @@ export function LandingHeader() {
               )}
             </Link>
           ) : (
-            <Link
-              href="/login"
-              className="btn-primary text-xs py-2 px-3.5 sm:px-4 shadow-sm"
-              title="دخول الأساتذة والمفتشين"
-            >
-              <LogIn className="w-4 h-4" />
-              <span>دخول الأستاذ</span>
-            </Link>
+            <div className="flex items-center gap-2">
+              <Link
+                href="/login?tab=register"
+                className="btn-primary text-xs py-2 px-3.5 sm:px-4 shadow-sm"
+                title="إنشاء حساب أستاذ جديد"
+              >
+                <GraduationCap className="w-4 h-4" />
+                <span>انضمام كأستاذ</span>
+              </Link>
+              <Link
+                href="/login?tab=login"
+                className="px-3 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold transition"
+                title="تسجيل دخول أستاذ أو مفتش"
+              >
+                <span>دخول</span>
+              </Link>
+            </div>
           )}
         </div>
       </div>

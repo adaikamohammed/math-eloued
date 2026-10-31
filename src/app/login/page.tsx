@@ -1,30 +1,179 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import { Lock, Mail, Loader2, AlertCircle, ArrowLeft, ArrowRight, GraduationCap, ShieldCheck, Clock, Sparkles } from "lucide-react";
+import { validatePasswordStrength } from "@/lib/passwordPolicy";
+import { MIDDLE_SCHOOL_SUBJECTS } from "@/lib/types";
+import {
+  Lock,
+  Mail,
+  User,
+  Building2,
+  MapPin,
+  Loader2,
+  AlertCircle,
+  ArrowRight,
+  GraduationCap,
+  ShieldCheck,
+  Sparkles,
+  BookOpen,
+  CheckCircle2,
+  LogIn,
+  UserPlus,
+} from "lucide-react";
 
-export default function LoginPage() {
+const DISTRICTS = [
+  { id: 1, name: "المقاطعة 1 — الوادي 1" },
+  { id: 2, name: "المقاطعة 2 — الوادي 2" },
+  { id: 3, name: "المقاطعة 3 — قمار" },
+  { id: 4, name: "المقاطعة 4 — الرقيبة" },
+  { id: 5, name: "المقاطعة 5 — الدبيلة والمقرن" },
+  { id: 0, name: "ولاية أخرى / مقاطعة أخرى" },
+];
+
+function AuthForm() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
-  const [pendingReview, setPendingReview] = useState(false);
+  const searchParams = useSearchParams();
+
+  // التبويب الافتراضي هو "إنشاء حساب" (register) فوراً بناءً على طلب المنصة للعامة
+  const initialTab = searchParams.get("tab") === "login" ? "login" : "register";
+  const [activeTab, setActiveTab] = useState<"register" | "login">(initialTab);
+
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab === "login") setActiveTab("login");
+    else if (tab === "register") setActiveTab("register");
+  }, [searchParams]);
+
+  // حقول تسجيل الدخول
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
   const [isSharedDevice, setIsSharedDevice] = useState(false);
 
+  // حقول إنشاء حساب جديد
+  const [fullName, setFullName] = useState("");
+  const [subject, setSubject] = useState("mathematics");
+  const [regEmail, setRegEmail] = useState("");
+  const [regPassword, setRegPassword] = useState("");
+  const [districtId, setDistrictId] = useState("1");
+  const [middleSchoolName, setMiddleSchoolName] = useState("");
+
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+  const [registeredCode, setRegisteredCode] = useState<string | null>(null);
+
+  // ── 1. معالجة إنشاء الحساب فورياً ──
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg("");
+
+    if (!fullName.trim() || !regEmail.trim() || !regPassword) {
+      setErrorMsg("يرجى ملء جميع الحقول المطلوبة");
+      return;
+    }
+
+    const pwdCheck = validatePasswordStrength(regPassword);
+    if (!pwdCheck.valid) {
+      setErrorMsg(pwdCheck.error || "كلمة المرور يجب أن تكون 8 أحرف على الأقل وتحتوي على أرقام وأحرف");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const subjectObj = MIDDLE_SCHOOL_SUBJECTS.find((s) => s.id === subject);
+      const prefix = subjectObj?.codePrefix || "MTH";
+      const randomCode = `${prefix}-${Math.floor(100 + Math.random() * 900)}`;
+      const cleanSlug = `prof-${Math.random().toString(36).substring(2, 8)}`;
+      const cleanEmail = regEmail.trim().toLowerCase();
+
+      // محاولة التسجيل عبر دالة النظام المباشرة
+      let registeredSuccessfully = false;
+      try {
+        const { data: rpcRes, error: rpcErr } = await supabase.rpc("register_teacher_instant", {
+          p_email: cleanEmail,
+          p_password: regPassword,
+          p_full_name: fullName.trim(),
+          p_subject: subject,
+          p_district_id: Number(districtId) || 1,
+          p_school_custom_name: middleSchoolName.trim() || "متوسطة ولاية الوادي",
+          p_teacher_code: randomCode,
+          p_slug: cleanSlug,
+        });
+
+        if (!rpcErr && rpcRes && rpcRes.success !== false) {
+          registeredSuccessfully = true;
+        }
+      } catch {
+        registeredSuccessfully = false;
+      }
+
+      // في حال عدم توفر الـ RPC يتم التسجيل المباشر عبر Supabase Auth
+      if (!registeredSuccessfully) {
+        const { error: signUpErr } = await supabase.auth.signUp({
+          email: cleanEmail,
+          password: regPassword,
+          options: {
+            data: {
+              full_name: fullName.trim(),
+              role: "teacher",
+              subject: subject,
+              district_id: Number(districtId) || 1,
+              school_custom_name: middleSchoolName.trim() || "متوسطة ولاية الوادي",
+              teacher_code: randomCode,
+              slug: cleanSlug,
+            },
+          },
+        });
+
+        if (signUpErr) {
+          throw signUpErr;
+        }
+      }
+
+      // تسجيل الدخول التلقائي بعد إنشاء الحساب
+      const { error: loginErr } = await supabase.auth.signInWithPassword({
+        email: cleanEmail,
+        password: regPassword,
+      });
+
+      if (loginErr) {
+        console.warn("Auto login warning:", loginErr);
+      }
+
+      setRegisteredCode(randomCode);
+
+      setTimeout(() => {
+        router.push("/admin?welcome=1");
+        router.refresh();
+      }, 1500);
+    } catch (err: any) {
+      console.error("Register error:", err);
+      const raw = String(err?.message || "");
+
+      if (raw.includes("already registered") || raw.includes("User already registered") || raw.includes("مسجل مسبقاً")) {
+        setErrorMsg("هذا البريد الإلكتروني مسجل مسبقاً في المنصة. يمكنك التبديل إلى تبويب 'تسجيل الدخول' أعلاه.");
+      } else if (raw.includes("rate limit") || raw.includes("over_email_send_rate_limit")) {
+        setErrorMsg("تم تجاوز الحد المسموح به حالياً. يرجى المحاولة بعد لحظات.");
+      } else {
+        setErrorMsg(raw || "حدث خطأ أثناء إنشاء الحساب، يرجى التحقق من البيانات والمحاولة مجدداً");
+      }
+      setLoading(false);
+    }
+  };
+
+  // ── 2. معالجة تسجيل الدخول ──
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg("");
-    setPendingReview(false);
     setLoading(true);
 
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password: password,
+        email: loginEmail.trim(),
+        password: loginPassword,
       });
 
       if (error) {
@@ -35,21 +184,16 @@ export default function LoginPage() {
         throw new Error("لم يتم العثور على بيانات المستخدم");
       }
 
-      // جلب الملف الشخصي لمعرفة الدور وحالة التفعيل والاعتماد
+      // جلب الملف الشخصي لمعرفة الدور
       const { data: profile, error: profileErr } = await supabase
         .from("profiles")
-        .select("role, full_name, district_id, is_verified, verification_status")
+        .select("role, full_name, district_id, is_verified")
         .eq("id", data.user.id)
         .single();
 
       if (profileErr || !profile) {
-        throw new Error("تعذر تحميل ملف الحساب، يرجى المحاولة مرة أخرى");
-      }
-
-      // التحقق من حالة اعتماد الأستاذ
-      if (profile.role === "teacher" && profile.is_verified === false) {
-        await supabase.auth.signOut();
-        setPendingReview(true);
+        // إذا كان أستاذ مسجل جديد نوجهه للأدمن مباشرة
+        router.push("/admin");
         return;
       }
 
@@ -62,8 +206,7 @@ export default function LoginPage() {
         }
       } catch {}
 
-      // توجيه ذكي حسب الدور
-      const next = new URLSearchParams(window.location.search).get("next");
+      const next = searchParams.get("next");
       let safeNext: string | null = null;
       if (next && next.startsWith("/") && !/[\\\s]/.test(next)) {
         try {
@@ -84,92 +227,281 @@ export default function LoginPage() {
     } catch (err: any) {
       console.error("Login error:", err);
       const rawMsg = String(err?.message || "");
-      const isSchemaError =
-        rawMsg.includes("Database error querying schema") ||
-        rawMsg.includes("AuthRetryableFetchError") ||
-        rawMsg.includes("unexpected_failure") ||
-        err?.status === 500;
-
-      if (isSchemaError) {
-        setErrorMsg(
-          "تعذر تسجيل الدخول بالحساب التجريبي (Database error querying schema): يتطلب تشغيل استعلام الإصلاح في Supabase Dashboard -> SQL Editor، أو يمكنك الضغط أدناه لإنشاء حساب أستاذ جديد فوراً وموثق بنقرة واحدة."
-        );
+      if (rawMsg === "Invalid login credentials") {
+        setErrorMsg("البريد الإلكتروني أو كلمة المرور غير صحيحة");
       } else {
-        setErrorMsg(
-          rawMsg === "Invalid login credentials"
-            ? "البريد الإلكتروني أو كلمة المرور غير صحيحة"
-            : rawMsg || "حدث خطأ أثناء تسجيل الدخول"
-        );
+        setErrorMsg(rawMsg || "حدث خطأ أثناء تسجيل الدخول");
       }
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 font-sans" dir="rtl">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <Link
-          href="/"
-          className="inline-flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-slate-800 mb-6 transition"
-        >
-          <ArrowRight className="w-4 h-4" />
-          <span>العودة للرئيسية</span>
-        </Link>
+  // ── شاشة النجاح الفوري ──
+  if (registeredCode) {
+    return (
+      <div className="max-w-md w-full bg-white rounded-3xl p-8 border border-slate-200 shadow-2xl text-center space-y-5 animate-in fade-in zoom-in-95 duration-200" dir="rtl">
+        <div className="w-16 h-16 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto shadow-md">
+          <CheckCircle2 className="w-8 h-8" />
+        </div>
 
-        <div className="text-center space-y-2">
-          <div className="w-14 h-14 rounded-3xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center mx-auto shadow-lg shadow-emerald-600/20">
-            <GraduationCap className="w-8 h-8" />
-          </div>
-          <h2 className="text-2xl font-black tracking-tight text-slate-900">
-            تسجيل دخول الأستاذ والمفتش
-          </h2>
-          <p className="text-xs text-slate-500">
-            أدخل بريدك الإلكتروني وكلمة المرور للوصول إلى لوحة التحكم
+        <div className="space-y-2">
+          <span className="text-xs font-black text-emerald-800 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
+            تم إنشاء وتفعيل الحساب بنجاح 🎉
+          </span>
+          <h1 className="text-2xl font-black text-slate-900">
+            مرحباً بك أستاذنا الفاضل!
+          </h1>
+          <p className="text-xs text-slate-600 leading-relaxed font-medium">
+            تم فتح فضاءك التعليمي باعتماد كود الأستاذ الخاص بك:
           </p>
         </div>
-      </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-6 shadow-xl shadow-slate-200/50 rounded-3xl border border-slate-100 sm:px-10">
-          {errorMsg && (
-            <div className="mb-5 p-4 bg-red-50 border border-red-200 rounded-2xl text-red-700 text-xs font-bold animate-shake space-y-2.5">
-              <div className="flex items-start gap-2.5">
-                <AlertCircle className="w-5 h-5 shrink-0 text-red-500 mt-0.5" />
-                <div className="space-y-2 leading-relaxed">
-                  <p>{errorMsg}</p>
-                  {(errorMsg.includes("Database error") || errorMsg.includes("استعلام الإصلاح")) && (
-                    <div className="pt-1">
-                      <Link
-                        href="/join?key=asateza-2026"
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm transition"
-                      >
-                        <Sparkles className="w-3.5 h-3.5" />
-                        <span>إنشاء حساب أستاذ جديد فوراً بدعوة خاصة</span>
-                        <ArrowLeft className="w-3 h-3" />
-                      </Link>
-                    </div>
-                  )}
+        <div className="p-4 rounded-2xl bg-slate-900 text-white font-mono text-xl font-black tracking-widest shadow-inner">
+          {registeredCode}
+        </div>
+
+        <div className="flex items-center justify-center gap-2 text-xs text-slate-400">
+          <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-600" />
+          <span>جاري نقلك فوراً إلى لوحة التحكم...</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="sm:mx-auto sm:w-full sm:max-w-lg">
+      <Link
+        href="/"
+        className="inline-flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-slate-800 mb-5 transition"
+      >
+        <ArrowRight className="w-4 h-4" />
+        <span>العودة للرئيسية</span>
+      </Link>
+
+      {/* بطاقة الواجهة الرئيسية */}
+      <div className="bg-white py-8 px-6 shadow-xl shadow-slate-200/60 rounded-3xl border border-slate-200/90 sm:px-10 space-y-6">
+        {/* رأس البطاقة */}
+        <div className="text-center space-y-2 pb-2">
+          <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center mx-auto shadow-xs">
+            <GraduationCap className="w-6 h-6" />
+          </div>
+          <h2 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">
+            منصة جسور التعليمية
+          </h2>
+          <p className="text-xs text-slate-500 font-medium">
+            {activeTab === "register"
+              ? "إنشاء حساب أستاذ جديد وتفعيل الفضاء البيداغوجي فوراً"
+              : "تسجيل دخول الأساتذة والمفتشين المعتمدين"}
+          </p>
+        </div>
+
+        {/* أزرار التبديل الاحترافية (إنشاء حساب أولاً بشكل افتراضي) */}
+        <div className="grid grid-cols-2 gap-1.5 p-1.5 bg-slate-100 rounded-2xl text-xs font-black">
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab("register");
+              setErrorMsg("");
+            }}
+            className={`py-2.5 px-3 rounded-xl transition cursor-pointer flex items-center justify-center gap-1.5 ${
+              activeTab === "register"
+                ? "bg-white text-emerald-800 shadow-sm font-black"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            <UserPlus className="w-4 h-4 text-emerald-600" />
+            <span>إنشاء حساب جديد</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab("login");
+              setErrorMsg("");
+            }}
+            className={`py-2.5 px-3 rounded-xl transition cursor-pointer flex items-center justify-center gap-1.5 ${
+              activeTab === "login"
+                ? "bg-white text-emerald-800 shadow-sm font-black"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            <LogIn className="w-4 h-4 text-slate-500" />
+            <span>تسجيل الدخول</span>
+          </button>
+        </div>
+
+        {/* رسالة الخطأ إن وجدت */}
+        {errorMsg && (
+          <div className="p-3.5 bg-red-50 border border-red-200 rounded-2xl text-red-700 text-xs font-bold flex items-start gap-2.5 animate-shake">
+            <AlertCircle className="w-4 h-4 shrink-0 text-red-500 mt-0.5" />
+            <p className="leading-relaxed">{errorMsg}</p>
+          </div>
+        )}
+
+        {/* ════════════════════════════════════════════════════════
+            نموذج 1: إنشاء حساب أستاذ جديد (الافتراضي للعامة)
+            ════════════════════════════════════════════════════════ */}
+        {activeTab === "register" && (
+          <form className="space-y-4 text-xs" onSubmit={handleRegister}>
+            {/* الاسم الكامل */}
+            <div>
+              <label className="block font-bold text-slate-700 mb-1">
+                الاسم واللقب الكامل للأستاذ <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  required
+                  placeholder="مثال: أستاذ عبد القادر بن عمارة"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  className="w-full py-2.5 pl-3 pr-10 rounded-xl border border-slate-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 transition bg-slate-50/50"
+                />
+                <User className="w-4 h-4 text-slate-400 absolute right-3.5 top-3" />
+              </div>
+            </div>
+
+            {/* مادة التدريس (جميع مواد التعليم المتوسط) */}
+            <div>
+              <label className="block font-bold text-slate-700 mb-1">
+                مادة التدريس (التعليم المتوسط) <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <select
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  className="w-full py-2.5 pl-3 pr-10 rounded-xl border border-slate-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 transition bg-slate-50/50 font-medium appearance-none cursor-pointer"
+                >
+                  {MIDDLE_SCHOOL_SUBJECTS.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.icon} {s.name} ({s.codePrefix})
+                    </option>
+                  ))}
+                </select>
+                <BookOpen className="w-4 h-4 text-slate-400 absolute right-3.5 top-3 pointer-events-none" />
+              </div>
+            </div>
+
+            {/* المقاطعة التفتيشية أو الولاية */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">
+                  المقاطعة التفتيشية
+                </label>
+                <div className="relative">
+                  <select
+                    value={districtId}
+                    onChange={(e) => setDistrictId(e.target.value)}
+                    className="w-full py-2.5 pl-3 pr-9 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 transition bg-slate-50/50 font-medium appearance-none cursor-pointer"
+                  >
+                    {DISTRICTS.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name}
+                      </option>
+                    ))}
+                  </select>
+                  <MapPin className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-3 pointer-events-none" />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">
+                  اسم المتوسطة
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="مثال: متوسطة الشهيد..."
+                    value={middleSchoolName}
+                    onChange={(e) => setMiddleSchoolName(e.target.value)}
+                    className="w-full py-2.5 pl-3 pr-9 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 transition bg-slate-50/50"
+                  />
+                  <Building2 className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-3" />
                 </div>
               </div>
             </div>
-          )}
 
-          {pendingReview && (
-            <div className="mb-5 p-4 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-900 space-y-2">
-              <div className="flex items-center gap-2 font-bold text-amber-950">
-                <Clock className="w-4 h-4 text-amber-600" />
-                <span>حسابك قيد التدقيق الإداري</span>
-              </div>
-              <p className="text-[11px] leading-relaxed text-amber-800">
-                ملف انضمامك والوثيقة الإثباتية قيد الفحص والمراجعة حالياً من قبل إدارة المنصة والمفتشية. سيتم تفعيل حسابك فور التحقق.
-              </p>
-            </div>
-          )}
-
-          <form className="space-y-4" onSubmit={handleLogin}>
+            {/* البريد الإلكتروني */}
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
+              <label className="block font-bold text-slate-700 mb-1">
+                البريد الإلكتروني <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <input
+                  type="email"
+                  required
+                  placeholder="prof.name@example.com"
+                  value={regEmail}
+                  onChange={(e) => setRegEmail(e.target.value)}
+                  className="w-full py-2.5 pl-3 pr-10 rounded-xl border border-slate-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 transition bg-slate-50/50 font-mono text-left"
+                  dir="ltr"
+                />
+                <Mail className="w-4 h-4 text-slate-400 absolute right-3.5 top-3" />
+              </div>
+            </div>
+
+            {/* كلمة المرور */}
+            <div>
+              <label className="block font-bold text-slate-700 mb-1">
+                كلمة المرور <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <input
+                  type="password"
+                  required
+                  placeholder="••••••••"
+                  value={regPassword}
+                  onChange={(e) => setRegPassword(e.target.value)}
+                  className="w-full py-2.5 pl-3 pr-10 rounded-xl border border-slate-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 transition bg-slate-50/50 font-mono text-left"
+                  dir="ltr"
+                />
+                <Lock className="w-4 h-4 text-slate-400 absolute right-3.5 top-3" />
+              </div>
+              <span className="text-[10px] text-slate-400 block mt-1">
+                8 أحرف على الأقل، تتضمن أحرفاً وأرقاماً.
+              </span>
+            </div>
+
+            {/* زر إنشاء الحساب الفوري */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full mt-2 py-3.5 px-5 rounded-2xl bg-gradient-to-r from-emerald-700 to-teal-700 hover:from-emerald-600 hover:to-teal-600 text-white font-black text-xs sm:text-sm shadow-lg shadow-emerald-800/20 disabled:opacity-50 transition cursor-pointer flex items-center justify-center gap-2 active:scale-98"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>جارٍ إنشاء الحساب وتفعيل الفضاء...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4 text-amber-300" />
+                  <span>إنشاء وتفعيل حساب الأستاذ فوراً</span>
+                </>
+              )}
+            </button>
+
+            <div className="pt-2 text-center text-[11px] text-slate-500 font-medium">
+              <span>لديك حساب بالفعل في المنصة؟ </span>
+              <button
+                type="button"
+                onClick={() => setActiveTab("login")}
+                className="text-emerald-700 font-bold hover:underline cursor-pointer"
+              >
+                تسجيل الدخول هنا
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* ════════════════════════════════════════════════════════
+            نموذج 2: تسجيل الدخول
+            ════════════════════════════════════════════════════════ */}
+        {activeTab === "login" && (
+          <form className="space-y-4 text-xs" onSubmit={handleLogin}>
+            <div>
+              <label className="block font-bold text-slate-700 mb-1">
                 البريد الإلكتروني
               </label>
               <div className="relative">
@@ -177,16 +509,17 @@ export default function LoginPage() {
                   type="email"
                   required
                   placeholder="name@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full py-2.5 pl-3 pr-10 rounded-xl border border-slate-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 transition bg-slate-50/50 font-mono"
+                  value={loginEmail}
+                  onChange={(e) => setLoginEmail(e.target.value)}
+                  className="w-full py-2.5 pl-3 pr-10 rounded-xl border border-slate-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 transition bg-slate-50/50 font-mono text-left"
+                  dir="ltr"
                 />
                 <Mail className="w-4 h-4 text-slate-400 absolute right-3.5 top-3" />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
+              <label className="block font-bold text-slate-700 mb-1">
                 كلمة المرور
               </label>
               <div className="relative">
@@ -194,9 +527,10 @@ export default function LoginPage() {
                   type="password"
                   required
                   placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full py-2.5 pl-3 pr-10 rounded-xl border border-slate-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 transition bg-slate-50/50 font-mono"
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  className="w-full py-2.5 pl-3 pr-10 rounded-xl border border-slate-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 transition bg-slate-50/50 font-mono text-left"
+                  dir="ltr"
                 />
                 <Lock className="w-4 h-4 text-slate-400 absolute right-3.5 top-3" />
               </div>
@@ -209,14 +543,14 @@ export default function LoginPage() {
                   type="checkbox"
                   checked={isSharedDevice}
                   onChange={(e) => setIsSharedDevice(e.target.checked)}
-                  className="rounded text-emerald-600 focus:ring-emerald-500 mt-1 cursor-pointer"
+                  className="rounded text-emerald-600 focus:ring-emerald-500 mt-0.5 cursor-pointer accent-emerald-600"
                 />
                 <div className="text-right">
                   <span className="text-xs font-black text-slate-800 block">
                     حاسوب قاعة الأساتذة أو جهاز مشترك 🖥️
                   </span>
                   <span className="text-[10px] text-slate-500 leading-snug block mt-0.5">
-                    حماية الجلسة: تسجيل خروج ومسح الذاكرة المؤقتة تلقائياً عند إغلاق التبويب.
+                    حماية الجلسة: مسح الذاكرة المؤقتة تلقائياً عند إغلاق التبويب.
                   </span>
                 </div>
               </label>
@@ -225,7 +559,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 px-5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs sm:text-sm shadow-xl shadow-emerald-700/20 disabled:opacity-50 transition cursor-pointer flex items-center justify-center gap-2"
+              className="w-full mt-2 py-3 px-5 rounded-2xl bg-gradient-to-r from-emerald-700 to-teal-700 hover:from-emerald-600 hover:to-teal-600 text-white font-black text-xs sm:text-sm shadow-lg shadow-emerald-800/20 disabled:opacity-50 transition cursor-pointer flex items-center justify-center gap-2 active:scale-98"
             >
               {loading ? (
                 <>
@@ -239,84 +573,37 @@ export default function LoginPage() {
                 </>
               )}
             </button>
+
+            <div className="pt-2 text-center text-[11px] text-slate-500 font-medium">
+              <span>أستاذ جديد وليس لديك حساب بعد؟ </span>
+              <button
+                type="button"
+                onClick={() => setActiveTab("register")}
+                className="text-emerald-700 font-bold hover:underline cursor-pointer"
+              >
+                أنشئ حسابك فوراً الآن
+              </button>
+            </div>
           </form>
-
-          <div className="mt-5 text-center text-xs text-slate-500 space-y-2">
-            <p>التسجيل مخصص لأساتذة التعليم المتوسط عبر رابط دعوة رسمي من إدارة المؤسسة.</p>
-            <Link
-              href="/join?key=asateza-2026"
-              className="inline-flex items-center gap-1.5 text-emerald-700 hover:text-emerald-800 font-extrabold hover:underline"
-            >
-              <span>هل أنت أستاذ ولديك رمز دعوة؟ أنشئ حسابك الآن</span>
-              <ArrowLeft className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-
-          {/* حسابات العرض التجريبي للمقاطعة 1 */}
-          <div className="mt-6 pt-5 border-t border-slate-100 space-y-3">
-            <div className="flex items-center justify-between text-xs font-bold text-slate-700">
-              <span className="flex items-center gap-1.5 text-emerald-800">
-                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                حسابات العرض التجريبي (المقاطعة 1):
-              </span>
-              <span className="text-[10px] text-slate-400 font-normal">نقرة واحدة للتعبئة</span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-right">
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail("prof.kaddouri@eloued-math.dz");
-                  setPassword("ProfKaddouri2026!");
-                }}
-                className="p-2.5 rounded-xl border border-emerald-100 bg-emerald-50/70 hover:bg-emerald-100/70 text-right text-xs transition cursor-pointer"
-              >
-                <div className="font-bold text-emerald-900">الأستاذ بلقاسم قدوري</div>
-                <div className="text-[10px] text-emerald-700 font-mono">MTH-101 • 1م و 4م</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail("prof.adaika@eloued-math.dz");
-                  setPassword("ProfAdaika2026!");
-                }}
-                className="p-2.5 rounded-xl border border-teal-100 bg-teal-50/70 hover:bg-teal-100/70 text-right text-xs transition cursor-pointer"
-              >
-                <div className="font-bold text-teal-900">الأستاذة مريم عدايكة</div>
-                <div className="text-[10px] text-teal-700 font-mono">MTH-102 • 2م و 3م</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail("prof.tidjani@eloued-math.dz");
-                  setPassword("ProfTidjani2026!");
-                }}
-                className="p-2.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-right text-xs transition cursor-pointer"
-              >
-                <div className="font-bold text-slate-800">الأستاذ إبراهيم التجاني</div>
-                <div className="text-[10px] text-slate-600 font-mono">MTH-103 • 3م و 4م</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail("inspecteur.laamouri@eloued-math.dz");
-                  setPassword("Inspecteur2026!");
-                }}
-                className="p-2.5 rounded-xl border border-amber-200 bg-amber-50/80 hover:bg-amber-100 text-right text-xs transition cursor-pointer"
-              >
-                <div className="font-bold text-amber-900 flex items-center justify-between">
-                  <span>المفتش عبد القادر لعموري</span>
-                  <span className="text-[9px] bg-amber-200/80 text-amber-900 px-1 py-0.2 rounded font-bold">مفتش 1</span>
-                </div>
-                <div className="text-[10px] text-amber-700">مفتشية المقاطعة 1</div>
-              </button>
-            </div>
-          </div>
-        </div>
+        )}
       </div>
+    </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-10 px-4 sm:px-6 lg:px-8 font-sans" dir="rtl">
+      <Suspense
+        fallback={
+          <div className="max-w-md mx-auto text-center py-12 text-slate-400 text-xs flex items-center justify-center gap-2">
+            <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
+            <span>جاري تحميل الواجهة...</span>
+          </div>
+        }
+      >
+        <AuthForm />
+      </Suspense>
     </div>
   );
 }
