@@ -25,6 +25,7 @@ import {
   CheckSquare,
   Square,
   Filter,
+  ArrowRightLeft,
 } from "lucide-react";
 import { LoginRequired } from "@/components/LoginRequired";
 import { PageExplainer } from "@/components/PageExplainer";
@@ -83,6 +84,10 @@ export default function StudentsManagementPage() {
   // نوافذ إضافة وتعديل
   const [isClassModalOpen, setIsClassModalOpen] = useState(false);
   const [newClassName, setNewClassName] = useState("");
+  const [isMoveClassModalOpen, setIsMoveClassModalOpen] = useState(false);
+  const [targetClassForMove, setTargetClassForMove] = useState("");
+  const [customTargetClassInput, setCustomTargetClassInput] = useState("");
+  const [deleteSourceClassAfterMove, setDeleteSourceClassAfterMove] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   // تحميل أولي فوري بدون أي تأخير (0ms) من التخزين المحلي، وجلب متوازٍ في الخلفية
@@ -240,14 +245,14 @@ export default function StudentsManagementPage() {
 
   // قفل تمرير الصفحة خلف النوافذ المنبثقة
   useEffect(() => {
-    if (isClassModalOpen) {
+    if (isClassModalOpen || isMoveClassModalOpen) {
       const orig = document.body.style.overflow;
       document.body.style.overflow = "hidden";
       return () => {
         document.body.style.overflow = orig;
       };
     }
-  }, [isClassModalOpen]);
+  }, [isClassModalOpen, isMoveClassModalOpen]);
 
   // حفظ البيانات وتحديث التخزين المحلي
   const persistChanges = async (newStudents: StudentRosterItem[], newClasses: string[]) => {
@@ -586,6 +591,138 @@ export default function StudentsManagementPage() {
     }
   };
 
+  // نقل جميع تلاميذ الفوج الحالي إلى فوج آخر (حل مشكلة الإدخال في الفوج الخطأ مثل 2م3 إلى 1م3)
+  const handleMoveEntireClass = async () => {
+    const rawTarget = targetClassForMove === "__new__" ? customTargetClassInput : targetClassForMove;
+    const finalTarget = rawTarget.trim().replace(/\s+/g, "");
+
+    if (!finalTarget) {
+      setMessage({ type: "err", text: "يرجى تحديد الفوج المراد النقل إليه أو كتابة اسم فوج جديد" });
+      return;
+    }
+
+    if (finalTarget === selectedClass) {
+      setMessage({ type: "err", text: "الفوج المراد النقل إليه هو نفس الفوج الحالي!" });
+      return;
+    }
+
+    let updatedClasses = customClasses.includes(finalTarget)
+      ? [...customClasses]
+      : [...customClasses, finalTarget];
+
+    if (deleteSourceClassAfterMove) {
+      updatedClasses = updatedClasses.filter((c) => c !== selectedClass);
+    }
+
+    let updatedStudents = [...students];
+
+    if (isGridMode) {
+      // نقل الأسطر الحالية الموجودة في الجدول بما فيها التعديلات المفتوحة
+      const validGridRows = gridRows.filter((r) => r.studentName.trim() !== "");
+      // استبعاد تلاميذ هذا الفوج من المصفوفة القديمة
+      updatedStudents = updatedStudents.filter((s) => s.className !== selectedClass);
+      // إضافة تلاميذ الجدول بالفوج الجديد
+      const transferredGridStudents: StudentRosterItem[] = validGridRows.map((r, idx) => ({
+        id: r.id.startsWith("new-") ? `std-${Date.now()}-${idx}` : r.id,
+        studentName: r.studentName.trim(),
+        className: finalTarget,
+        gender: r.gender,
+        groupName: r.groupName,
+        isRepeater: r.isRepeater,
+        parentPhone: r.parentPhone.trim(),
+        notes: r.notes.trim(),
+      }));
+      updatedStudents = [...updatedStudents, ...transferredGridStudents];
+
+      // إعداد أسطر الجدول للفوج الجديد
+      const newClassStudents = updatedStudents.filter((s) => s.className === finalTarget);
+      setGridRows([
+        ...newClassStudents.map((s) => ({
+          id: s.id,
+          studentName: s.studentName,
+          gender: s.gender || "ذكر",
+          groupName: (s.groupName === "فوج 2" ? "فوج 2" : "فوج 1") as "فوج 1" | "فوج 2",
+          isRepeater: Boolean(s.isRepeater),
+          parentPhone: s.parentPhone || "",
+          notes: s.notes || "",
+        })),
+        createEmptyRow(undefined, "فوج 1"),
+        createEmptyRow(undefined, "فوج 2"),
+      ]);
+    } else {
+      updatedStudents = updatedStudents.map((s) =>
+        s.className === selectedClass ? { ...s, className: finalTarget } : s
+      );
+    }
+
+    setStudents(updatedStudents);
+    setCustomClasses(updatedClasses);
+    setSelectedClass(finalTarget);
+    setIsMoveClassModalOpen(false);
+    setSelectedIds(new Set());
+
+    await persistChanges(updatedStudents, updatedClasses);
+    setMessage({
+      type: "ok",
+      text: `تم نقل جميع تلاميذ الفوج بنجاح إلى "${finalTarget}"! 🎉`,
+    });
+  };
+
+  // نقل التلاميذ المحددين إلى فوج آخر
+  const handleBulkMoveToClass = async (targetCls: string) => {
+    const finalTarget = targetCls.trim().replace(/\s+/g, "");
+    if (selectedIds.size === 0 || !finalTarget) return;
+    if (finalTarget === selectedClass) {
+      setMessage({ type: "err", text: "التلاميذ موجودون بالفعل في هذا الفوج" });
+      return;
+    }
+
+    const updatedClasses = customClasses.includes(finalTarget)
+      ? [...customClasses]
+      : [...customClasses, finalTarget];
+
+    let updatedStudents = [...students];
+    const count = selectedIds.size;
+
+    if (isGridMode) {
+      const movingRows = gridRows.filter((r) => selectedIds.has(r.id) && r.studentName.trim() !== "");
+      const remainingRows = gridRows.filter((r) => !selectedIds.has(r.id));
+
+      updatedStudents = updatedStudents.filter((s) => !selectedIds.has(s.id));
+      const movedStudents: StudentRosterItem[] = movingRows.map((r, idx) => ({
+        id: r.id.startsWith("new-") ? `std-${Date.now()}-${idx}` : r.id,
+        studentName: r.studentName.trim(),
+        className: finalTarget,
+        gender: r.gender,
+        groupName: r.groupName,
+        isRepeater: r.isRepeater,
+        parentPhone: r.parentPhone.trim(),
+        notes: r.notes.trim(),
+      }));
+      updatedStudents = [...updatedStudents, ...movedStudents];
+
+      setGridRows(
+        remainingRows.length > 0
+          ? remainingRows
+          : [createEmptyRow(undefined, "فوج 1"), createEmptyRow(undefined, "فوج 2")]
+      );
+    } else {
+      updatedStudents = updatedStudents.map((s) =>
+        selectedIds.has(s.id) ? { ...s, className: finalTarget } : s
+      );
+    }
+
+    setStudents(updatedStudents);
+    setCustomClasses(updatedClasses);
+    setSelectedIds(new Set());
+    await persistChanges(updatedStudents, updatedClasses);
+
+    setMessage({
+      type: "ok",
+      text: `تم نقل (${count}) تلميذ إلى فوج "${finalTarget}" بنجاح ✨`,
+    });
+  };
+
   // حذف تلميذ فردي في وضع العرض
   const handleDeleteStudent = async (id: string, name: string) => {
     if (!confirm(`هل أنت متأكد من حذف التلميذ "${name}" من القائمة؟`)) return;
@@ -898,6 +1035,23 @@ export default function StudentsManagementPage() {
             <div className="flex items-center gap-2 shrink-0">
               {selectedClass !== "all" && selectedClass && (
                 <>
+                  {/* زر نقل جميع تلاميذ الفوج لقسم آخر */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const other = customClasses.find((c) => c !== selectedClass) || "";
+                      setTargetClassForMove(other);
+                      setCustomTargetClassInput("");
+                      setDeleteSourceClassAfterMove(false);
+                      setIsMoveClassModalOpen(true);
+                    }}
+                    className="px-3.5 py-2 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-[#107a57] text-xs font-black transition flex items-center gap-1.5 cursor-pointer shadow-2xs active:scale-95"
+                    title="نقل جميع تلاميذ هذا الفوج إلى فوج آخر بنقرة واحدة (مثال: من 2م3 إلى 1م3)"
+                  >
+                    <ArrowRightLeft className="w-3.5 h-3.5" />
+                    <span>نقل الفوج لقسم آخر 🔄</span>
+                  </button>
+
                   {isGridMode ? (
                     <div className="flex items-center gap-2">
                       {activeClassStudents.length > 0 && (
@@ -1120,6 +1274,33 @@ export default function StudentsManagementPage() {
                 >
                   <span>تعيين كـ جديد</span>
                 </button>
+
+                {/* نقل المحددين إلى فوج آخر */}
+                {customClasses.length > 1 && (
+                  <div className="flex items-center gap-1.5 bg-white/10 px-2.5 py-1 rounded-xl border border-white/15">
+                    <ArrowRightLeft className="w-3.5 h-3.5 text-emerald-300" />
+                    <span className="text-[11px] font-bold text-gray-200">نقل المحددين إلى:</span>
+                    <select
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          handleBulkMoveToClass(e.target.value);
+                          e.target.value = "";
+                        }
+                      }}
+                      defaultValue=""
+                      className="bg-slate-800 text-white text-xs font-bold rounded-lg px-2 py-1 border border-white/20 focus:outline-none focus:ring-1 focus:ring-emerald-400 cursor-pointer"
+                    >
+                      <option value="" disabled>اختر الفوج...</option>
+                      {customClasses
+                        .filter((c) => c !== selectedClass)
+                        .map((cls) => (
+                          <option key={cls} value={cls}>
+                            فوج {cls}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                )}
 
                 {/* حذف جماعي */}
                 <button
@@ -1619,6 +1800,112 @@ export default function StudentsManagementPage() {
                   className="w-full py-2 rounded-xl bg-gray-100 text-xs font-bold text-gray-700 hover:bg-gray-200 cursor-pointer"
                 >
                   إغلاق
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+
+        {/* ─── Modal نقل جميع تلاميذ الفوج إلى قسم آخر ─── */}
+        {mounted && isMoveClassModalOpen && createPortal(
+          <div className="fixed inset-0 z-[999999] bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150" dir="rtl">
+            <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full border border-slate-200 shadow-2xl space-y-5 my-auto max-h-[92vh] flex flex-col overflow-y-auto animate-in zoom-in-95 duration-150">
+              <div className="flex items-center justify-between border-b border-[#e8e8e0] pb-3 shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-100 text-[#107a57] flex items-center justify-center">
+                    <ArrowRightLeft className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-gray-900">نقل تلاميذ الفوج ({selectedClass})</h3>
+                    <p className="text-[11px] text-gray-500">نقل سريع وفوري لجميع تلاميذ هذا القسم دفعة واحدة</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsMoveClassModalOpen(false)}
+                  className="p-1.5 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="p-3.5 bg-emerald-50/90 rounded-2xl border border-emerald-100 text-xs text-emerald-950 space-y-1">
+                <p className="font-bold">
+                  سيتم نقل جميع تلاميذ الفوج الحالي <strong>{selectedClass}</strong> ({isGridMode ? gridRows.filter((r) => r.studentName.trim()).length : students.filter((s) => s.className === selectedClass).length} تلميذ) إلى الفوج الذي تختاره بالأسفل.
+                </p>
+                <p className="text-[11px] text-emerald-800">
+                  حل مباشر إذا كنت قد كتبت أو استوردت التلاميذ بالخطأ في قسم آخر (مثل 2م3 بدلاً من 1م3).
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-black text-gray-800 mb-1.5">
+                    اختر الفوج الهدف المراد النقل إليه:
+                  </label>
+                  <select
+                    value={targetClassForMove}
+                    onChange={(e) => setTargetClassForMove(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl bg-[#fafaf7] border border-[#e8e8e0] text-xs font-bold text-gray-900 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#107a57]/20 focus:border-[#107a57] cursor-pointer"
+                  >
+                    <option value="" disabled>-- حدد الفوج من القائمة --</option>
+                    {customClasses
+                      .filter((c) => c !== selectedClass)
+                      .map((cls) => (
+                        <option key={cls} value={cls}>
+                          فوج {cls}
+                        </option>
+                      ))}
+                    <option value="__new__">➕ كتابة اسم فوج جديد (مثل: 1م3)...</option>
+                  </select>
+                </div>
+
+                {targetClassForMove === "__new__" && (
+                  <div className="space-y-1.5 animate-in fade-in duration-150">
+                    <label className="block text-xs font-black text-gray-800">
+                      اسم الفوج الجديد:
+                    </label>
+                    <input
+                      type="text"
+                      value={customTargetClassInput}
+                      onChange={(e) => setCustomTargetClassInput(e.target.value)}
+                      placeholder="مثال: 1م3 أو 3م2"
+                      className="w-full px-3 py-2 rounded-xl bg-white border border-emerald-300 text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#107a57]/30"
+                      autoFocus
+                    />
+                  </div>
+                )}
+
+                <div className="p-3 bg-amber-50 rounded-xl border border-amber-200">
+                  <label className="flex items-start gap-2.5 text-xs text-amber-900 font-bold cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={deleteSourceClassAfterMove}
+                      onChange={(e) => setDeleteSourceClassAfterMove(e.target.checked)}
+                      className="mt-0.5 rounded text-[#107a57] focus:ring-[#107a57] cursor-pointer"
+                    />
+                    <span>
+                      حذف الفوج القديم (<strong>{selectedClass}</strong>) بعد النقل نهائياً من قائمتك (مفيد إذا أنشأته بالخطأ)
+                    </span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="pt-2 flex items-center gap-2 border-t border-[#e8e8e0] shrink-0">
+                <button
+                  type="button"
+                  onClick={handleMoveEntireClass}
+                  className="btn-primary flex-1 py-2.5 text-xs font-black flex items-center justify-center gap-2 cursor-pointer shadow-md active:scale-95"
+                >
+                  <ArrowRightLeft className="w-4 h-4" />
+                  <span>تأكيد النقل الآن 🚀</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsMoveClassModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl bg-gray-100 text-xs font-bold text-gray-700 hover:bg-gray-200 transition cursor-pointer"
+                >
+                  إلغاء
                 </button>
               </div>
             </div>
