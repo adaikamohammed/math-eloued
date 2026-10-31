@@ -313,6 +313,93 @@ export default function StudentsManagementPage() {
     });
   };
 
+  // التنقل الذكي بالكيبورد في شبكة التلاميذ مثل Excel (الأسهم و Enter و Space)
+  const handleGridKeyDown = (
+    e: React.KeyboardEvent<HTMLInputElement | HTMLSelectElement>,
+    rowIdx: number,
+    colIdx: number
+  ) => {
+    const totalRows = filteredGridRows.length;
+    const totalCols = 6;
+    const isSelect = e.currentTarget instanceof HTMLSelectElement;
+
+    // مسافة (Space) على القوائم المنسدلة لتبديل الخيار مباشرة
+    if (e.key === " " && isSelect) {
+      e.preventDefault();
+      if (colIdx === 1) {
+        const cur = filteredGridRows[rowIdx]?.gender || "ذكر";
+        handleUpdateRow(rowIdx, "gender", cur === "ذكر" ? "أنثى" : "ذكر");
+      } else if (colIdx === 2) {
+        const cur = filteredGridRows[rowIdx]?.groupName || "فوج 1";
+        handleUpdateRow(rowIdx, "groupName", cur === "فوج 1" ? "فوج 2" : "فوج 1");
+      } else if (colIdx === 3) {
+        const cur = Boolean(filteredGridRows[rowIdx]?.isRepeater);
+        handleUpdateRow(rowIdx, "isRepeater", !cur);
+      }
+      return;
+    }
+
+    // 1. النزول للطالب الموالي (ArrowDown أو Enter)
+    if (e.key === "ArrowDown" || e.key === "Enter") {
+      e.preventDefault();
+      if (rowIdx < totalRows - 1) {
+        const nextElem = document.getElementById(`student-grid-${rowIdx + 1}-${colIdx}`);
+        nextElem?.focus();
+        if (nextElem instanceof HTMLInputElement) nextElem.select();
+      } else {
+        // عند آخر طالب: إضافة سطر جديد تلقائياً والتركيز عليه
+        handleAddRow();
+        setTimeout(() => {
+          const newElem = document.getElementById(`student-grid-${rowIdx + 1}-${colIdx}`);
+          newElem?.focus();
+          if (newElem instanceof HTMLInputElement) newElem.select();
+        }, 50);
+      }
+      return;
+    }
+
+    // 2. الصعود للطالب السابق (ArrowUp)
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (rowIdx > 0) {
+        const prevElem = document.getElementById(`student-grid-${rowIdx - 1}-${colIdx}`);
+        prevElem?.focus();
+        if (prevElem instanceof HTMLInputElement) prevElem.select();
+      }
+      return;
+    }
+
+    // 3. الانتقال يساراً إلى الخلية التالية في السطر (ArrowLeft في واجهة RTL)
+    if (e.key === "ArrowLeft") {
+      const target = e.currentTarget;
+      const isInput = target instanceof HTMLInputElement;
+      const atEdge = isInput ? target.selectionEnd === target.value.length : true;
+
+      if (atEdge && colIdx < totalCols - 1) {
+        e.preventDefault();
+        const nextColElem = document.getElementById(`student-grid-${rowIdx}-${colIdx + 1}`);
+        nextColElem?.focus();
+        if (nextColElem instanceof HTMLInputElement) nextColElem.select();
+      }
+      return;
+    }
+
+    // 4. الانتقال يميناً إلى الخلية السابقة في السطر (ArrowRight في واجهة RTL)
+    if (e.key === "ArrowRight") {
+      const target = e.currentTarget;
+      const isInput = target instanceof HTMLInputElement;
+      const atEdge = isInput ? target.selectionStart === 0 : true;
+
+      if (atEdge && colIdx > 0) {
+        e.preventDefault();
+        const prevColElem = document.getElementById(`student-grid-${rowIdx}-${colIdx - 1}`);
+        prevColElem?.focus();
+        if (prevColElem instanceof HTMLInputElement) prevColElem.select();
+      }
+      return;
+    }
+  };
+
   // ترتيب أسطر الجدول أبجدياً
   const handleSortGridRows = () => {
     setGridRows((prev) => {
@@ -1060,6 +1147,19 @@ export default function StudentsManagementPage() {
           {/* ─── 1. وضع جدول الإدخال التفاعلي المباشر (Inline Editable Grid) ─── */}
           {selectedClass !== "all" && isGridMode ? (
             <div>
+              {/* شريط توجيه للكيبورد مثل Excel */}
+              <div className="bg-emerald-50/80 border-b border-emerald-100 px-4 py-2 flex flex-wrap items-center justify-between gap-2 text-[11px] text-emerald-950 font-bold">
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="text-sm">⌨️</span>
+                  <span>
+                    <strong>تنقل ذكي بالكيبورد (مثل Excel):</strong> استخدم أسهم الكيبورد (<strong>↑ ↓</strong>) للانتقال المباشر بين التلاميذ، و (<strong>← →</strong>) بين الخانات، و <strong>Enter</strong> للنزول مباشرة، و <strong>مسافة</strong> لتبديل الفوج/الجنس/معيد.
+                  </span>
+                </span>
+                <span className="text-[10px] text-emerald-800 bg-white px-2.5 py-0.5 rounded-full border border-emerald-200 font-black shadow-2xs">
+                  إدخال سريع بدون فأرة ⚡
+                </span>
+              </div>
+
               <div className="overflow-x-auto">
                 <table className="w-full text-right border-collapse min-w-[780px]">
                   <thead>
@@ -1115,33 +1215,29 @@ export default function StudentsManagementPage() {
                             {idx + 1}
                           </td>
 
-                          {/* الاسم واللقب الكامل */}
+                          {/* الاسم واللقب الكامل (Col 0) */}
                           <td className="py-2 px-3">
                             <input
+                              id={`student-grid-${idx}-0`}
                               type="text"
                               value={row.studentName}
                               onChange={(e) => handleUpdateRow(idx, "studentName", e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  e.preventDefault();
-                                  if (idx === gridRows.length - 1) {
-                                    handleAddRow();
-                                  }
-                                }
-                              }}
+                              onKeyDown={(e) => handleGridKeyDown(e, idx, 0)}
                               placeholder={`اسم ولقب التلميذ رقم ${idx + 1}...`}
-                              className="w-full px-3 py-1.5 rounded-lg bg-white border border-[#e8e8e0] text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#107a57]/30 focus:border-[#107a57]"
+                              className="w-full px-3 py-1.5 rounded-lg bg-white border border-[#e8e8e0] text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#107a57]/30 focus:border-[#107a57] transition"
                             />
                           </td>
 
-                          {/* الجنس: أزرق للذكر، وردي للبنت */}
+                          {/* الجنس: أزرق للذكر، وردي للبنت (Col 1) */}
                           <td className="py-2 px-2 text-center">
                             <select
+                              id={`student-grid-${idx}-1`}
                               value={row.gender}
                               onChange={(e) =>
                                 handleUpdateRow(idx, "gender", e.target.value as "ذكر" | "أنثى")
                               }
-                              className={`w-full px-2 py-1.5 rounded-lg border text-xs font-bold cursor-pointer text-center focus:outline-none focus:ring-2 ${
+                              onKeyDown={(e) => handleGridKeyDown(e, idx, 1)}
+                              className={`w-full px-2 py-1.5 rounded-lg border text-xs font-bold cursor-pointer text-center focus:outline-none focus:ring-2 transition ${
                                 row.gender === "أنثى"
                                   ? "bg-pink-50 text-pink-800 border-pink-300 focus:ring-pink-300"
                                   : "bg-blue-50 text-blue-800 border-blue-300 focus:ring-blue-300"
@@ -1152,14 +1248,16 @@ export default function StudentsManagementPage() {
                             </select>
                           </td>
 
-                          {/* الفوج: بنفسجي لفوج 1، عنبري لفوج 2 */}
+                          {/* الفوج: بنفسجي لفوج 1، عنبري لفوج 2 (Col 2) */}
                           <td className="py-2 px-2 text-center">
                             <select
+                              id={`student-grid-${idx}-2`}
                               value={row.groupName}
                               onChange={(e) =>
                                 handleUpdateRow(idx, "groupName", e.target.value as "فوج 1" | "فوج 2")
                               }
-                              className={`w-full px-2 py-1.5 rounded-lg border text-xs font-black cursor-pointer text-center focus:outline-none focus:ring-2 ${
+                              onKeyDown={(e) => handleGridKeyDown(e, idx, 2)}
+                              className={`w-full px-2 py-1.5 rounded-lg border text-xs font-black cursor-pointer text-center focus:outline-none focus:ring-2 transition ${
                                 row.groupName === "فوج 2"
                                   ? "bg-amber-50 text-amber-950 border-amber-300 focus:ring-amber-300"
                                   : "bg-purple-50 text-purple-900 border-purple-300 focus:ring-purple-300"
@@ -1170,14 +1268,16 @@ export default function StudentsManagementPage() {
                             </select>
                           </td>
 
-                          {/* معيد: أحمر للمعيد، أخضر للجديد */}
+                          {/* معيد: أحمر للمعيد، أخضر للجديد (Col 3) */}
                           <td className="py-2 px-2 text-center">
                             <select
+                              id={`student-grid-${idx}-3`}
                               value={row.isRepeater ? "yes" : "no"}
                               onChange={(e) =>
                                 handleUpdateRow(idx, "isRepeater", e.target.value === "yes")
                               }
-                              className={`w-full px-2 py-1.5 rounded-lg border text-xs font-black cursor-pointer text-center focus:outline-none focus:ring-2 ${
+                              onKeyDown={(e) => handleGridKeyDown(e, idx, 3)}
+                              className={`w-full px-2 py-1.5 rounded-lg border text-xs font-black cursor-pointer text-center focus:outline-none focus:ring-2 transition ${
                                 row.isRepeater
                                   ? "bg-red-50 text-red-700 border-red-300 focus:ring-red-300"
                                   : "bg-emerald-50 text-emerald-800 border-emerald-300 focus:ring-emerald-300"
@@ -1188,25 +1288,29 @@ export default function StudentsManagementPage() {
                             </select>
                           </td>
 
-                          {/* هاتف الولي */}
+                          {/* هاتف الولي (Col 4) */}
                           <td className="py-2 px-3">
                             <input
+                              id={`student-grid-${idx}-4`}
                               type="tel"
                               value={row.parentPhone}
                               onChange={(e) => handleUpdateRow(idx, "parentPhone", e.target.value)}
+                              onKeyDown={(e) => handleGridKeyDown(e, idx, 4)}
                               placeholder="06 / 05 / 07..."
-                              className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-[#e8e8e0] text-xs font-mono text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#107a57]/30"
+                              className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-[#e8e8e0] text-xs font-mono text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#107a57]/30 transition"
                             />
                           </td>
 
-                          {/* ملاحظات الأستاذ */}
+                          {/* ملاحظات الأستاذ (Col 5) */}
                           <td className="py-2 px-3">
                             <input
+                              id={`student-grid-${idx}-5`}
                               type="text"
                               value={row.notes}
                               onChange={(e) => handleUpdateRow(idx, "notes", e.target.value)}
+                              onKeyDown={(e) => handleGridKeyDown(e, idx, 5)}
                               placeholder="ملاحظات وتوجيهات..."
-                              className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-[#e8e8e0] text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#107a57]/30"
+                              className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-[#e8e8e0] text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#107a57]/30 transition"
                             />
                           </td>
 
