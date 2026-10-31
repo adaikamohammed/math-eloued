@@ -140,7 +140,26 @@ export type InspectionRecord = {
   activityScore: number; // علامة حل النشاط والمشاركة (من 5)
   score: number; // علامة هذه المراقبة من 20 (تحسب تلقائياً)
   notes?: string; // ملاحظة سريعة للتلميذ
+  // حقول الفروض والاختبار والتقويم المخصص
+  test1Score?: number;
+  test2Score?: number;
+  examScore?: number;
+  customScores?: Record<string, number>;
 };
+
+export interface EvaluationCriterion {
+  id: string;
+  name: string;
+  maxScore: number;
+  description?: string;
+}
+
+export interface ClassEvaluationSettings {
+  testsCount: 1 | 2;
+  coefficient: number;
+  criteria: EvaluationCriterion[];
+}
+
 
 export type InspectionSession = {
   id: string;
@@ -277,6 +296,7 @@ export type LessonsData = {
   diaryEntries?: DailyDiaryEntry[];
   customNotebooks?: CustomNotebook[];
   boardNomenclature?: BoardNomenclature;
+  evaluationSettings?: Record<string, ClassEvaluationSettings>;
 };
 
 export const LEVELS = {

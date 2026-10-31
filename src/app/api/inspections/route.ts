@@ -70,7 +70,7 @@ export async function GET(req: NextRequest) {
   sessions.sort((a, b) => a.sessionNumber - b.sessionNumber);
 
   return NextResponse.json(
-    { sessions, roster },
+    { sessions, roster, evaluationSettings: data.evaluationSettings || {} },
     {
       headers: {
         "Cache-Control": "no-store, no-cache, must-revalidate",
@@ -129,6 +129,21 @@ export async function POST(req: NextRequest) {
         sessions: data.inspectionSessions,
         roster: data.studentRoster,
       });
+    }
+
+    // حفظ تخصيص إعدادات التقويم والمعامل ونظام الفروض
+    if (body.type === "saveEvaluationSettings") {
+      if (!data.evaluationSettings) data.evaluationSettings = {};
+      const { className, settings, applyToAll } = body;
+      if (applyToAll && Array.isArray(data.customClasses) && data.customClasses.length > 0) {
+        for (const cls of data.customClasses) {
+          data.evaluationSettings[cls] = settings;
+        }
+      } else if (className) {
+        data.evaluationSettings[className] = settings;
+      }
+      await saveLessonsData(ctx, data);
+      return NextResponse.json({ success: true, evaluationSettings: data.evaluationSettings });
     }
 
     // ب) تغيير فوج تلميذ محدد (بين فوج 1 وفوج 2)
@@ -342,15 +357,32 @@ export async function PUT(req: NextRequest) {
       existingRec.notes = body.notes ? String(body.notes).trim() : undefined;
     }
 
-    // إعادة حساب علامة هذه المراقبة من 20 تلقائياً
-    existingRec.score = calculateInspectionScore(
-      existingRec.lessonsDone,
-      session.totalLessons,
-      existingRec.homeworksDone,
-      session.totalHomeworks,
-      existingRec.behaviorScore,
-      existingRec.activityScore
-    );
+    if (body.test1Score !== undefined) {
+      existingRec.test1Score = body.test1Score === null || body.test1Score === "" ? undefined : Math.max(0, Math.min(20, Number(body.test1Score)));
+    }
+    if (body.test2Score !== undefined) {
+      existingRec.test2Score = body.test2Score === null || body.test2Score === "" ? undefined : Math.max(0, Math.min(20, Number(body.test2Score)));
+    }
+    if (body.examScore !== undefined) {
+      existingRec.examScore = body.examScore === null || body.examScore === "" ? undefined : Math.max(0, Math.min(20, Number(body.examScore)));
+    }
+    if (body.customScores !== undefined) {
+      existingRec.customScores = body.customScores;
+    }
+
+    if (body.score !== undefined) {
+      existingRec.score = Math.max(0, Math.min(20, Number(body.score)));
+    } else {
+      // إعادة حساب علامة هذه المراقبة من 20 تلقائياً
+      existingRec.score = calculateInspectionScore(
+        existingRec.lessonsDone,
+        session.totalLessons,
+        existingRec.homeworksDone,
+        session.totalHomeworks,
+        existingRec.behaviorScore,
+        existingRec.activityScore
+      );
+    }
 
     session.records[studentName] = existingRec;
     session.updatedAt = new Date().toISOString();
