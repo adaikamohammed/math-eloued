@@ -28,6 +28,7 @@ import {
   MessageSquare,
   Building2,
   BookMarked,
+  Smartphone,
 } from "lucide-react";
 import { useLayout } from "@/context/LayoutContext";
 import { supabase } from "@/lib/supabase";
@@ -154,6 +155,11 @@ export function DesktopSidebar() {
       const followupItems: NavItem[] = [];
 
       if (flags.continuousAssessment !== false) {
+        followupItems.push({
+          label: "دفتر التقويم المستمر الصفي 📱",
+          href: "/eval/continuous",
+          icon: Smartphone,
+        });
         followupItems.push({
           label: "سجل التنقيط والتقويم المستمر",
           href: "/eval",

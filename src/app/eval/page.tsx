@@ -57,6 +57,8 @@ import {
   HelpCircle,
   Clock,
   Layers,
+  Smartphone,
+  Lock,
 } from "lucide-react";
 
 // عبارات التوجيه والملاحظات البيداغوجية المعتمدة
@@ -97,11 +99,6 @@ export default function GradebookEvaluationPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
-  // التبويب الرئيسي: "gradebook" (جدول رصد النقاط) vs "ledger" (دفتر المتابعة والتقويم المستمر الصفي)
-  const [mainTab, setMainTab] = useState<"gradebook" | "ledger">("gradebook");
-
-  // التبويب الفرعي داخل دفتر المتابعة
-  const [ledgerSubTab, setLedgerSubTab] = useState<"bonus" | "notebook" | "homework" | "behavior" | "quiz">("bonus");
 
   // الأفواج والتلاميذ
   const [customClasses, setCustomClasses] = useState<string[]>(["1م1", "1م2", "2م3"]);
@@ -492,9 +489,9 @@ export default function GradebookEvaluationPage() {
   const handleTableKeyDown = (
     e: React.KeyboardEvent<HTMLInputElement>,
     rowIndex: number,
-    colName: "continuous" | "test1" | "exam" | "notes"
+    colName: "test1" | "exam" | "notes"
   ) => {
-    const cols: ("continuous" | "test1" | "exam" | "notes")[] = ["continuous", "test1", "exam", "notes"];
+    const cols: ("test1" | "exam" | "notes")[] = ["test1", "exam", "notes"];
     const colIdx = cols.indexOf(colName);
 
     if (e.key === "ArrowDown" || e.key === "Enter") {
@@ -550,7 +547,7 @@ export default function GradebookEvaluationPage() {
       trimester: selectedTrimester,
       students: classStudents,
       records: gradeRecords,
-      includeCriteriaBreakdown: mainTab === "ledger",
+      includeCriteriaBreakdown: false,
     });
   };
 
@@ -568,7 +565,7 @@ export default function GradebookEvaluationPage() {
       trimester: selectedTrimester,
       students: classStudents,
       records: gradeRecords,
-      includeCriteriaBreakdown: mainTab === "ledger",
+      includeCriteriaBreakdown: false,
     });
   };
 
@@ -683,6 +680,14 @@ export default function GradebookEvaluationPage() {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
+            <Link
+              href="/eval/continuous"
+              className="px-3.5 py-1.5 rounded-xl border border-emerald-400 bg-emerald-600 hover:bg-emerald-700 text-xs font-black text-white transition shadow-sm flex items-center gap-1.5"
+              title="فتح صفحة دفتر التقويم المستمر الصفي اليومي للتنقيط السريع من الهاتف"
+            >
+              <Smartphone className="w-3.5 h-3.5 text-emerald-100" />
+              <span>دفتر التقويم اليومي 📱</span>
+            </Link>
             <button
               onClick={() => setIsCharterModalOpen(true)}
               type="button"
@@ -770,56 +775,19 @@ export default function GradebookEvaluationPage() {
           </div>
         )}
 
-        {/* ─── التبويب المزدوج الرئيسي: جدول رصد النقاط vs دفتر المتابعة والتقويم المستمر ─── */}
-        <div className="bg-white rounded-3xl p-2 border border-[#e8e8e0] shadow-sm flex items-center gap-2 print:hidden">
-          <button
-            type="button"
-            onClick={() => setMainTab("gradebook")}
-            className={`flex-1 py-3 px-4 rounded-2xl text-xs sm:text-sm font-black transition cursor-pointer flex items-center justify-center gap-2 ${
-              mainTab === "gradebook"
-                ? "bg-[#107a57] text-white shadow-sm"
-                : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-            }`}
-          >
-            <Award className="w-4 h-4" />
-            <span>1. جدول رصد النقاط والمعدل الفصلي (الكشف العام) 📊</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setMainTab("ledger")}
-            className={`flex-1 py-3 px-4 rounded-2xl text-xs sm:text-sm font-black transition cursor-pointer flex items-center justify-center gap-2 ${
-              mainTab === "ledger"
-                ? "bg-indigo-700 text-white shadow-sm"
-                : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-            }`}
-          >
-            <ClipboardCheck className="w-4 h-4 text-amber-300" />
-            <span>2. دفتر المتابعة والتقويم المستمر الصفي (الحصص والأنشطة) 🎯</span>
-          </button>
-        </div>
-
         {/* ─── بطاقة الترويسة الرئيسية + اختيار الفوج والفصل والمادة ─── */}
         <div className="bg-white rounded-3xl p-5 sm:p-6 border border-[#e8e8e0] shadow-sm space-y-4 print:hidden">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100 pb-4">
             <div className="space-y-1">
               <div className="inline-flex items-center gap-2 bg-[#e6f4ee] text-[#107a57] border border-[#107a57]/20 px-3 py-0.5 rounded-full text-xs font-bold">
                 <ShieldCheck className="w-3.5 h-3.5" />
-                <span>
-                  {mainTab === "gradebook"
-                    ? "سجل المتابعة والتنقيط الرسمي المعتمد للتثبيت والترسيم"
-                    : "دفتر التدوين الصفي المستمر (الكراس، الواجبات، السلوك، والنقاط الإضافية)"}
-                </span>
+                <span>سجل المتابعة والتنقيط الرسمي المعتمد للتثبيت والترسيم</span>
               </div>
               <h1 className="text-xl font-black text-gray-900">
-                {mainTab === "gradebook"
-                  ? "جدول رصد النقاط والمعدل الفصلي للمادة"
-                  : "دفتر المتابعة والتقويم الصفي المستمر طيلة الفصل"}
+                جدول رصد النقاط والمعدل الفصلي للمادة
               </h1>
               <p className="text-xs text-gray-500 font-medium">
-                {mainTab === "gradebook"
-                  ? "رصد مرن للتقويم المستمر طيلة الفصل، إدخال علامات الفروض والاختبار، وحساب معدل المادة آلياً."
-                  : "متابعة يومية حية: تفقد الكراس، مراقبة الواجبات، السلوك، الاستجوابات، ورصيد الزيادة والنقصان الصفي المباشر."}
+                رصد علامات الفروض والاختبارات، مع استيراد تلقائي لنقاط التقويم المستمر من دفتر التقويم اليومي وحساب معدل المادة الفصلي آلياً.
               </p>
             </div>
 
@@ -868,9 +836,7 @@ export default function GradebookEvaluationPage() {
                     onClick={() => setSelectedClass(cls)}
                     className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition cursor-pointer flex items-center gap-1 ${
                       isActive
-                        ? mainTab === "gradebook"
-                          ? "bg-[#107a57] text-white shadow-sm"
-                          : "bg-indigo-700 text-white shadow-sm"
+                        ? "bg-[#107a57] text-white shadow-sm"
                         : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                     }`}
                   >
@@ -1009,10 +975,9 @@ export default function GradebookEvaluationPage() {
         </div>
 
         {/* ═══════════════════════════════════════════════════════════════════
-            التبويب 1: جدول رصد النقاط والمعدل الفصلي (الكشف العام الشامل)
+            جدول رصد النقاط والمعدل الفصلي (الكشف العام الشامل)
             ═══════════════════════════════════════════════════════════════════ */}
-        {mainTab === "gradebook" && (
-          <div className="bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden print:border-none print:shadow-none animate-in fade-in duration-200">
+        <div className="bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden print:border-none print:shadow-none animate-in fade-in duration-200">
             {filteredStudents.length === 0 ? (
               <div className="text-center py-12 px-4 space-y-3">
                 <Users className="w-10 h-10 text-gray-300 mx-auto" />
@@ -1036,8 +1001,20 @@ export default function GradebookEvaluationPage() {
                       <th className="py-3 px-3 w-10 text-center">#</th>
                       <th className="py-3 px-3 min-w-[160px]">اسم ولقب التلميذ(ة)</th>
                       <th className="py-3 px-2 w-16 text-center">الفوج</th>
-                      <th className="py-3 px-2 w-36 text-center bg-emerald-50 text-emerald-950 font-black">
-                        التقويم المستمر (20ن)
+                      <th className="py-3 px-2 w-36 text-center bg-emerald-50 text-emerald-950 font-black border-l border-emerald-100">
+                        <div className="flex flex-col items-center gap-0.5">
+                          <div className="flex items-center gap-1">
+                            <span>التقويم المستمر (20ن)</span>
+                            <span title="العلامة مستوردة آلياً من دفتر التقويم المستمر وغير قابلة للتعديل هنا">🔒</span>
+                          </div>
+                          <Link
+                            href="/eval/continuous"
+                            className="text-[10px] text-emerald-700 hover:text-emerald-900 font-bold underline decoration-dotted"
+                            title="الانتقال لدفتر التقويم الصفي لتعديل جزئيات النقاط"
+                          >
+                            (تعديل بالدفتر 📱)
+                          </Link>
+                        </div>
                       </th>
                       <th className="py-3 px-2 w-24 text-center bg-blue-50/60 text-blue-950 font-black">
                         الفرض (20ن)
@@ -1099,54 +1076,19 @@ export default function GradebookEvaluationPage() {
                             </span>
                           </td>
 
-                          {/* التقويم المستمر (20ن) مع أزرار الزيادة والنقصان ورابط التفاصيل */}
-                          <td className="py-2.5 px-2 text-center bg-emerald-50/30">
-                            <div className="inline-flex items-center gap-1">
-                              <button
-                                type="button"
-                                onClick={() => addBonusPoints(st.studentName, -0.5)}
-                                className="w-5 h-6 rounded bg-gray-100 hover:bg-rose-100 hover:text-rose-700 text-gray-600 font-bold text-xs flex items-center justify-center transition cursor-pointer select-none"
-                                title="خصم 0.5 نقطة (-0.5)"
+                          {/* التقويم المستمر (20ن) غير قابل للتعديل المباشر هنا - يأتي من دفتر التقويم المستمر */}
+                          <td className="py-2.5 px-2 text-center bg-emerald-50/30 border-l border-emerald-100">
+                            <div className="inline-flex items-center justify-center gap-1.5">
+                              <span className="font-mono font-black text-xs text-emerald-950 bg-white border border-emerald-200 px-2.5 py-1 rounded-lg shadow-2xs">
+                                {continuous !== undefined ? Number(continuous).toFixed(2) : "20.00"}
+                              </span>
+                              <Link
+                                href="/eval/continuous"
+                                className="text-slate-400 hover:text-emerald-700 p-0.5 transition"
+                                title="العلامة مستوردة آلياً من دفتر التقويم الصفي — انقر لتعديلها في صفحة التقويم"
                               >
-                                -
-                              </button>
-                              <input
-                                type="number"
-                                dir="ltr"
-                                step="0.25"
-                                min="0"
-                                max="20"
-                                data-row={idx}
-                                data-col="continuous"
-                                value={continuous}
-                                onKeyDown={(e) => handleTableKeyDown(e, idx, "continuous")}
-                                onChange={(e) => {
-                                  const val = e.target.value === "" ? 0 : parseFloat(e.target.value);
-                                  updateStudentField(st.studentName, { continuousScore: Math.min(20, Math.max(0, val)) });
-                                }}
-                                className="w-14 py-1 px-1 text-center font-mono font-black text-xs bg-white border border-emerald-300 rounded-lg focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600 shadow-2xs text-emerald-950"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => addBonusPoints(st.studentName, 0.5)}
-                                className="w-5 h-6 rounded bg-gray-100 hover:bg-emerald-100 hover:text-emerald-700 text-gray-600 font-bold text-xs flex items-center justify-center transition cursor-pointer select-none"
-                                title="إضافة 0.5 نقطة (+0.5)"
-                              >
-                                +
-                              </button>
-
-                              {/* شارة رصيد الزيادة/الخصم الصفي إن وُجد */}
-                              {bonus !== 0 && (
-                                <span
-                                  className={`text-[10px] font-mono font-bold px-1 py-0.5 rounded cursor-pointer ${
-                                    bonus > 0 ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
-                                  }`}
-                                  title={`رصيد الحصص: ${bonus > 0 ? `+${bonus}` : bonus}`}
-                                  onClick={() => setDetailStudentName(st.studentName)}
-                                >
-                                  {bonus > 0 ? `+${bonus}` : bonus}
-                                </span>
-                              )}
+                                <Smartphone className="w-3.5 h-3.5 text-emerald-600" />
+                              </Link>
                             </div>
                           </td>
 
@@ -1268,601 +1210,6 @@ export default function GradebookEvaluationPage() {
               </div>
             )}
           </div>
-        )}
-
-        {/* ═══════════════════════════════════════════════════════════════════
-            التبويب 2: دفتر المتابعة والتقويم المستمر الصفي (الحصص والأنشطة)
-            ═══════════════════════════════════════════════════════════════════ */}
-        {mainTab === "ledger" && (
-          <div className="bg-white rounded-3xl border border-gray-200 shadow-sm p-5 sm:p-6 space-y-6 animate-in fade-in duration-200">
-            {/* ألسنة التخصص داخل دفتر المتابعة الصفي */}
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-4">
-              <div className="flex items-center gap-2 flex-wrap">
-                <button
-                  type="button"
-                  onClick={() => setLedgerSubTab("bonus")}
-                  className={`px-3.5 py-2 rounded-2xl text-xs font-black transition cursor-pointer flex items-center gap-1.5 ${
-                    ledgerSubTab === "bonus"
-                      ? "bg-amber-500 text-white shadow-sm"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  }`}
-                >
-                  <Zap className="w-4 h-4" />
-                  <span>⚡ رصيد الزيادة والخصم الصفي (+ / -)</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setLedgerSubTab("notebook")}
-                  className={`px-3.5 py-2 rounded-2xl text-xs font-black transition cursor-pointer flex items-center gap-1.5 ${
-                    ledgerSubTab === "notebook"
-                      ? "bg-indigo-600 text-white shadow-sm"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  }`}
-                >
-                  <BookOpen className="w-4 h-4" />
-                  <span>📖 تفقد وتصحيح الكراريس</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setLedgerSubTab("homework")}
-                  className={`px-3.5 py-2 rounded-2xl text-xs font-black transition cursor-pointer flex items-center gap-1.5 ${
-                    ledgerSubTab === "homework"
-                      ? "bg-emerald-600 text-white shadow-sm"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  }`}
-                >
-                  <CheckCheck className="w-4 h-4" />
-                  <span>📝 مراقبة الواجبات المنزلية</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setLedgerSubTab("behavior")}
-                  className={`px-3.5 py-2 rounded-2xl text-xs font-black transition cursor-pointer flex items-center gap-1.5 ${
-                    ledgerSubTab === "behavior"
-                      ? "bg-teal-600 text-white shadow-sm"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  }`}
-                >
-                  <Users className="w-4 h-4" />
-                  <span>🙋‍♂️ السلوك والمشاركة والأدوات</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setLedgerSubTab("quiz")}
-                  className={`px-3.5 py-2 rounded-2xl text-xs font-black transition cursor-pointer flex items-center gap-1.5 ${
-                    ledgerSubTab === "quiz"
-                      ? "bg-blue-600 text-white shadow-sm"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  }`}
-                >
-                  <Award className="w-4 h-4" />
-                  <span>✍️ الاستجوابات الكتابية</span>
-                </button>
-              </div>
-
-              {/* زر تخصيص سلم التنقيط */}
-              <button
-                type="button"
-                onClick={() => setIsRubricModalOpen(true)}
-                className="px-3.5 py-2 rounded-2xl border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-900 text-xs font-black transition cursor-pointer flex items-center gap-1.5"
-              >
-                <Sliders className="w-3.5 h-3.5 text-indigo-600" />
-                <span>تخصيص سلم ومعايير التقويم ⚙️</span>
-              </button>
-            </div>
-
-            {/* ─── 1. شاشة رصيد الزيادة والخصم الصفي المباشر (+ / -) ─── */}
-            {ledgerSubTab === "bonus" && (
-              <div className="space-y-4">
-                <div className="bg-amber-50/80 border border-amber-200 p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-                  <div className="space-y-1">
-                    <strong className="text-amber-950 font-black flex items-center gap-1.5">
-                      <Zap className="w-4 h-4 text-amber-600" />
-                      <span>رصد المشاركات والمكافآت والخصومات أثناء الحصة الحية:</span>
-                    </strong>
-                    <p className="text-amber-800">
-                      اضغط على أزرار الزيادة أو الخصم بجانب اسم التلميذ، وسيتم تحديث علامة تقويمه المستمر فوراً ولحظياً في جدول النقاط العام.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {filteredStudents.map((st) => {
-                    const rec = getRecordForStudent(st.studentName);
-                    const bonus = rec.bonusPoints || 0;
-                    const continuous = rec.continuousScore ?? 20;
-
-                    return (
-                      <div
-                        key={st.studentName}
-                        className="bg-white border border-gray-200 rounded-2xl p-3.5 shadow-2xs hover:border-gray-300 transition flex flex-col justify-between gap-2.5"
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <span className="font-black text-gray-900 text-xs block">{st.studentName}</span>
-                            <span className="text-[10px] text-gray-400 font-bold">{st.groupName || "فوج 1"}</span>
-                          </div>
-
-                          <div className="text-left shrink-0">
-                            <span className="text-[10px] text-gray-400 block font-medium">التقويم الحالي:</span>
-                            <span className="text-xs font-mono font-black text-[#107a57] bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200">
-                              {continuous} / 20
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* رصيد الزيادة والنقصان الصفي */}
-                        <div className="flex items-center justify-between gap-1 pt-1 border-t border-gray-100">
-                          <div className="flex items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() => addBonusPoints(st.studentName, 1.0, "مشاركة ممتازة")}
-                              className="px-2 py-1 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-mono font-black text-xs transition cursor-pointer"
-                              title="إضافة نقطة كاملة (+1.0)"
-                            >
-                              +1
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => addBonusPoints(st.studentName, 0.5, "حل تمرين")}
-                              className="px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-mono font-bold text-xs transition cursor-pointer"
-                              title="إضافة نصف نقطة (+0.5)"
-                            >
-                              +0.5
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => addBonusPoints(st.studentName, -0.5, "تهاون")}
-                              className="px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 font-mono font-bold text-xs transition cursor-pointer"
-                              title="خصم نصف نقطة (-0.5)"
-                            >
-                              -0.5
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => addBonusPoints(st.studentName, -1.0, "إهمال الواجب")}
-                              className="px-2 py-1 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-800 font-mono font-black text-xs transition cursor-pointer"
-                              title="خصم نقطة كاملة (-1.0)"
-                            >
-                              -1
-                            </button>
-                          </div>
-
-                          <div className="text-left">
-                            <span
-                              className={`text-xs font-mono font-black px-2 py-0.5 rounded-lg ${
-                                bonus > 0
-                                  ? "bg-emerald-100 text-emerald-800"
-                                  : bonus < 0
-                                  ? "bg-rose-100 text-rose-800"
-                                  : "bg-gray-100 text-gray-500"
-                              }`}
-                              title="إجمالي رصيد الحصص"
-                            >
-                              {bonus > 0 ? `+${bonus}` : bonus}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* ─── 2. شاشة تفقد وتصحيح الكراريس ─── */}
-            {ledgerSubTab === "notebook" && (
-              <div className="space-y-4">
-                <div className="bg-indigo-50 border border-indigo-200 p-3.5 rounded-2xl text-xs space-y-1">
-                  <strong className="text-indigo-950 font-black">مراقبة كراس الدروس والمحاولات:</strong>
-                  <p className="text-indigo-800">
-                    حدد حالة كراس كل تلميذ، وسيتم ضبط علامته وحفظ الملاحظة آلياً وتحديث التقويم المستمر.
-                  </p>
-                </div>
-
-                <div className="overflow-x-auto border border-gray-200 rounded-2xl">
-                  <table className="w-full text-right text-xs">
-                    <thead>
-                      <tr className="bg-slate-50 border-b font-black text-gray-700">
-                        <th className="p-3 w-10 text-center">#</th>
-                        <th className="p-3">اسم التلميذ</th>
-                        <th className="p-3 text-center">حالة الكراس السريعة</th>
-                        <th className="p-3 text-center w-28">علامة كراس م1</th>
-                        <th className="p-3 text-center w-28">علامة كراس م2</th>
-                        <th className="p-3">ملاحظات الكراس</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {filteredStudents.map((st, idx) => {
-                        const rec = getRecordForStudent(st.studentName);
-                        return (
-                          <tr key={st.studentName} className="hover:bg-gray-50">
-                            <td className="p-3 text-center font-mono font-bold text-gray-400">{idx + 1}</td>
-                            <td className="p-3 font-bold text-gray-900">{st.studentName}</td>
-                            <td className="p-3 text-center">
-                              <div className="inline-flex items-center gap-1">
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    updateStudentField(st.studentName, {
-                                      notebook1Score: 2,
-                                      notebook2Score: 2,
-                                      notebookStatus: "complete",
-                                    })
-                                  }
-                                  className={`px-2 py-1 rounded-lg text-[11px] font-bold cursor-pointer transition ${
-                                    rec.notebookStatus === "complete"
-                                      ? "bg-emerald-600 text-white"
-                                      : "bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
-                                  }`}
-                                >
-                                  كامل ونظيف ✨
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    updateStudentField(st.studentName, {
-                                      notebook1Score: 1.5,
-                                      notebook2Score: 1.5,
-                                      notebookStatus: "incomplete",
-                                    })
-                                  }
-                                  className={`px-2 py-1 rounded-lg text-[11px] font-bold cursor-pointer transition ${
-                                    rec.notebookStatus === "incomplete"
-                                      ? "bg-amber-600 text-white"
-                                      : "bg-amber-50 text-amber-800 hover:bg-amber-100"
-                                  }`}
-                                >
-                                  ناقص دروس ⚠️
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    updateStudentField(st.studentName, {
-                                      notebook1Score: 0.5,
-                                      notebook2Score: 0.5,
-                                      notebookStatus: "blank",
-                                    })
-                                  }
-                                  className={`px-2 py-1 rounded-lg text-[11px] font-bold cursor-pointer transition ${
-                                    rec.notebookStatus === "blank"
-                                      ? "bg-rose-600 text-white"
-                                      : "bg-rose-50 text-rose-800 hover:bg-rose-100"
-                                  }`}
-                                >
-                                  بياض وإهمال ❌
-                                </button>
-                              </div>
-                            </td>
-                            <td className="p-3 text-center">
-                              <input
-                                type="number"
-                                step="0.5"
-                                min="0"
-                                max="2"
-                                value={rec.notebook1Score ?? 2}
-                                onChange={(e) =>
-                                  updateStudentField(st.studentName, { notebook1Score: parseFloat(e.target.value) || 0 })
-                                }
-                                className="w-14 py-1 text-center font-mono font-bold bg-white border border-gray-200 rounded-lg"
-                              />
-                            </td>
-                            <td className="p-3 text-center">
-                              <input
-                                type="number"
-                                step="0.5"
-                                min="0"
-                                max="2"
-                                value={rec.notebook2Score ?? 2}
-                                onChange={(e) =>
-                                  updateStudentField(st.studentName, { notebook2Score: parseFloat(e.target.value) || 0 })
-                                }
-                                className="w-14 py-1 text-center font-mono font-bold bg-white border border-gray-200 rounded-lg"
-                              />
-                            </td>
-                            <td className="p-3">
-                              <input
-                                type="text"
-                                placeholder="ملاحظة حول كراس التلميذ..."
-                                value={rec.notes || ""}
-                                onChange={(e) => updateStudentField(st.studentName, { notes: e.target.value })}
-                                className="w-full py-1 px-2 bg-white border border-gray-200 rounded-lg text-xs"
-                              />
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {/* ─── 3. شاشة مراقبة الواجبات المنزلية ─── */}
-            {ledgerSubTab === "homework" && (
-              <div className="space-y-4">
-                <div className="bg-emerald-50 border border-emerald-200 p-3.5 rounded-2xl text-xs space-y-1">
-                  <strong className="text-emerald-950 font-black">مراقبة وتسليم الواجبات المنزلية:</strong>
-                  <p className="text-emerald-800">
-                    رصد إنجاز الواجبات المنزلية والوظائف المحروسة وتدوين علامات كراس المحاولات.
-                  </p>
-                </div>
-
-                <div className="overflow-x-auto border border-gray-200 rounded-2xl">
-                  <table className="w-full text-right text-xs">
-                    <thead>
-                      <tr className="bg-slate-50 border-b font-black text-gray-700">
-                        <th className="p-3 w-10 text-center">#</th>
-                        <th className="p-3">اسم التلميذ</th>
-                        <th className="p-3 text-center">حالة الواجب الميدانية</th>
-                        <th className="p-3 text-center w-28">علامة وظيفة 1</th>
-                        <th className="p-3 text-center w-28">علامة وظيفة 2</th>
-                        <th className="p-3">ملاحظات الواجب</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {filteredStudents.map((st, idx) => {
-                        const rec = getRecordForStudent(st.studentName);
-                        return (
-                          <tr key={st.studentName} className="hover:bg-gray-50">
-                            <td className="p-3 text-center font-mono font-bold text-gray-400">{idx + 1}</td>
-                            <td className="p-3 font-bold text-gray-900">{st.studentName}</td>
-                            <td className="p-3 text-center">
-                              <div className="inline-flex items-center gap-1">
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    updateStudentField(st.studentName, {
-                                      homework1Score: 2,
-                                      homework2Score: 2,
-                                      homeworkStatus: "complete",
-                                    })
-                                  }
-                                  className={`px-2 py-1 rounded-lg text-[11px] font-bold cursor-pointer transition ${
-                                    rec.homeworkStatus === "complete"
-                                      ? "bg-emerald-600 text-white"
-                                      : "bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
-                                  }`}
-                                >
-                                  منجز بجدية ✅
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    updateStudentField(st.studentName, {
-                                      homework1Score: 1,
-                                      homework2Score: 1,
-                                      homeworkStatus: "partial",
-                                    })
-                                  }
-                                  className={`px-2 py-1 rounded-lg text-[11px] font-bold cursor-pointer transition ${
-                                    rec.homeworkStatus === "partial"
-                                      ? "bg-amber-600 text-white"
-                                      : "bg-amber-50 text-amber-800 hover:bg-amber-100"
-                                  }`}
-                                >
-                                  محاولة جزئية ⚠️
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    updateStudentField(st.studentName, {
-                                      homework1Score: 0,
-                                      homework2Score: 0,
-                                      homeworkStatus: "missing",
-                                    })
-                                  }
-                                  className={`px-2 py-1 rounded-lg text-[11px] font-bold cursor-pointer transition ${
-                                    rec.homeworkStatus === "missing"
-                                      ? "bg-rose-600 text-white"
-                                      : "bg-rose-50 text-rose-800 hover:bg-rose-100"
-                                  }`}
-                                >
-                                  لم ينجز ❌
-                                </button>
-                              </div>
-                            </td>
-                            <td className="p-3 text-center">
-                              <input
-                                type="number"
-                                step="0.5"
-                                min="0"
-                                max="2"
-                                value={rec.homework1Score ?? 2}
-                                onChange={(e) =>
-                                  updateStudentField(st.studentName, { homework1Score: parseFloat(e.target.value) || 0 })
-                                }
-                                className="w-14 py-1 text-center font-mono font-bold bg-white border border-gray-200 rounded-lg"
-                              />
-                            </td>
-                            <td className="p-3 text-center">
-                              <input
-                                type="number"
-                                step="0.5"
-                                min="0"
-                                max="2"
-                                value={rec.homework2Score ?? 2}
-                                onChange={(e) =>
-                                  updateStudentField(st.studentName, { homework2Score: parseFloat(e.target.value) || 0 })
-                                }
-                                className="w-14 py-1 text-center font-mono font-bold bg-white border border-gray-200 rounded-lg"
-                              />
-                            </td>
-                            <td className="p-3">
-                              <input
-                                type="text"
-                                placeholder="ملاحظة حول الواجب..."
-                                value={rec.notes || ""}
-                                onChange={(e) => updateStudentField(st.studentName, { notes: e.target.value })}
-                                className="w-full py-1 px-2 bg-white border border-gray-200 rounded-lg text-xs"
-                              />
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {/* ─── 4. شاشة السلوك والمشاركة وإحضار الأدوات ─── */}
-            {ledgerSubTab === "behavior" && (
-              <div className="space-y-4">
-                <div className="bg-teal-50 border border-teal-200 p-3.5 rounded-2xl text-xs space-y-1">
-                  <strong className="text-teal-950 font-black">السلوك والانضباط والمشاركة وإحضار الأدوات:</strong>
-                  <p className="text-teal-800">
-                    تقييم السلوك الصفي، الحضور، إحضار الأدوات الهندسية والكتاب، والمشاركة الفعالة على السبورة.
-                  </p>
-                </div>
-
-                <div className="overflow-x-auto border border-gray-200 rounded-2xl">
-                  <table className="w-full text-right text-xs">
-                    <thead>
-                      <tr className="bg-slate-50 border-b font-black text-gray-700">
-                        <th className="p-3 w-10 text-center">#</th>
-                        <th className="p-3">اسم التلميذ</th>
-                        <th className="p-3 text-center w-36">علامة السلوك والمشاركة (من 4)</th>
-                        <th className="p-3">توجيه وملاحظة السلوك</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {filteredStudents.map((st, idx) => {
-                        const rec = getRecordForStudent(st.studentName);
-                        return (
-                          <tr key={st.studentName} className="hover:bg-gray-50">
-                            <td className="p-3 text-center font-mono font-bold text-gray-400">{idx + 1}</td>
-                            <td className="p-3 font-bold text-gray-900">{st.studentName}</td>
-                            <td className="p-3 text-center">
-                              <div className="inline-flex items-center gap-1.5">
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    updateStudentField(st.studentName, {
-                                      behaviorScore: Math.max(0, (rec.behaviorScore ?? 4) - 0.5),
-                                    })
-                                  }
-                                  className="w-6 h-6 rounded bg-gray-100 hover:bg-gray-200 font-bold"
-                                >
-                                  -
-                                </button>
-                                <input
-                                  type="number"
-                                  step="0.5"
-                                  min="0"
-                                  max="4"
-                                  value={rec.behaviorScore ?? 4}
-                                  onChange={(e) =>
-                                    updateStudentField(st.studentName, { behaviorScore: parseFloat(e.target.value) || 0 })
-                                  }
-                                  className="w-14 py-1 text-center font-mono font-bold bg-white border border-gray-200 rounded-lg text-teal-950"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    updateStudentField(st.studentName, {
-                                      behaviorScore: Math.min(4, (rec.behaviorScore ?? 4) + 0.5),
-                                    })
-                                  }
-                                  className="w-6 h-6 rounded bg-gray-100 hover:bg-gray-200 font-bold"
-                                >
-                                  +
-                                </button>
-                              </div>
-                            </td>
-                            <td className="p-3">
-                              <input
-                                type="text"
-                                placeholder="ملاحظة حول سلوك التلميذ..."
-                                value={rec.notes || ""}
-                                onChange={(e) => updateStudentField(st.studentName, { notes: e.target.value })}
-                                className="w-full py-1 px-2 bg-white border border-gray-200 rounded-lg text-xs"
-                              />
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {/* ─── 5. شاشة الاستجوابات الكتابية الدورية ─── */}
-            {ledgerSubTab === "quiz" && (
-              <div className="space-y-4">
-                <div className="bg-blue-50 border border-blue-200 p-3.5 rounded-2xl text-xs space-y-1">
-                  <strong className="text-blue-950 font-black">الاستجوابات الكتابية الدورية السريعة:</strong>
-                  <p className="text-blue-800">
-                    رصد علامات الاستجوابات الكتابية (استجواب 1 واستجواب 2) خلال الفصل.
-                  </p>
-                </div>
-
-                <div className="overflow-x-auto border border-gray-200 rounded-2xl">
-                  <table className="w-full text-right text-xs">
-                    <thead>
-                      <tr className="bg-slate-50 border-b font-black text-gray-700">
-                        <th className="p-3 w-10 text-center">#</th>
-                        <th className="p-3">اسم التلميذ</th>
-                        <th className="p-3 text-center w-36">استجواب 1 (من 4ن)</th>
-                        <th className="p-3 text-center w-36">استجواب 2 (من 4ن)</th>
-                        <th className="p-3 text-center w-28 bg-emerald-50">مجموع الاستجوابات</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {filteredStudents.map((st, idx) => {
-                        const rec = getRecordForStudent(st.studentName);
-                        const q1 = rec.quiz1Score ?? 4;
-                        const q2 = rec.quiz2Score ?? 4;
-                        return (
-                          <tr key={st.studentName} className="hover:bg-gray-50">
-                            <td className="p-3 text-center font-mono font-bold text-gray-400">{idx + 1}</td>
-                            <td className="p-3 font-bold text-gray-900">{st.studentName}</td>
-                            <td className="p-3 text-center">
-                              <input
-                                type="number"
-                                step="0.5"
-                                min="0"
-                                max="4"
-                                value={q1}
-                                onChange={(e) =>
-                                  updateStudentField(st.studentName, { quiz1Score: parseFloat(e.target.value) || 0 })
-                                }
-                                className="w-16 py-1 text-center font-mono font-bold bg-white border border-blue-200 rounded-lg text-blue-950"
-                              />
-                            </td>
-                            <td className="p-3 text-center">
-                              <input
-                                type="number"
-                                step="0.5"
-                                min="0"
-                                max="4"
-                                value={q2}
-                                onChange={(e) =>
-                                  updateStudentField(st.studentName, { quiz2Score: parseFloat(e.target.value) || 0 })
-                                }
-                                className="w-16 py-1 text-center font-mono font-bold bg-white border border-blue-200 rounded-lg text-blue-950"
-                              />
-                            </td>
-                            <td className="p-3 text-center bg-emerald-50/50">
-                              <span className="font-mono font-black text-emerald-900 bg-emerald-100 px-2.5 py-0.5 rounded-lg">
-                                {(q1 + q2).toFixed(1)} / 8
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
 
         {/* ─── زر حفظ التغييرات العائم في أسفل الصفحة ─── */}
         {hasUnsavedChanges && (
