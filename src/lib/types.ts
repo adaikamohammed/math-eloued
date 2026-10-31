@@ -409,6 +409,43 @@ export function getLevelFromClassName(className: string): number {
   return 1;
 }
 
+// معايير التقويم المستمر
+export type ContinuousCriterion = {
+  id: string;
+  name: string;
+  maxScore: number;
+  icon?: string;
+  description?: string;
+};
+
+export type ContinuousEvalRubricType = "official_ministerial" | "equal_four" | "custom";
+
+export type ContinuousEvalConfig = {
+  rubricType: ContinuousEvalRubricType;
+  totalMax: number; // 20
+  criteria: ContinuousCriterion[];
+  allowBonusPoints: boolean;
+};
+
+// المعايير الوزارية الرسمية المعتمدة
+export const OFFICIAL_MINISTERIAL_CRITERIA: ContinuousCriterion[] = [
+  { id: "c_beh", name: "الانضباط والسلوك والمشاركة الصفية", maxScore: 4, icon: "🙋‍♂️", description: "الحضور المنتظم، إحضار الأدوات والكتاب، والمشاركة الإيجابية في بناء الدرس." },
+  { id: "c_nb1", name: "كراس التلميذ: المقطع 1", maxScore: 2, icon: "📖", description: "نظافة الكراس واكتمال الدروس وتدوين الأنشطة." },
+  { id: "c_nb2", name: "كراس التلميذ: المقطع 2", maxScore: 2, icon: "📖", description: "اكتمال الدروس وخلوه من البياض والاعتناء بالأشكال الهندسية." },
+  { id: "c_hw1", name: "الوظائف المنزلية: وظيفة 1", maxScore: 2, icon: "📝", description: "تسليم الوظيفة في موعدها والجدية في المحاولات الفردية." },
+  { id: "c_hw2", name: "الوظائف المنزلية: وظيفة 2", maxScore: 2, icon: "📝", description: "تسليم الوظيفة الثانية ومحاولات كراس المحاولات." },
+  { id: "c_qz1", name: "الاستجواب الكتابي 1", maxScore: 4, icon: "✍️", description: "الاستجواب الكتابي السريع الأول خلال الفصل." },
+  { id: "c_qz2", name: "الاستجواب الكتابي 2", maxScore: 4, icon: "✍️", description: "الاستجواب الكتابي السريع الثاني خلال الفصل." },
+];
+
+// معايير الأرباع المتساوية (4 × 5 = 20ن)
+export const EQUAL_FOUR_CRITERIA: ContinuousCriterion[] = [
+  { id: "c_beh", name: "السلوك والمواظبة والأدوات", maxScore: 5, icon: "📐", description: "الانضباط الصفي وإحضار الأدوات الهندسية والكتاب المدرسي." },
+  { id: "c_nb", name: "كراس الدروس والمحاولات", maxScore: 5, icon: "📖", description: "اكتمال عناصر الدرس وخلوه من البياض ونظافة الخط وتصحيح التمارين." },
+  { id: "c_hw", name: "الواجبات والأنشطة المنزلية", maxScore: 5, icon: "📝", description: "إنجاز الواجبات المنزلية والجدية في المحاولات الفردية وتجنب النقل." },
+  { id: "c_act", name: "المشاركة والاستجوابات", maxScore: 5, icon: "🙋‍♂️", description: "المشاركة الفعالة في بناء الدرس على السبورة والاستجوابات الدورية." },
+];
+
 // سجل الرصد والتنقيط الفصلي الرسمي
 export type OfficialGradeRecord = {
   id?: string;
@@ -419,13 +456,20 @@ export type OfficialGradeRecord = {
   // علامة التقويم المستمر الإجمالية (من 20)
   continuousScore: number;
   // التفصيل البيداغوجي لعناصر التقويم (اختياري مرن):
-  behaviorScore?: number;    // المشاركة والسلوك (من 4)
+  behaviorScore?: number;    // المشاركة والسلوك (من 4 أو 5)
   notebook1Score?: number;   // كراس التلميذ: مقطع 1 (من 2)
   notebook2Score?: number;   // كراس التلميذ: مقطع 2 (من 2)
   homework1Score?: number;   // وظيفة 1 (من 2)
   homework2Score?: number;   // وظيفة 2 (من 2)
   quiz1Score?: number;       // استجواب 1 (من 4)
   quiz2Score?: number;       // استجواب 2 (من 4)
+  // رصيد الزيادة والنقصان الصفي أثناء الحصص (+ / -)
+  bonusPoints?: number;
+  // حالة الكراس والواجبات الميدانية
+  notebookStatus?: "complete" | "incomplete" | "blank" | "missing";
+  homeworkStatus?: "complete" | "partial" | "missing";
+  // علامات المعايير المخصصة للأستاذ
+  customScores?: Record<string, number>;
   // الفروض
   test1Score?: number;       // الفرض الأول (من 20)
   test2Score?: number;       // الفرض الثاني (اختياري، من 20)
@@ -458,6 +502,7 @@ export type LessonsData = {
   customNotebooks?: CustomNotebook[];
   boardNomenclature?: BoardNomenclature;
   evaluationSettings?: Record<string, ClassEvaluationSettings>;
+  continuousEvalConfig?: Record<string, ContinuousEvalConfig>;
 };
 
 export const LEVELS = {

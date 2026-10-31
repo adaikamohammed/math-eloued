@@ -55,6 +55,7 @@ export async function GET(
       diaryDayTitles: data.diaryDayTitles || {},
       studentRoster: data.studentRoster || [],
       gradebookRecords: data.gradebookRecords || [],
+      continuousEvalConfig: data.continuousEvalConfig || {},
       featureFlags: data.featureFlags || null,
       subject: data.subject || null,
       customNotebooks: data.customNotebooks || null,
@@ -161,6 +162,7 @@ export async function PUT(req: NextRequest) {
       body.specialDays !== undefined ||
       body.diaryDayTitles !== undefined ||
       body.gradebookRecords !== undefined ||
+      body.continuousEvalConfig !== undefined ||
       body.customNotebooks !== undefined ||
       body.boardNomenclature !== undefined ||
       body.featureFlags !== undefined
@@ -169,6 +171,7 @@ export async function PUT(req: NextRequest) {
       if (body.studentRoster !== undefined) data.studentRoster = body.studentRoster;
       if (body.customClasses !== undefined) data.customClasses = body.customClasses;
       if (body.gradebookRecords !== undefined) data.gradebookRecords = body.gradebookRecords;
+      if (body.continuousEvalConfig !== undefined) data.continuousEvalConfig = body.continuousEvalConfig;
       if (body.diaryEntries !== undefined) data.diaryEntries = body.diaryEntries;
       if (body.cahierTextesEntries !== undefined) data.cahierTextesEntries = body.cahierTextesEntries;
       if (body.specialDays !== undefined) data.specialDays = body.specialDays;
@@ -182,6 +185,7 @@ export async function PUT(req: NextRequest) {
         studentRoster: data.studentRoster,
         customClasses: data.customClasses,
         gradebookRecords: data.gradebookRecords,
+        continuousEvalConfig: data.continuousEvalConfig,
         diaryEntries: data.diaryEntries,
         cahierTextesEntries: data.cahierTextesEntries,
         specialDays: data.specialDays,
