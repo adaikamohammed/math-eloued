@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { LayoutProvider, useLayout } from "@/context/LayoutContext";
 import { GlobalNavbar } from "@/components/GlobalNavbar";
 import { DesktopSidebar } from "@/components/DesktopSidebar";
@@ -26,21 +26,46 @@ const DASHBOARD_ROUTES = [
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <LayoutProvider>
-      <AppShellContent>{children}</AppShellContent>
+      <React.Suspense
+        fallback={
+          <div
+            className="min-h-screen bg-[#fafaf7] text-[#1a1a2e] font-sans antialiased"
+            dir="rtl"
+            suppressHydrationWarning
+          >
+            {children}
+          </div>
+        }
+      >
+        <AppShellContent>{children}</AppShellContent>
+      </React.Suspense>
     </LayoutProvider>
   );
 }
 
 function AppShellContent({ children }: { children: React.ReactNode }) {
   const routerPathname = usePathname();
+  const searchParams = useSearchParams();
   const pathname =
     routerPathname ||
     (typeof window !== "undefined" ? window.location.pathname : "/");
+  const { user } = useLayout();
+
+  // فحص ما إذا كان الرابط مخصصاً للولي أو الزائر العام (بدون شريط جانبي ولا هيدر إدارة):
+  // 1. /messages/send (إرسال رسالة سرية مخصصة للأولياء والتلاميذ)
+  // 2. /honor عند تصفح رابط أستاذ معين (?teacher=) أو عندما لا يكون الزائر مسجلاً بحساب أستاذ
+  const hasTeacherParam = Boolean(
+    searchParams?.get("teacher") ||
+      (typeof window !== "undefined" && window.location.search.includes("teacher="))
+  );
+
+  const isParentHonorView =
+    pathname.startsWith("/honor") && (hasTeacherParam || !user);
 
   // فحص ما إذا كان المسار الحالي لوحة تحكم داخلية للأستاذ/المفتش
-  // ملاحظة: /messages/send هي صفحة عامة مخصصة لإرسال التلاميذ والأولياء لرسائلهم، دون شريط الأستاذ
   const isDashboardRoute =
     pathname !== "/messages/send" &&
+    !isParentHonorView &&
     DASHBOARD_ROUTES.some(
       (route) => pathname === route || pathname.startsWith(route + "/")
     );

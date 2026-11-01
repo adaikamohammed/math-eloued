@@ -28,10 +28,6 @@ const PAGE_INFO: Record<string, { title: string; subtitle: string }> = {
     title: "دليل الأساتذة",
     subtitle: "البحث بالرمز التعريفي للأستاذ والولوج للمساحات التعليمية",
   },
-  "/my-children": {
-    title: "فضاء الأولياء",
-    subtitle: "متابعة وتقويم الأبناء والتواصل التربوي المستمر",
-  },
 
   "/honor": {
     title: "لوحة الشرف وتكريم النوابغ",

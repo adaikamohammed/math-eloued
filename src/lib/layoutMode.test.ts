@@ -9,13 +9,13 @@ test("layoutFor: full-width platform pages", () => {
 });
 
 test("layoutFor: desktop-wide teacher and parent pages", () => {
-  for (const p of ["/admin", "/year/1", "/lesson/abc", "/my-children"]) {
+  for (const p of ["/admin", "/year/1", "/lesson/abc", "/messages", "/eval", "/honor"]) {
     assert.equal(layoutFor(p), "wide", p);
   }
 });
 
 test("layoutFor: everything else keeps the phone column, prefixes match whole segments", () => {
-  for (const p of ["/administrator", "/honor", "/pedagogy", "/settings", "/eval", "/forumx", "/teacher"]) {
+  for (const p of ["/administrator", "/pedagogy", "/settings", "/forumx", "/teacher"]) {
     assert.equal(layoutFor(p), "phone", p);
   }
 });

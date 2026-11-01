@@ -245,15 +245,7 @@ export default function TeacherWallet() {
           </div>
         </div>
 
-        {wallet.length > 0 && (
-          <Link
-            href="/my-children"
-            className="inline-flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl bg-[#fafaf7] hover:bg-[#e6f4ee] text-[#107a57] border border-[#e8e8e0] hover:border-[#107a57]/30 text-xs font-bold transition self-start sm:self-auto shrink-0"
-          >
-            <BookOpen className="w-3.5 h-3.5" />
-            <span>عرض المستجدات المجمعة</span>
-          </Link>
-        )}
+
       </div>
 
       {/* رسالة التنبيه إن وجدت */}

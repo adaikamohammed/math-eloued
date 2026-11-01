@@ -2,7 +2,7 @@
 export type LayoutMode = "full" | "wide" | "phone";
 
 const FULL_PREFIXES = ["/inspector", "/super-admin", "/login", "/register", "/t", "/forum"];
-const WIDE_PREFIXES = ["/admin", "/year", "/lesson", "/my-children", "/messages", "/eval", "/honor"];
+const WIDE_PREFIXES = ["/admin", "/year", "/lesson", "/messages", "/eval", "/honor"];
 
 const under = (pathname: string, prefix: string) => pathname === prefix || pathname.startsWith(prefix + "/");
 

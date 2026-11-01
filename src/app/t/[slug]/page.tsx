@@ -394,33 +394,46 @@ export default async function TeacherPublicSpace({ params, searchParams }: Teach
 
             {/* 4. ميثاق ونقاط التقويم المستمر (20 / 20) */}
             {showContinuousAssessment && (
-              <section className="bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 rounded-3xl p-5 sm:p-6 border border-emerald-200/90 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div className="flex items-start gap-3.5">
-                  <div className="w-11 h-11 rounded-2xl bg-emerald-700 text-white flex items-center justify-center font-bold shadow-xs shrink-0">
-                    <Scale className="w-5 h-5 text-emerald-100" />
-                  </div>
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-xs sm:text-sm font-black text-slate-900">
-                        ميثاق ونقاط التقويم المستمر الشفاف (20 / 20)
-                      </h3>
-                      <span className="text-[10px] bg-emerald-700 text-white px-2 py-0.5 rounded-md font-bold">
-                        شفافية ⚖️
-                      </span>
+              <section className="bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 rounded-3xl p-5 sm:p-6 border border-emerald-200/90 shadow-2xs space-y-3">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div className="flex items-start gap-3.5">
+                    <div className="w-11 h-11 rounded-2xl bg-emerald-700 text-white flex items-center justify-center font-bold shadow-xs shrink-0">
+                      <Scale className="w-5 h-5 text-emerald-100" />
                     </div>
-                    <p className="text-xs text-slate-600 leading-relaxed font-medium">
-                      معايير المتابعة الدقيقة: كراس القسم المنظم • السلوك والانضباط الصفي • إنجاز الواجبات • الاستجوابات والفروض.
-                    </p>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-xs sm:text-sm font-black text-slate-900">
+                          ميثاق ونقاط التقويم المستمر الشفاف (20 / 20)
+                        </h3>
+                        <span className="text-[10px] bg-emerald-700 text-white px-2 py-0.5 rounded-md font-bold">
+                          شفافية ⚖️
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-600 leading-relaxed font-medium">
+                        معايير المتابعة الدقيقة لاحتساب علامة التقويم الصفيّة لكل تلميذ بكل وضوح وعدالة:
+                      </p>
+                    </div>
                   </div>
                 </div>
 
-                <Link
-                  href="/my-children"
-                  className="w-full sm:w-auto text-xs font-black text-emerald-900 bg-white border border-emerald-200 px-4 py-2.5 rounded-xl hover:bg-emerald-100 active:scale-95 transition shadow-2xs text-center shrink-0 flex items-center justify-center gap-1.5"
-                >
-                  <span>متابعة تقويم ابنك</span>
-                  <ChevronLeft className="w-3.5 h-3.5" />
-                </Link>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                  <div className="p-2.5 rounded-2xl bg-white border border-emerald-200/70 text-center shadow-2xs">
+                    <span className="block text-xs font-black text-emerald-800">كراس القسم (5ن)</span>
+                    <span className="text-[10px] text-slate-500 font-medium">النظافة واكتمال الدروس</span>
+                  </div>
+                  <div className="p-2.5 rounded-2xl bg-white border border-emerald-200/70 text-center shadow-2xs">
+                    <span className="block text-xs font-black text-emerald-800">الانضباط (5ن)</span>
+                    <span className="text-[10px] text-slate-500 font-medium">السلوك والمشاركة الإيجابية</span>
+                  </div>
+                  <div className="p-2.5 rounded-2xl bg-white border border-emerald-200/70 text-center shadow-2xs">
+                    <span className="block text-xs font-black text-emerald-800">الواجبات (5ن)</span>
+                    <span className="text-[10px] text-slate-500 font-medium">حل التمارين المنزلية</span>
+                  </div>
+                  <div className="p-2.5 rounded-2xl bg-white border border-emerald-200/70 text-center shadow-2xs">
+                    <span className="block text-xs font-black text-emerald-800">الاستجوابات (5ن)</span>
+                    <span className="text-[10px] text-slate-500 font-medium">الفروض والتقويمات الفجائية</span>
+                  </div>
+                </div>
               </section>
             )}
           </main>

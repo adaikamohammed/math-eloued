@@ -16,7 +16,6 @@ import {
   Calendar,
   ClipboardList,
   Sliders,
-  Heart,
   Building2,
 } from "lucide-react";
 import { useLayout } from "@/context/LayoutContext";
@@ -61,7 +60,6 @@ export function MobileBottomNav() {
   let items = [
     { label: "الرئيسية", href: "/", icon: Sparkles },
     { label: "بحث بكود", href: "/t/search", icon: Search },
-    { label: "محفظتي", href: "/my-children", icon: Heart },
     { label: "لوحة الشرف", href: "/honor", icon: Trophy },
     { label: "دخول الأستاذ", href: "/login", icon: GraduationCap },
   ];

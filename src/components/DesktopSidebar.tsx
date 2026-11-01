@@ -12,7 +12,6 @@ import {
   ShieldCheck,
   GraduationCap,
   Settings,
-  Heart,
   PanelRightClose,
   PanelRightOpen,
   LogIn,
@@ -274,7 +273,6 @@ export function DesktopSidebar() {
         items: [
           { label: "الرئيسية", href: "/", icon: Sparkles },
           { label: "بحث عن أستاذ بكود", href: "/t/search", icon: Search },
-          { label: "أبنائي ومحفظتي", href: "/my-children", icon: Heart },
           { label: "لوحة الشرف وتكريم النوابغ", href: "/honor", icon: Trophy },
         ],
       },

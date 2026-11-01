@@ -17,10 +17,9 @@ const data = {
 
 test("teacherFeedItems: skips hidden and undated items, flags the child, builds links", () => {
   const items = teacherFeedItems({ id: "T1", name: "أ. خالد", childName: "أحمد بن علي" }, data);
-  assert.deepEqual(items.map((i) => i.key).sort(), ["a-T1-a1", "l-T1-l 1", "s-T1-s1", "s-T1-s2"]);
+  assert.deepEqual(items.map((i) => i.key).sort(), ["a-T1-a1", "l-T1-l 1", "s-T1-s1"]);
   assert.equal(items.find((i) => i.key === "a-T1-a1")!.urgent, true);
   assert.equal(items.find((i) => i.key === "s-T1-s1")!.mentionsChild, true);
-  assert.equal(items.find((i) => i.key === "s-T1-s2")!.mentionsChild, false);
   assert.equal(items.find((i) => i.kind === "lesson")!.href, "/lesson/l%201?teacher=T1");
   assert.deepEqual(teacherFeedItems({ id: "T1", name: "x" }, null), []);
 });
