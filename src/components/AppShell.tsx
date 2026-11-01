@@ -19,6 +19,7 @@ const DASHBOARD_ROUTES = [
   "/forum",
   "/pedagogy",
   "/eval",
+  "/messages",
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -33,9 +34,12 @@ function AppShellContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || "/";
 
   // فحص ما إذا كان المسار الحالي لوحة تحكم داخلية للأستاذ/المفتش
-  const isDashboardRoute = DASHBOARD_ROUTES.some(
-    (route) => pathname === route || pathname.startsWith(route + "/")
-  );
+  // ملاحظة: /messages/send هي صفحة عامة مخصصة لإرسال التلاميذ والأولياء لرسائلهم، دون شريط الأستاذ
+  const isDashboardRoute =
+    pathname !== "/messages/send" &&
+    DASHBOARD_ROUTES.some(
+      (route) => pathname === route || pathname.startsWith(route + "/")
+    );
 
   // ─── 1. الصفحات العامة للأولياء، صفحة الهبوط، فضاء الأستاذ، التسجيل، والدخول ───
   // لا يظهر فيها الشريط الجانبي ولا أدوات الإدارة؛ فقط محتوى الصفحة المستقل
