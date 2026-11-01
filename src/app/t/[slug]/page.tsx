@@ -14,8 +14,6 @@ import {
   CalendarClock,
   Users,
   MessageCircle,
-  Scale,
-  Camera,
   Check,
   Eye,
   Layers,
@@ -66,7 +64,6 @@ export default async function TeacherPublicSpace({ params, searchParams }: Teach
   // إعدادات وتخصيصات الفضاء البيداغوجي للأستاذ
   const flags = publicData.featureFlags || (profile as any).feature_flags || {};
   const showAnnouncements = flags.announcements !== false;
-  const showContinuousAssessment = flags.continuousAssessment !== false;
   const showMessages = flags.messages !== false;
 
   // التحقق من تعيين ساعة الاستقبال ولوحة الشرف
@@ -185,8 +182,8 @@ export default async function TeacherPublicSpace({ params, searchParams }: Teach
               </div>
             </div>
 
-            {/* إحصائيات سريعة للأستاذ تظهر بوضوح في شاشات الحاسوب */}
-            <div className="flex flex-wrap items-center justify-center gap-2.5 shrink-0 bg-white/10 backdrop-blur-md p-3 rounded-2xl border border-white/10">
+            {/* إحصائيات سريعة للأستاذ تظهر بوضوح في شاشات الحاسوب والهاتف */}
+            <div className="flex items-center justify-center gap-2.5 shrink-0 bg-white/10 backdrop-blur-md p-2.5 rounded-2xl border border-white/10">
               <div className="px-3 py-1.5 rounded-xl bg-white/10 text-center">
                 <span className="block text-xs font-black text-emerald-200">{activeLevels.length}</span>
                 <span className="text-[10px] text-emerald-100/80">مستويات مسندة</span>
@@ -195,15 +192,6 @@ export default async function TeacherPublicSpace({ params, searchParams }: Teach
                 <span className="block text-xs font-black text-emerald-200">{teacherLessons.length}</span>
                 <span className="text-[10px] text-emerald-100/80">درساً وواجباً</span>
               </div>
-              {flags.boardLessons !== false && (
-                <Link
-                  href={isValidLevel ? `/t/${slug}/board?lvl=${requestedLevel}` : `/t/${slug}/board`}
-                  className="px-3 py-1.5 rounded-xl bg-emerald-500/30 hover:bg-emerald-500/40 text-center transition border border-emerald-400/30 flex items-center gap-1.5 text-xs font-bold text-white"
-                >
-                  <Camera className="w-3.5 h-3.5 text-emerald-300" />
-                  <span>السبورة الرقمية 📸</span>
-                </Link>
-              )}
             </div>
           </div>
         </div>
@@ -299,24 +287,15 @@ export default async function TeacherPublicSpace({ params, searchParams }: Teach
                       </div>
 
                       {/* أزرار الإجراء السريع لكل سنة دراسية */}
-                      <div className="grid grid-cols-1 gap-1.5 pt-2 border-t border-slate-200/60">
+                      {/* زر واحد واضح ومباشر للولي لمشاهدة محتوى السنة الدراسية */}
+                      <div className="pt-2 border-t border-slate-200/60">
                         <Link
                           href={`/year/${lvl}?teacher=${profile.id}`}
-                          className="w-full py-2 px-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-black flex items-center justify-center gap-1.5 transition shadow-2xs"
+                          className="w-full py-2.5 px-4 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-black flex items-center justify-center gap-2 transition shadow-2xs hover:shadow-md"
                         >
                           <span>عرض الدروس والواجبات</span>
-                          <ChevronLeft className="w-3.5 h-3.5" />
+                          <ChevronLeft className="w-4 h-4" />
                         </Link>
-
-                        {flags.boardLessons !== false && (
-                          <Link
-                            href={`/t/${slug}/board?lvl=${lvl}`}
-                            className="w-full py-1.5 px-3 rounded-xl bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold flex items-center justify-center gap-1.5 transition shadow-2xs"
-                          >
-                            <Camera className="w-3.5 h-3.5 text-emerald-600" />
-                            <span>كراس السبورة {item.tag} 📸</span>
-                          </Link>
-                        )}
                       </div>
                     </div>
                   );
@@ -324,54 +303,7 @@ export default async function TeacherPublicSpace({ params, searchParams }: Teach
               </div>
             </section>
 
-            {/* 2. كراس الدروس وصور السبورة الرقمية اليومية */}
-            {flags.boardLessons !== false && (
-              <section className="bg-gradient-to-r from-emerald-800 via-teal-800 to-emerald-900 text-white rounded-3xl p-5 sm:p-6 shadow-md space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="flex items-center gap-3.5">
-                    <div className="w-12 h-12 rounded-2xl bg-white/15 backdrop-blur-md flex items-center justify-center text-white border border-white/20 shadow-inner shrink-0">
-                      <Camera className="w-6 h-6 text-emerald-200" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h2 className="text-base sm:text-lg font-black text-white">
-                          كراس الدروس والسبورة الرقمية اليومية
-                        </h2>
-                        <span className="text-[10px] bg-white/20 text-white px-2.5 py-0.5 rounded-full font-bold">
-                          {isValidLevel ? `${requestedLevel}م 📸` : "جديد 📸"}
-                        </span>
-                      </div>
-                      <p className="text-xs text-emerald-100 font-medium mt-0.5">
-                        {isValidLevel
-                          ? `توثيق السبورة اليومية والملخصات لجميع حصص السنة ${requestedLevel} متوسط`
-                          : "توثيق صور السبورة اليومية، كراس القسم، والواجبات المنزلية بدقة"}
-                      </p>
-                    </div>
-                  </div>
-
-                  <Link
-                    href={isValidLevel ? `/t/${slug}/board?lvl=${requestedLevel}` : `/t/${slug}/board`}
-                    className="bg-white text-emerald-950 hover:bg-emerald-50 px-4 py-2.5 rounded-2xl text-xs font-black transition shadow-sm shrink-0 flex items-center justify-center gap-1.5 active:scale-95"
-                  >
-                    <span>تصفح كراس السبورة الشامل</span>
-                    <ChevronLeft className="w-4 h-4" />
-                  </Link>
-                </div>
-
-                <div className="text-xs text-emerald-100/90 leading-relaxed bg-black/15 p-3.5 rounded-2xl border border-white/10 flex items-start gap-2.5">
-                  <span className="text-base shrink-0">💡</span>
-                  <div>
-                    <strong className="text-white block font-black">خدمة التلميذ الغائب وحفظ الحق البيداغوجي:</strong>
-                    <span>
-                      إذا غاب ابنك عن الحصة، يستطيع فتح كراس السبورة اليومي ونقل عناصر الدرس والأنشطة والواجبات بدقة دون
-                      الحاجة لاستعارة كراس زميله أو الوقوع في أخطاء النقل.
-                    </span>
-                  </div>
-                </div>
-              </section>
-            )}
-
-            {/* 3. شريط إعلانات وتنبيهات الأستاذ */}
+            {/* إعلانات وتنبيهات الأستاذ */}
             {showAnnouncements && announcements && announcements.length > 0 && (
               <section className="bg-white rounded-3xl p-5 sm:p-6 border border-emerald-100 shadow-2xs space-y-3">
                 <div className="flex items-center gap-2 text-xs font-black text-emerald-800 border-b border-slate-100 pb-2">
@@ -388,51 +320,6 @@ export default async function TeacherPublicSpace({ params, searchParams }: Teach
                       <p className="text-slate-600 leading-relaxed whitespace-pre-wrap font-medium">{a.content}</p>
                     </div>
                   ))}
-                </div>
-              </section>
-            )}
-
-            {/* 4. ميثاق ونقاط التقويم المستمر (20 / 20) */}
-            {showContinuousAssessment && (
-              <section className="bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 rounded-3xl p-5 sm:p-6 border border-emerald-200/90 shadow-2xs space-y-3">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                  <div className="flex items-start gap-3.5">
-                    <div className="w-11 h-11 rounded-2xl bg-emerald-700 text-white flex items-center justify-center font-bold shadow-xs shrink-0">
-                      <Scale className="w-5 h-5 text-emerald-100" />
-                    </div>
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-xs sm:text-sm font-black text-slate-900">
-                          ميثاق ونقاط التقويم المستمر الشفاف (20 / 20)
-                        </h3>
-                        <span className="text-[10px] bg-emerald-700 text-white px-2 py-0.5 rounded-md font-bold">
-                          شفافية ⚖️
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-600 leading-relaxed font-medium">
-                        معايير المتابعة الدقيقة لاحتساب علامة التقويم الصفيّة لكل تلميذ بكل وضوح وعدالة:
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
-                  <div className="p-2.5 rounded-2xl bg-white border border-emerald-200/70 text-center shadow-2xs">
-                    <span className="block text-xs font-black text-emerald-800">كراس القسم (5ن)</span>
-                    <span className="text-[10px] text-slate-500 font-medium">النظافة واكتمال الدروس</span>
-                  </div>
-                  <div className="p-2.5 rounded-2xl bg-white border border-emerald-200/70 text-center shadow-2xs">
-                    <span className="block text-xs font-black text-emerald-800">الانضباط (5ن)</span>
-                    <span className="text-[10px] text-slate-500 font-medium">السلوك والمشاركة الإيجابية</span>
-                  </div>
-                  <div className="p-2.5 rounded-2xl bg-white border border-emerald-200/70 text-center shadow-2xs">
-                    <span className="block text-xs font-black text-emerald-800">الواجبات (5ن)</span>
-                    <span className="text-[10px] text-slate-500 font-medium">حل التمارين المنزلية</span>
-                  </div>
-                  <div className="p-2.5 rounded-2xl bg-white border border-emerald-200/70 text-center shadow-2xs">
-                    <span className="block text-xs font-black text-emerald-800">الاستجوابات (5ن)</span>
-                    <span className="text-[10px] text-slate-500 font-medium">الفروض والتقويمات الفجائية</span>
-                  </div>
                 </div>
               </section>
             )}
