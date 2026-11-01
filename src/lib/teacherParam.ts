@@ -29,16 +29,24 @@ export function teacherHomeHref(teacherId: string | null): string {
 
 // اسم الأستاذ ومتوسطته لعرضهما في رأس صفحات الولي (من الملف العام)
 export function useTeacherInfo(teacherId: string | null) {
-  const [info, setInfo] = useState<{ full_name: string; school_custom_name: string | null } | null>(null);
+  const [info, setInfo] = useState<{
+    id?: string;
+    slug?: string;
+    full_name: string;
+    school_custom_name: string | null;
+    subject?: string;
+    teacher_code?: string;
+  } | null>(null);
+
   useEffect(() => {
     if (!teacherId) return;
-    supabase
-      .from("profiles")
-      .select("full_name, school_custom_name")
-      .eq("id", teacherId)
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(teacherId);
+    const query = supabase.from("profiles").select("id, slug, full_name, school_custom_name, subject, teacher_code");
+    (isUuid ? query.eq("id", teacherId) : query.eq("slug", teacherId))
       .maybeSingle()
       .then(({ data }) => setInfo(data ?? null));
   }, [teacherId]);
+
   return info;
 }
 

@@ -56,24 +56,24 @@ export default async function TeacherBoardPage({ params, searchParams }: BoardPa
 
       {/* رأس الفضاء */}
       <div className="bg-white border-b border-[#e8e8e0] px-4 py-4">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
           <Link
             href={backHref}
-            className="inline-flex items-center gap-1.5 text-xs text-gray-600 hover:text-[#107a57] font-bold transition bg-[#fafaf7] px-3 py-1.5 rounded-xl border border-[#e8e8e0]"
+            className="inline-flex items-center gap-1.5 text-xs text-gray-600 hover:text-[#107a57] font-bold transition bg-[#fafaf7] px-3.5 py-2 rounded-xl border border-[#e8e8e0]"
           >
             <ArrowRight className="w-4 h-4" />
             <span>العودة لصفحة الأستاذ</span>
           </Link>
 
           <div className="text-right flex items-center gap-2">
-            <span className="font-mono text-xs font-black bg-[#e6f4ee] text-[#107a57] px-2.5 py-1 rounded-md border border-[#107a57]/20">
+            <span className="font-mono text-xs font-black bg-[#e6f4ee] text-[#107a57] px-3 py-1.5 rounded-xl border border-[#107a57]/20">
               {displayCode}
             </span>
           </div>
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         {/* بطاقة معلومات الأستاذ */}
         <div className="bg-white rounded-3xl border border-[#e8e8e0] p-6 shadow-xs flex flex-col sm:flex-row items-center gap-4 text-center sm:text-right">
           <div className="w-16 h-16 rounded-2xl bg-[#e6f4ee] text-[#107a57] border border-[#107a57]/20 flex items-center justify-center text-3xl font-black shrink-0">

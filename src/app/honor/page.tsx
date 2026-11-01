@@ -392,7 +392,7 @@ ${item.notes ? `💬 كلمة الأستاذ: «${item.notes}»\n` : ""}
         </div>
       )}
 
-      <div className="max-w-4xl mx-auto pb-16 space-y-4 sm:space-y-5">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 space-y-4 sm:space-y-6">
         {/* ── رأس الصفحة والهوية ── */}
         <div className="flex items-center justify-between gap-3 bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-100 shadow-2xs">
           <div className="flex items-center gap-3 min-w-0">
@@ -773,7 +773,7 @@ ${item.notes ? `💬 كلمة الأستاذ: «${item.notes}»\n` : ""}
               </p>
             </div>
           ) : (
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {filteredHonors.map((item) => (
                 <div
                   key={item.id}

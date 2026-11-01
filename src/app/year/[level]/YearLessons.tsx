@@ -90,7 +90,7 @@ export function YearLessons({ level }: { level: 1 | 2 | 3 | 4 }) {
   }, [lessonsItems]);
 
   return (
-    <div className="pb-12 space-y-4 fade-up">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-20 space-y-5 fade-up font-sans" dir="rtl">
       <BackHeader href={teacherHomeHref(teacherId)} title={LEVELS[level].label} subtitle="اختر القسم لمشاهدة الدروس أو السلاسل والملخصات" />
 
       {/* أزرار اختيار الأقسام الـ 4 (الدروس، الأعمال الموجهة، سلاسل التمارين، الملخصات) */}

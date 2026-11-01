@@ -63,7 +63,7 @@ export default function MyChildrenPage() {
   }, []);
 
   return (
-    <div className="pb-16 space-y-4">
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-20 space-y-5 font-sans" dir="rtl">
       <BackHeader href="/" title="مستجدات أبنائي" subtitle="كل إعلانات ودروس واستدعاءات أساتذتهم في صفحة واحدة" />
 
       {!groups && <Loading />}
