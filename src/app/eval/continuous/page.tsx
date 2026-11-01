@@ -15,6 +15,7 @@ import {
   Edit2,
   HelpCircle,
   X,
+  Sparkles,
 } from "lucide-react";
 import {
   OfficialGradeRecord,
@@ -29,6 +30,13 @@ export interface ContinuousColumn {
   title: string; // عنوان العمود مثل: وظيفة 1، كراس 1، مشاركة، استجواب
   maxScore: number; // العلامة القصوى للعمود (مثلاً: 2، 4، 5)
   category?: "behavior" | "notebook" | "homework" | "quiz" | "custom";
+}
+
+// تعريف بنية حصة النقاط الإضافية الميدانية
+export interface BonusSession {
+  id: string; // معرف الحصة الفريد
+  title: string; // عنوان الحصة (مثلاً: حصة 1، حصة 2، تطبيقات هندسية...)
+  date?: string; // تاريخ الحصة (مثلاً: 01/11، أو الأحد)
 }
 
 // الأعمدة الافتراضية الرسمية (مجموعها 20 نقطة)
@@ -107,6 +115,12 @@ export default function ContinuousEvalMobilePage() {
   const [newColTitle, setNewColTitle] = useState("");
   const [newColMax, setNewColMax] = useState<number>(2);
 
+  // حصص النقاط الإضافية للأستاذ (كل حصة مستقلة في بداية الجدول)
+  const [bonusSessions, setBonusSessions] = useState<BonusSession[]>([
+    { id: "sess_1", title: "حصة 1", date: "حصة" },
+  ]);
+  const [editingSession, setEditingSession] = useState<BonusSession | null>(null);
+
   // مرجع لتأخير الحفظ التلقائي
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -133,6 +147,39 @@ export default function ContinuousEvalMobilePage() {
       localStorage.setItem(`jusoor_eval_cols_${selectedClass}`, JSON.stringify(newCols));
     } catch {}
   }, [selectedClass]);
+
+  // جلب حصص النقاط الإضافية المحفوظة للفوج والفصل
+  useEffect(() => {
+    try {
+      const savedSess = localStorage.getItem(`jusoor_eval_sessions_${selectedClass}_T${selectedTrimester}`);
+      if (savedSess) {
+        const parsed = JSON.parse(savedSess);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setBonusSessions(parsed);
+          return;
+        }
+      }
+    } catch {}
+    let todayStr = "حصة";
+    try {
+      todayStr = new Intl.DateTimeFormat("ar-DZ", { month: "numeric", day: "numeric" }).format(new Date());
+    } catch {}
+    setBonusSessions([{ id: "sess_1", title: "حصة 1", date: todayStr }]);
+  }, [selectedClass, selectedTrimester]);
+
+  // حفظ حصص النقاط الإضافية
+  const saveBonusSessions = useCallback(
+    (newSessions: BonusSession[]) => {
+      setBonusSessions(newSessions);
+      try {
+        localStorage.setItem(
+          `jusoor_eval_sessions_${selectedClass}_T${selectedTrimester}`,
+          JSON.stringify(newSessions)
+        );
+      } catch {}
+    },
+    [selectedClass, selectedTrimester]
+  );
 
   // جلب البيانات الأولية من الكاش ثم السيرفر
   useEffect(() => {
@@ -237,6 +284,14 @@ export default function ContinuousEvalMobilePage() {
           if (existing.quiz2Score !== undefined) cScores.col_q2 = existing.quiz2Score;
           existing.customScores = cScores;
         }
+
+        // ربط رصيد الحصص السابق بالحصة الأولى إن وُجد ولم تكن موزعة على الحصص
+        const firstSessId = bonusSessions[0]?.id || "sess_1";
+        const hasSessionScores = bonusSessions.some((s) => existing.customScores?.[s.id] !== undefined);
+        if (existing.bonusPoints && !hasSessionScores && existing.customScores) {
+          existing.customScores[firstSessId] = existing.bonusPoints;
+        }
+
         return existing;
       }
 
@@ -244,6 +299,9 @@ export default function ContinuousEvalMobilePage() {
       const initialCustomScores: Record<string, number> = {};
       columns.forEach((col) => {
         initialCustomScores[col.id] = 0;
+      });
+      bonusSessions.forEach((sess) => {
+        initialCustomScores[sess.id] = 0;
       });
 
       return {
@@ -262,7 +320,7 @@ export default function ContinuousEvalMobilePage() {
         customScores: initialCustomScores,
       };
     },
-    [records, selectedClass, selectedTrimester, columns]
+    [records, selectedClass, selectedTrimester, columns, bonusSessions]
   );
 
   // حفظ التغييرات إلى السيرفر والكاش تلقائياً
@@ -352,18 +410,32 @@ export default function ContinuousEvalMobilePage() {
     [selectedClass, selectedTrimester, getRecord, computeStudentTotal, triggerAutoSave]
   );
 
-  // زيادة أو إنقاص نقاط إضافية صفيّة بلمسة واحدة
-  const handleBonusChange = useCallback(
-    (studentName: string, delta: number) => {
+  // تعديل رصيد تلميذ في حصة معينة (+0.5 أو -0.5 أو أي قيمة) وحساب المجموع بدقة
+  const handleSessionScoreChange = useCallback(
+    (studentName: string, sessionId: string, delta: number) => {
       setRecords((prev) => {
         const key = `${selectedClass.replace(/\s+/g, "")}_${studentName.trim()}_T${selectedTrimester}`;
         const current = getRecord(studentName);
-        const newBonus = Math.round(((current.bonusPoints || 0) + delta) * 10) / 10;
+        const nextCustomScores = { ...(current.customScores || {}) };
+
+        const currentVal = nextCustomScores[sessionId] ?? 0;
+        const newVal = Math.round((currentVal + delta) * 10) / 10;
+        nextCustomScores[sessionId] = newVal;
+
+        // حساب مجموع رصيد الحصص الكلي لهذا التلميذ عبر كافة الحصص
+        const totalBonus = bonusSessions.reduce((acc, s) => {
+          const v = s.id === sessionId ? newVal : (nextCustomScores[s.id] ?? 0);
+          return acc + v;
+        }, 0);
+
         const updated: OfficialGradeRecord = {
           ...current,
-          bonusPoints: newBonus,
+          customScores: nextCustomScores,
+          bonusPoints: Math.round(totalBonus * 10) / 10,
         };
-        updated.continuousScore = computeStudentTotal(updated.customScores || {}, newBonus);
+
+        // إعادة حساب العلامة الإجمالية من 20 متضمنة نقاط الحصص
+        updated.continuousScore = computeStudentTotal(nextCustomScores, updated.bonusPoints);
         updated.updatedAt = new Date().toISOString();
 
         const next = { ...prev, [key]: updated };
@@ -372,8 +444,70 @@ export default function ContinuousEvalMobilePage() {
         return next;
       });
     },
-    [selectedClass, selectedTrimester, getRecord, computeStudentTotal, triggerAutoSave]
+    [selectedClass, selectedTrimester, getRecord, bonusSessions, computeStudentTotal, triggerAutoSave]
   );
+
+  // إضافة عمود حصة جديدة
+  const handleAddSession = () => {
+    const nextIdx = bonusSessions.length + 1;
+    let todayStr = "حصة";
+    try {
+      todayStr = new Intl.DateTimeFormat("ar-DZ", { month: "numeric", day: "numeric" }).format(new Date());
+    } catch {}
+    const newSess: BonusSession = {
+      id: `sess_${Date.now()}`,
+      title: `حصة ${nextIdx}`,
+      date: todayStr,
+    };
+    const updated = [...bonusSessions, newSess];
+    saveBonusSessions(updated);
+  };
+
+  // حفظ تعديل عنوان أو تاريخ الحصة
+  const handleSaveEditSession = () => {
+    if (!editingSession || !editingSession.title.trim()) return;
+    const updated = bonusSessions.map((s) => (s.id === editingSession.id ? editingSession : s));
+    saveBonusSessions(updated);
+    setEditingSession(null);
+  };
+
+  // حذف حصة مع إعادة حساب النقاط الإجمالية
+  const handleDeleteSession = (sessId: string) => {
+    if (bonusSessions.length <= 1) {
+      alert("يجب الإبقاء على حصة واحدة على الأقل في الجدول.");
+      return;
+    }
+    if (confirm("هل تريد بالتأكيد حذف عمود هذه الحصة وخصم نقاطها من الحساب؟")) {
+      const updated = bonusSessions.filter((s) => s.id !== sessId);
+      saveBonusSessions(updated);
+      setEditingSession(null);
+
+      // إعادة حساب علامات التلاميذ بدون هذه الحصة
+      setRecords((prev) => {
+        const next = { ...prev };
+        studentRoster
+          .filter((s) => (s.className || "").replace(/\s+/g, "") === selectedClass.replace(/\s+/g, ""))
+          .forEach((st) => {
+            const key = `${selectedClass.replace(/\s+/g, "")}_${st.studentName.trim()}_T${selectedTrimester}`;
+            const cur = next[key];
+            if (cur) {
+              const nextScores = { ...(cur.customScores || {}) };
+              delete nextScores[sessId];
+              const newBonus = updated.reduce((acc, s) => acc + (nextScores[s.id] ?? 0), 0);
+              const upd: OfficialGradeRecord = {
+                ...cur,
+                customScores: nextScores,
+                bonusPoints: Math.round(newBonus * 10) / 10,
+              };
+              upd.continuousScore = computeStudentTotal(nextScores, upd.bonusPoints);
+              next[key] = upd;
+            }
+          });
+        triggerAutoSave(next);
+        return next;
+      });
+    }
+  };
 
   // عمليات سريعة على العمود بالكامل (مثل: وضع علامة كاملة لمن أحضر الواجب)
   const handleBatchColumnAction = useCallback(
@@ -513,30 +647,32 @@ export default function ContinuousEvalMobilePage() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 pb-28 font-sans antialiased" dir="rtl">
-      {/* ─── الشريط العلوي الثابت ─── */}
-      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm px-3 py-2.5">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-2">
+      {/* ─── السطر العلوي المحسن (مريح وعصري وغير مثبت لسهولة التمرير) ─── */}
+      <header className="bg-white border-b border-slate-200/90 px-3 sm:px-6 py-3 transition-all shadow-2xs">
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
           {/* زر العودة وعنوان الصفحة */}
-          <div className="flex items-center gap-2 min-w-0">
+          <div className="flex items-center gap-2.5 min-w-0">
             <Link
               href="/eval"
-              className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition flex items-center justify-center shrink-0"
+              className="p-2 sm:px-3 sm:py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition flex items-center gap-1.5 shrink-0 text-xs font-bold cursor-pointer"
               title="العودة إلى جدول رصد النقاط والمعدل"
             >
-              <ArrowRight className="w-5 h-5" />
+              <ArrowRight className="w-4 h-4" />
+              <span className="hidden sm:inline">العودة للرصد الرسمي</span>
             </Link>
+
             <div className="min-w-0">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <h1 className="text-sm font-black text-slate-900 flex items-center gap-1.5 truncate">
-                  <Smartphone className="w-4 h-4 text-emerald-600" />
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-sm sm:text-base font-black text-slate-900 flex items-center gap-1.5">
+                  <Smartphone className="w-4 h-4 text-emerald-600 shrink-0" />
                   <span>دفتر التقويم المستمر الميداني</span>
                 </h1>
-                <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full border border-emerald-200">
+                <span className="text-[10px] bg-emerald-50 text-emerald-800 font-bold px-2 py-0.5 rounded-full border border-emerald-200">
                   تنقيط صفي مرن
                 </span>
               </div>
-              <p className="text-[10px] text-slate-500 truncate">
-                تعديل وحرية الأعمدة • الافتراضي 0 • رصد الواجبات والكراريس باللون الأحمر
+              <p className="text-[11px] text-slate-500 hidden sm:block truncate mt-0.5">
+                رصد فوري لنقاط الحصص والواجبات • الافتراضي 0 • رصد الكراريس باللون الأحمر
               </p>
             </div>
           </div>
@@ -544,14 +680,14 @@ export default function ContinuousEvalMobilePage() {
           {/* مؤشر الحفظ والأزرار الإجرائية */}
           <div className="flex items-center gap-2 shrink-0">
             {saveStatus === "saving" && (
-              <span className="text-[11px] font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded-lg border border-amber-200 flex items-center gap-1">
+              <span className="text-[11px] font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-xl border border-amber-200 flex items-center gap-1">
                 <span>جارٍ الحفظ...</span>
               </span>
             )}
             {saveStatus === "saved" && (
-              <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 flex items-center gap-1 animate-fade-in">
+              <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-xl border border-emerald-200 flex items-center gap-1 animate-fade-in">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                <span>محفوظ تلقائياً</span>
+                <span>تم الحفظ تلقائياً</span>
               </span>
             )}
 
@@ -559,7 +695,7 @@ export default function ContinuousEvalMobilePage() {
             <button
               type="button"
               onClick={() => setIsColumnModalOpen(true)}
-              className="py-1.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-black flex items-center gap-1.5 shadow-sm transition active:scale-95 cursor-pointer"
+              className="py-2 px-3.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-black flex items-center gap-1.5 shadow-sm transition active:scale-95 cursor-pointer"
               title="إدارة وتعديل أعمدة التقويم المستمر"
             >
               <Sliders className="w-3.5 h-3.5 text-amber-300" />
@@ -568,11 +704,10 @@ export default function ContinuousEvalMobilePage() {
 
             <Link
               href="/eval"
-              className="py-1.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black flex items-center gap-1.5 shadow-sm transition active:scale-95"
+              className="py-2 px-3.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-black flex items-center gap-1.5 shadow-sm transition active:scale-95 cursor-pointer"
             >
               <TableIcon className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">جدول الرصد الفصلي</span>
-              <span className="sm:hidden">الرصد</span>
+              <span>جدول الرصد الفصلي</span>
             </Link>
           </div>
         </div>
@@ -697,6 +832,54 @@ export default function ContinuousEvalMobilePage() {
                     اسم التلميذ
                   </th>
 
+                  {/* ─── أعمدة النقاط الإضافية الميدانية (حسب الحصص) في البداية ─── */}
+                  {bonusSessions.map((sess, sIdx) => (
+                    <th
+                      key={sess.id}
+                      className="py-2 px-2 min-w-[95px] border-l border-slate-200/80 bg-amber-50/70 text-amber-950"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setEditingSession(sess)}
+                            className="font-black text-amber-900 hover:text-amber-700 hover:underline text-xs flex items-center gap-1 group text-right truncate cursor-pointer"
+                            title="تعديل اسم أو تاريخ هذه الحصة أو حذفها"
+                          >
+                            <Sparkles className="w-3 h-3 text-amber-600 shrink-0" />
+                            <span className="truncate">{sess.title}</span>
+                            <Edit2 className="w-2.5 h-2.5 text-amber-500 opacity-0 group-hover:opacity-100 transition shrink-0" />
+                          </button>
+                        </div>
+                        <div className="flex items-center justify-between text-[10px] text-amber-700 font-medium">
+                          <span className="truncate">{sess.date || `حصة ${sIdx + 1}`}</span>
+                          <span className="bg-amber-100 text-amber-800 px-1 rounded font-mono font-bold shrink-0">±0.5ن</span>
+                        </div>
+                      </div>
+                    </th>
+                  ))}
+
+                  {/* زر إضافة حصة نقاط إضافية جديدة */}
+                  <th className="py-2 px-1.5 w-14 border-l border-slate-200/80 bg-amber-50/40 text-center">
+                    <button
+                      type="button"
+                      onClick={handleAddSession}
+                      className="inline-flex items-center gap-1 px-1.5 py-1 rounded-lg bg-amber-200/70 hover:bg-amber-300 text-amber-900 text-[10px] font-black transition cursor-pointer"
+                      title="إضافة عمود حصة جديدة للنقاط الإضافية"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>حصة</span>
+                    </button>
+                  </th>
+
+                  {/* في حال وجود أكثر من حصة، عمود مجموع نقاط الحصص */}
+                  {bonusSessions.length > 1 && (
+                    <th className="py-2.5 px-2 text-center min-w-[75px] border-l border-slate-200/80 bg-amber-100/60 text-amber-950 font-black">
+                      <div>مجموع الحصص</div>
+                      <span className="text-[10px] text-amber-700 font-bold">إضافي</span>
+                    </th>
+                  )}
+
                   {/* أعمدة التقويم المرنة */}
                   {columns.map((col, cIdx) => (
                     <th
@@ -744,12 +927,6 @@ export default function ContinuousEvalMobilePage() {
                     </th>
                   ))}
 
-                  {/* عمود الرصيد الإضافي */}
-                  <th className="py-2.5 px-2 text-center min-w-[80px] border-l border-slate-200/80 bg-amber-50/60 text-amber-950 font-black">
-                    <div>إضافي (+/-)</div>
-                    <span className="text-[10px] text-amber-700 font-normal">حصص</span>
-                  </th>
-
                   {/* عمود المجموع النهائي من 20 */}
                   <th className="py-2.5 px-3 text-center min-w-[95px] bg-emerald-50 text-emerald-950 font-black">
                     <div>المجموع</div>
@@ -761,7 +938,7 @@ export default function ContinuousEvalMobilePage() {
               <tbody className="divide-y divide-slate-100">
                 {filteredStudents.length === 0 ? (
                   <tr>
-                    <td colSpan={columns.length + 3} className="py-12 text-center text-slate-400">
+                    <td colSpan={columns.length + bonusSessions.length + (bonusSessions.length > 1 ? 1 : 0) + 3} className="py-12 text-center text-slate-400">
                       {searchQuery ? "لا يوجد تلميذ مطابق لنتائج البحث" : "لا يوجد تلاميذ مسجلين في هذا الفوج"}
                     </td>
                   </tr>
@@ -794,6 +971,77 @@ export default function ContinuousEvalMobilePage() {
                             )}
                           </div>
                         </td>
+
+                        {/* خلايا حصص النقاط الإضافية (في البداية) */}
+                        {bonusSessions.map((sess) => {
+                          const sessScore = rec.customScores?.[sess.id] ?? 0;
+                          return (
+                            <td
+                              key={sess.id}
+                              className={`py-1.5 px-1.5 text-center border-l border-slate-100 transition ${
+                                sessScore > 0
+                                  ? "bg-amber-50/70"
+                                  : sessScore < 0
+                                  ? "bg-rose-50/50"
+                                  : "bg-amber-50/20"
+                              }`}
+                            >
+                              <div className="flex items-center justify-center gap-1">
+                                <span
+                                  className={`font-mono text-xs font-black min-w-[26px] py-0.5 px-1 rounded ${
+                                    sessScore > 0
+                                      ? "bg-amber-200/80 text-amber-950 font-extrabold"
+                                      : sessScore < 0
+                                      ? "bg-rose-200 text-rose-900 font-extrabold"
+                                      : "text-slate-400"
+                                  }`}
+                                >
+                                  {sessScore > 0 ? `+${sessScore}` : sessScore}
+                                </span>
+                                <div className="flex flex-col gap-0.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSessionScoreChange(st.studentName, sess.id, 0.5)}
+                                    className="w-4 h-3.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded text-[9px] font-black flex items-center justify-center cursor-pointer transition"
+                                    title="إضافة +0.5 في هذه الحصة"
+                                  >
+                                    +
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSessionScoreChange(st.studentName, sess.id, -0.5)}
+                                    className="w-4 h-3.5 bg-rose-100 hover:bg-rose-200 text-rose-800 rounded text-[9px] font-black flex items-center justify-center cursor-pointer transition"
+                                    title="خصم -0.5 في هذه الحصة"
+                                  >
+                                    -
+                                  </button>
+                                </div>
+                              </div>
+                            </td>
+                          );
+                        })}
+
+                        {/* خانة فارغة تحت زر إضافة حصة */}
+                        <td className="py-1.5 px-1 text-center border-l border-slate-100 bg-amber-50/10 text-slate-300">
+                          -
+                        </td>
+
+                        {/* في حال وجود أكثر من حصة: مجموع نقاط الحصص */}
+                        {bonusSessions.length > 1 && (
+                          <td className="py-1.5 px-1 text-center border-l border-slate-100 bg-amber-100/30">
+                            <span
+                              className={`font-mono text-xs font-black ${
+                                (rec.bonusPoints || 0) > 0
+                                  ? "text-amber-900 font-extrabold"
+                                  : (rec.bonusPoints || 0) < 0
+                                  ? "text-rose-700 font-extrabold"
+                                  : "text-slate-400"
+                              }`}
+                            >
+                              {(rec.bonusPoints || 0) > 0 ? `+${rec.bonusPoints}` : rec.bonusPoints || 0}
+                            </span>
+                          </td>
+                        )}
 
                         {/* خلايا الأعمدة الديناميكية */}
                         {columns.map((col) => {
@@ -895,56 +1143,31 @@ export default function ContinuousEvalMobilePage() {
                           );
                         })}
 
-                        {/* عمود الرصيد الإضافي (+ / -) */}
-                        <td className="py-1.5 px-1 text-center border-l border-slate-100 bg-amber-50/20">
-                          <div className="flex items-center justify-center gap-1">
+                        {/* عمود المجموع النهائي المحسوب بدقة من 20 (مدمج فيه نقاط الحصص) */}
+                        <td className="py-2 px-2 text-center bg-emerald-50/60 font-mono font-black text-xs">
+                          <div className="flex flex-col items-center justify-center">
                             <span
-                              className={`font-mono text-xs font-black min-w-[24px] ${
-                                (rec.bonusPoints || 0) > 0
-                                  ? "text-emerald-700 font-extrabold"
-                                  : (rec.bonusPoints || 0) < 0
-                                  ? "text-rose-700 font-extrabold"
-                                  : "text-slate-400"
+                              className={`inline-block px-2.5 py-1 rounded-lg text-xs font-black shadow-2xs ${
+                                finalScore >= 15
+                                  ? "bg-emerald-600 text-white"
+                                  : finalScore >= 10
+                                  ? "bg-teal-600 text-white"
+                                  : finalScore >= 8
+                                  ? "bg-amber-500 text-white"
+                                  : "bg-rose-600 text-white"
                               }`}
                             >
-                              {(rec.bonusPoints || 0) > 0 ? `+${rec.bonusPoints}` : rec.bonusPoints || 0}
+                              {finalScore.toFixed(1)}
                             </span>
-                            <div className="flex flex-col gap-0.5">
-                              <button
-                                type="button"
-                                onClick={() => handleBonusChange(st.studentName, 0.5)}
-                                className="w-4 h-3.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded text-[9px] font-bold flex items-center justify-center"
-                                title="إضافة +0.5"
+                            {(rec.bonusPoints || 0) > 0 && (
+                              <span
+                                className="text-[9px] text-amber-800 font-bold mt-0.5"
+                                title="مجموع النقاط الإضافية الممنوحة في الحصص"
                               >
-                                +
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleBonusChange(st.studentName, -0.5)}
-                                className="w-4 h-3.5 bg-rose-100 hover:bg-rose-200 text-rose-800 rounded text-[9px] font-bold flex items-center justify-center"
-                                title="خصم -0.5"
-                              >
-                                -
-                              </button>
-                            </div>
+                                +{rec.bonusPoints}ن حصص
+                              </span>
+                            )}
                           </div>
-                        </td>
-
-                        {/* عمود المجموع النهائي المحسوب بدقة من 20 */}
-                        <td className="py-2 px-2 text-center bg-emerald-50/60 font-mono font-black text-xs">
-                          <span
-                            className={`inline-block px-2.5 py-1 rounded-lg text-xs font-black shadow-2xs ${
-                              finalScore >= 15
-                                ? "bg-emerald-600 text-white"
-                                : finalScore >= 10
-                                ? "bg-teal-600 text-white"
-                                : finalScore >= 8
-                                ? "bg-amber-500 text-white"
-                                : "bg-rose-600 text-white"
-                            }`}
-                          >
-                            {finalScore.toFixed(1)}
-                          </span>
                         </td>
                       </tr>
                     );
@@ -1236,6 +1459,97 @@ export default function ContinuousEvalMobilePage() {
               >
                 <span>تم والعودة للجدول</span>
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════
+         نافذة تعديل الحصة الإضافية (تغيير العنوان أو التاريخ أو الحذف)
+         ══════════════════════════════════════════════════════════════ */}
+      {editingSession && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="px-5 py-4 bg-amber-50 border-b border-amber-200 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-amber-700" />
+                <h3 className="font-black text-amber-950 text-sm">
+                  تعديل بيانات الحصة الإضافية
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingSession(null)}
+                className="w-8 h-8 rounded-full bg-white hover:bg-slate-100 text-slate-500 flex items-center justify-center transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-black text-slate-700 mb-1">
+                  عنوان أو وصف الحصة:
+                </label>
+                <input
+                  type="text"
+                  value={editingSession.title}
+                  onChange={(e) =>
+                    setEditingSession({ ...editingSession, title: e.target.value })
+                  }
+                  placeholder="مثلاً: حصة 1، تطبيقات نظرية طالس، مشاركة صفية..."
+                  className="w-full py-2.5 px-3 rounded-xl border border-slate-200 text-sm focus:outline-hidden focus:ring-2 focus:ring-amber-500/20"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-black text-slate-700 mb-1">
+                  تاريخ الحصة أو توقيتها (اختياري):
+                </label>
+                <input
+                  type="text"
+                  value={editingSession.date || ""}
+                  onChange={(e) =>
+                    setEditingSession({ ...editingSession, date: e.target.value })
+                  }
+                  placeholder="مثلاً: 01/11، الأحد، أو الأسبوع 2..."
+                  className="w-full py-2.5 px-3 rounded-xl border border-slate-200 text-sm focus:outline-hidden focus:ring-2 focus:ring-amber-500/20"
+                />
+              </div>
+
+              <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                {bonusSessions.length > 1 ? (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteSession(editingSession.id)}
+                    className="text-xs text-rose-600 hover:text-rose-700 font-black flex items-center gap-1 transition cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>حذف هذه الحصة</span>
+                  </button>
+                ) : (
+                  <span className="text-[11px] text-slate-400">
+                    (يجب الإبقاء على حصة واحدة على الأقل)
+                  </span>
+                )}
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingSession(null)}
+                    className="py-2 px-3 rounded-xl border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-50 transition cursor-pointer"
+                  >
+                    إلغاء
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveEditSession}
+                    className="py-2 px-4 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-black transition cursor-pointer shadow-xs"
+                  >
+                    حفظ التغييرات
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
