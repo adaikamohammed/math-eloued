@@ -132,15 +132,6 @@ const FEATURE_DEFINITIONS: FeatureCardDef[] = [
     forParentsToo: true,
     parentsDescription: "قناة تواصل راقية ومباشرة مع الأستاذ دون إحراج أو إزعاج هاتفي.",
   },
-  {
-    key: "reception",
-    label: "بطاقة استقبال الأولياء",
-    description: "تحديد اليوم والساعة الرسمية الأسبوعية لاستقبال أولياء التلاميذ بالمؤسسة.",
-    icon: Users,
-    group: "followup",
-    forParentsToo: true,
-    parentsDescription: "تنبيه الولي بموعد ومكان الاستقبال الرسمي المعتمد داخل المتوسطة.",
-  },
 
   // فضاء التفتيش والملتقى
   {
@@ -272,13 +263,11 @@ export default function FeaturesCustomizationPage() {
         students: true,
         timetable: true,
         diary: true,
+        cahierTextes: true,
         homework: true,
         continuousAssessment: false,
         honors: false,
-        reception: true,
-        announcements: false,
         messages: false,
-        penalties: false,
         forum: false,
         inspectorSync: false,
       };
@@ -295,8 +284,6 @@ export default function FeaturesCustomizationPage() {
         boardLessons: true,
         continuousAssessment: true,
         honors: true,
-        announcements: true,
-        reception: true,
       };
     }
     handleSave(updated);
@@ -569,12 +556,6 @@ export default function FeaturesCustomizationPage() {
           {flags.messages !== false && (
             <span className="px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-800 border border-indigo-200 text-xs font-bold flex items-center gap-1.5">
               <MessageSquare className="w-3.5 h-3.5 text-indigo-600" /> صندوق الرسائل
-            </span>
-          )}
-
-          {flags.reception !== false && (
-            <span className="px-3 py-1.5 rounded-xl bg-sky-50 text-sky-800 border border-sky-200 text-xs font-bold flex items-center gap-1.5">
-              <Users className="w-3.5 h-3.5 text-sky-600" /> استقبال الأولياء
             </span>
           )}
 
