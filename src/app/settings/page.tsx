@@ -17,6 +17,7 @@ import {
   ShieldCheck,
   CalendarClock,
   Sparkles,
+  Crown,
 } from "lucide-react";
 import { LoginRequired } from "@/components/LoginRequired";
 import { TeacherQR } from "@/components/TeacherQR";
@@ -275,6 +276,33 @@ export default function TeacherSettingsPage() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* ─── بطاقة الوصول إلى لوحة تحكم مدير الموقع (المشرف العام) ─── */}
+      <div className="p-4 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-3xl border border-indigo-900/50 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-2xl bg-amber-400/20 border border-amber-400/30 text-amber-300 flex items-center justify-center shrink-0">
+            <Crown className="w-5 h-5" />
+          </div>
+          <div className="min-w-0">
+            <h3 className="text-xs sm:text-sm font-black text-white flex items-center gap-2">
+              <span>لوحة تحكم مدير الموقع (المشرف العام)</span>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/30 text-indigo-200 border border-indigo-400/30">
+                إدارة المنصة
+              </span>
+            </h3>
+            <p className="text-[11px] text-slate-300 font-medium truncate mt-0.5">
+              متابعة وإدارة كافة الأساتذة والمدراء والمفتشين المسجلين، طلبات التحقق، والمتوسطات
+            </p>
+          </div>
+        </div>
+        <Link
+          href="/super-admin"
+          className="py-2 px-4 rounded-xl bg-gradient-to-r from-indigo-500 to-emerald-500 hover:from-indigo-600 hover:to-emerald-600 text-white text-xs font-black transition flex items-center justify-center gap-1.5 shrink-0 shadow-2xs"
+        >
+          <span>دخول لوحة المشرف</span>
+          <ArrowRight className="w-3.5 h-3.5 rotate-180" />
+        </Link>
       </div>
 
       {/* ─── بطاقات الوصول السريع ─── */}

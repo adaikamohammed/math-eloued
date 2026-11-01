@@ -141,6 +141,7 @@ const FEATURE_DEFINITIONS: FeatureCardDef[] = [
     icon: Sparkles,
     group: "inspection",
     forParentsToo: false,
+    badge: "معطل افتراضياً لمنع التشتيت",
   },
   {
     key: "inspectorSync",
@@ -149,6 +150,7 @@ const FEATURE_DEFINITIONS: FeatureCardDef[] = [
     icon: ShieldCheck,
     group: "inspection",
     forParentsToo: false,
+    badge: "معطل افتراضياً لمنع التشتيت",
   },
 ];
 
@@ -391,27 +393,27 @@ export default function FeaturesCustomizationPage() {
             <div className="grid grid-cols-2 gap-1.5 text-xs">
               <button
                 type="button"
+                onClick={() => applyPreset("no_inspector")}
+                className="px-2.5 py-1.5 rounded-xl bg-emerald-500/30 hover:bg-emerald-500/40 text-emerald-100 font-bold transition text-right flex items-center gap-1.5 col-span-2 border border-emerald-400/40"
+              >
+                <Zap className="w-3.5 h-3.5 text-emerald-300" />
+                <span>النمط الصفي البيداغوجي (الموصى به — بدون تفتيش)</span>
+              </button>
+              <button
+                type="button"
                 onClick={() => applyPreset("all")}
                 className="px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold transition text-right flex items-center gap-1.5"
               >
                 <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                <span>تفعيل الكل</span>
+                <span>تفعيل الكل (شامل)</span>
               </button>
               <button
                 type="button"
                 onClick={() => applyPreset("minimal")}
                 className="px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold transition text-right flex items-center gap-1.5"
               >
-                <Zap className="w-3.5 h-3.5 text-emerald-300" />
-                <span>النمط المبسط</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => applyPreset("no_inspector")}
-                className="px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold transition text-right flex items-center gap-1.5 col-span-2"
-              >
-                <EyeOff className="w-3.5 h-3.5 text-blue-300" />
-                <span>استقلالية تامة (بدون فضاء التفتيش)</span>
+                <EyeOff className="w-3.5 h-3.5 text-slate-300" />
+                <span>النمط المختصر</span>
               </button>
             </div>
           </div>
@@ -616,6 +618,11 @@ function FeatureCard({
             {feat.forParentsToo && (
               <span className="text-[9px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.2 rounded-md">
                 يظهر للولي
+              </span>
+            )}
+            {feat.badge && (
+              <span className="text-[9px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded-md">
+                {feat.badge}
               </span>
             )}
           </div>

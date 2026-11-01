@@ -28,6 +28,7 @@ import {
   Building2,
   BookMarked,
   Smartphone,
+  Crown,
 } from "lucide-react";
 import { useLayout } from "@/context/LayoutContext";
 import { supabase } from "@/lib/supabase";
@@ -99,6 +100,81 @@ export function DesktopSidebar() {
 
   // بناء القوائم وفق رتبة المستخدم وإعداداته
   const categories: NavCategory[] = React.useMemo(() => {
+    // ─── 0. إذا كان المستخدم المشرف العام ومدير المنصة ───
+    if (user && user.role === "admin") {
+      return [
+        {
+          title: "الإدارة العامة للمنصة 🛡️",
+          items: [
+            {
+              label: "لوحة مدير الموقع (المشرف العام)",
+              href: "/super-admin",
+              icon: Crown,
+              badge: "تحكم شامل",
+              badgeColor: "bg-indigo-600 text-white",
+            },
+            {
+              label: "إدارة الحسابات والمسجلين",
+              href: "/super-admin?tab=accounts",
+              icon: Users,
+              badge: "كل الرتب",
+            },
+            {
+              label: "طلبات الانضمام والتحقق 🔔",
+              href: "/super-admin?tab=approvals",
+              icon: Trophy,
+              badge: "جديد",
+              badgeColor: "bg-amber-500 text-white",
+            },
+            {
+              label: "المفتشون والمقاطعات",
+              href: "/super-admin?tab=inspectors",
+              icon: ShieldCheck,
+            },
+            {
+              label: "دليل المتوسطات والمؤسسات",
+              href: "/super-admin?tab=schools",
+              icon: Building2,
+            },
+            {
+              label: "المنشور الولائي والمراسلات",
+              href: "/super-admin?tab=circular",
+              icon: Megaphone,
+            },
+          ],
+        },
+        {
+          title: "الميدان التربوي (فضاء الأستاذ)",
+          items: [
+            { label: "لوحة تحكم الأستاذ والدروس", href: "/admin", icon: GraduationCap },
+            { label: "كراس الدروس والسبورة", href: "/admin/board", icon: BookOpen },
+            { label: "إدارة الأفواج والتلاميذ", href: "/admin/students", icon: Users },
+            { label: "التوقيت الأسبوعي", href: "/admin/timetable", icon: Calendar },
+            { label: "الدفتر اليومي", href: "/admin/diary", icon: ClipboardList },
+            { label: "دفتر النصوص الميداني", href: "/admin/cahier-textes", icon: BookMarked },
+            { label: "دفتر التقويم المستمر الصفي 📱", href: "/eval/continuous", icon: Smartphone },
+            { label: "سجل التنقيط والتقويم المستمر", href: "/eval", icon: Scale },
+            { label: "لوحة الشرف وتكريم النوابغ", href: "/honor", icon: Trophy },
+          ],
+        },
+        {
+          title: "الفضاءات الرسمية الميدانية",
+          items: [
+            { label: "فضاء التفتيش والمناشير", href: "/inspector", icon: ShieldCheck },
+            { label: "فضاء إدارة المؤسسة", href: "/principal", icon: Building2 },
+            { label: "الملتقى البيداغوجي", href: "/forum", icon: Sparkles },
+          ],
+        },
+        {
+          title: "إدارة الفضاء والتخصيص",
+          items: [
+            { label: "تخصيص الواجهة والصفحات", href: "/settings/features", icon: Sliders },
+            { label: "إعدادات الحساب وكلمة المرور", href: "/settings", icon: Settings },
+          ],
+        },
+      ];
+    }
+
     // ─── 1. إذا كان المستخدم أستاذاً مسجلاً ───
     if (user && user.role === "teacher") {
       const flags = featureFlags || {};
@@ -217,6 +293,12 @@ export function DesktopSidebar() {
       cats.push({
         title: "إدارة الفضاء والتخصيص",
         items: [
+          {
+            label: "لوحة مدير الموقع (المشرف)",
+            href: "/super-admin",
+            icon: Crown,
+            badge: "إدارة",
+          },
           {
             label: "تخصيص الواجهة والصفحات",
             href: "/settings/features",

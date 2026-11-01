@@ -25,7 +25,7 @@ import {
   Lock,
   Copy,
 } from "lucide-react";
-import { UserProfile } from "@/lib/types";
+import { UserProfile, isSuperAdminEmail } from "@/lib/types";
 import { SchoolsManager } from "./SchoolsManager";
 import { OverviewTab } from "./OverviewTab";
 import { InspectorsTab } from "./InspectorsTab";
@@ -68,6 +68,11 @@ export default function SuperAdminPage() {
     action: "upgrade_inspector" | "downgrade_teacher" | "delete_user";
     districtId?: number;
   } | null>(null);
+  const [unauthorizedInfo, setUnauthorizedInfo] = useState<{
+    email: string;
+    currentRole: string;
+    fullName: string;
+  } | null>(null);
 
   /* ─── تحقق من صلاحية المشرف العام ─── */
   useEffect(() => {
@@ -85,14 +90,25 @@ export default function SuperAdminPage() {
       return;
     }
 
+    const email = (session.user.email || "").toLowerCase().trim();
+    const isOwnerEmail = isSuperAdminEmail(email);
+
     const { data: profile } = await supabase
       .from("profiles")
-      .select("role")
+      .select("role, full_name")
       .eq("id", session.user.id)
       .single();
 
-    if (!profile || profile.role !== "admin") {
-      router.push("/admin");
+    const isAdmin = profile?.role === "admin" || isOwnerEmail;
+
+    if (!isAdmin) {
+      setUnauthorizedInfo({
+        email: session.user.email || "",
+        currentRole: profile?.role || "teacher",
+        fullName: profile?.full_name || session.user.user_metadata?.full_name || "الأستاذ",
+      });
+      setAuthorized(false);
+      setLoading(false);
       return;
     }
 
@@ -223,7 +239,79 @@ export default function SuperAdminPage() {
     );
   }
 
-  if (!authorized) return null;
+  if (!authorized) {
+    const userEmail = unauthorizedInfo?.email || "بريدك المسجل";
+    const sqlCmd = `UPDATE public.profiles SET role = 'admin' WHERE id = (SELECT id FROM auth.users WHERE email = '${userEmail}');`;
+
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans" dir="rtl">
+        <div className="max-w-lg w-full bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-6">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center shrink-0">
+              <ShieldCheck className="w-6 h-6" />
+            </div>
+            <div>
+              <h2 className="text-base sm:text-lg font-black text-slate-900">
+                لوحة تحكم مدير الموقع (المشرف العام)
+              </h2>
+              <p className="text-xs text-slate-500 font-medium mt-0.5">
+                فضاء الإدارة العليا لمتابعة كافة الأساتذة والمدراء والمفتشين المسجلين
+              </p>
+            </div>
+          </div>
+
+          <div className="p-4 bg-amber-50/80 border border-amber-200 rounded-2xl text-xs text-amber-900 space-y-2 leading-relaxed">
+            <p className="font-bold">
+              🔒 تنبيه الصلاحية: أنت مسجل حالياً بحساب <strong>{unauthorizedInfo?.fullName}</strong> ({userEmail}) برتبة: ({unauthorizedInfo?.currentRole === "teacher" ? "أستاذ" : unauthorizedInfo?.currentRole || "مستخدم"}).
+            </p>
+            <p>
+              لوحة المشرف العام مخصصة حصرياً لمدير الموقع لمشاهدة كافة الأساتذة والمدراء والمفتشين المسجلين وتوثيق الحسابات وترقيتها.
+            </p>
+          </div>
+
+          <div className="space-y-2.5">
+            <label className="text-xs font-bold text-slate-700 block">
+              💡 لتفعيل صلاحية المشرف لحسابك الحالي في ثانية واحدة:
+            </label>
+            <p className="text-[11px] text-slate-500 leading-relaxed font-medium">
+              افتح لوحة تحكم مشروعك في <strong>Supabase</strong> ثم اختر <strong>SQL Editor</strong>، والصق الأمر التالي واضغط <strong>Run</strong>:
+            </p>
+            <div className="relative bg-slate-900 text-emerald-300 p-3.5 rounded-2xl font-mono text-xs overflow-x-auto text-left border border-slate-800" dir="ltr">
+              <code>{sqlCmd}</code>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                navigator.clipboard.writeText(sqlCmd);
+                showToast("success", "تم نسخ أمر الترقية بنجاح 📋");
+              }}
+              className="w-full py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
+            >
+              <Copy className="w-4 h-4 text-slate-600" />
+              <span>نسخ أمر الترقية SQL بنقرة واحدة</span>
+            </button>
+          </div>
+
+          <div className="flex items-center gap-3 pt-2">
+            <button
+              type="button"
+              onClick={checkAdminAuth}
+              className="flex-1 py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black transition flex items-center justify-center gap-2 shadow-xs cursor-pointer"
+            >
+              <RefreshCw className="w-4 h-4" />
+              <span>إعادة التحقق من الصلاحيات</span>
+            </button>
+            <Link
+              href="/admin"
+              className="py-2.5 px-4 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition text-center"
+            >
+              العودة للوحة الأستاذ
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 pb-16" dir="rtl">

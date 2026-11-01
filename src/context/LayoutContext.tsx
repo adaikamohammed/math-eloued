@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
+import { isSuperAdminEmail } from "@/lib/types";
 
 export type UserRole = "teacher" | "inspector" | "admin" | "principal" | null;
 
@@ -9,6 +10,7 @@ export interface UserSessionInfo {
   id: string;
   fullName: string;
   role: UserRole;
+  email?: string;
   code?: string;
   slug?: string;
   districtId?: number;
@@ -82,10 +84,13 @@ export function LayoutProvider({ children }: { children: React.ReactNode }) {
         .maybeSingle();
 
       if (profile) {
+        const userEmail = session.user.email || undefined;
+        const isAdmin = profile.role === "admin" || isSuperAdminEmail(userEmail);
         setUser({
           id: profile.id,
           fullName: profile.full_name || "مستخدم المنصة",
-          role: (profile.role as UserRole) || "teacher",
+          role: isAdmin ? "admin" : (profile.role as UserRole) || "teacher",
+          email: userEmail,
           code: profile.teacher_code || undefined,
           slug: profile.slug || undefined,
           districtId: profile.district_id || undefined,

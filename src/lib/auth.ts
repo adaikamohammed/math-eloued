@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from "./supabase";
+import { isSuperAdminEmail } from "./types";
 
 // سياق الطلب: من يقرأ أو يكتب بيانات أي أستاذ
 export interface TeacherContext {
@@ -43,7 +44,13 @@ export async function getSessionProfile() {
     .select("id, role, full_name, district_id, slug, teacher_code, school_custom_name, middle_school_id, levels_taught, is_verified")
     .eq("id", user.id)
     .single();
-  return { supabase, user, profile: profile ? { ...profile, email: user.email } : null };
+  const isSuper = Boolean(user.email && isSuperAdminEmail(user.email));
+  const effectiveRole = isSuper ? "admin" : (profile?.role ?? null);
+  return {
+    supabase,
+    user,
+    profile: profile ? { ...profile, role: effectiveRole, email: user.email } : null,
+  };
 }
 
 // الأستاذ المسجل دخوله (يحل محل كلمة المرور المشتركة القديمة)

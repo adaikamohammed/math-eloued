@@ -343,13 +343,30 @@ export const DEFAULT_FEATURE_FLAGS: TeacherFeatureFlags = {
   continuousAssessment: true,
   honors: true,
   messages: true,
-  inspectorSync: true,
+  inspectorSync: false, // معطل افتراضياً لمنع تشتيت الأستاذ والولي، ويمكن تفعيله بلمسة واحدة من الإعدادات
   students: true,
   timetable: true,
   diary: true,
   cahierTextes: true,
-  forum: true,
+  forum: false, // معطل افتراضياً لمنع التشتيت
 };
+
+export const SUPER_ADMIN_EMAILS: readonly string[] = [
+  "mohammedadaika104@gmail.com",
+  "mohammed.adaika@univ-bba.dz",
+  "adaikamohammed@gmail.com",
+];
+
+export function isSuperAdminEmail(email?: string | null): boolean {
+  if (!email) return false;
+  const clean = email.trim().toLowerCase();
+  if (SUPER_ADMIN_EMAILS.includes(clean)) return true;
+  if (typeof process !== "undefined" && process.env?.NEXT_PUBLIC_SUPER_ADMIN_EMAILS) {
+    const list = process.env.NEXT_PUBLIC_SUPER_ADMIN_EMAILS.toLowerCase().split(",").map((s) => s.trim());
+    if (list.includes(clean)) return true;
+  }
+  return false;
+}
 
 export const MIDDLE_SCHOOL_SUBJECTS = [
   { id: "mathematics", name: "الرياضيات", icon: "📐", codePrefix: "MTH" },
