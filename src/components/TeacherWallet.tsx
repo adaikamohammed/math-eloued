@@ -309,10 +309,10 @@ export default function TeacherWallet() {
             type="button"
             onClick={() => setShareModalOpen(true)}
             className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 hover:from-emerald-100 hover:to-teal-100 text-[#107a57] border border-emerald-200 text-xs font-black transition shadow-2xs cursor-pointer self-start sm:self-auto shrink-0 active:scale-95"
-            title="مشاركة كل أساتذة المحفظة دفعة واحدة مع الأم أو هاتف آخر"
+            title="مشاركة ونقل كافة أساتذة المحفظة دفعة واحدة لتجدهم في جهازك الآخر بنقرة واحدة"
           >
             <Share2 className="w-4 h-4 text-[#107a57]" />
-            <span>مشاركة مع الأم / جهاز آخر 📲</span>
+            <span>مشاركة كافة الأساتذة مع جهاز آخر 📲</span>
           </button>
         )}
       </div>

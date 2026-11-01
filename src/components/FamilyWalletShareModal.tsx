@@ -73,16 +73,16 @@ export function FamilyWalletShareModal({
             </div>
             <div>
               <h3 className="text-base sm:text-lg font-black text-slate-900">
-                مشاركة محفظة الأساتذة مع الأم أو جهاز آخر
+                مشاركة ونقل كافة الأساتذة إلى جهاز آخر
               </h3>
               <p className="text-xs text-slate-500 font-medium mt-0.5">
-                مزامنة عائلية فورية دون الحاجة لحساب أو كلمة مرور
+                مزامنة فورية لنقل كافة الأساتذة المحفوظين لتجدهم في هاتفك الآخر أو جهاز العائلة
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition shrink-0"
+            className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition shrink-0 cursor-pointer"
             aria-label="إغلاق"
           >
             <X className="w-5 h-5" />
@@ -91,9 +91,9 @@ export function FamilyWalletShareModal({
 
         {/* إرشادات سريعة */}
         <div className="p-3.5 bg-emerald-50/70 rounded-2xl border border-emerald-100 text-xs text-emerald-900 leading-relaxed font-medium">
-          💡 <strong>كيف تعمل المزامنة العائلية؟</strong>
+          💡 <strong>كيف تعمل المزامنة مع جهاز آخر؟</strong>
           <br />
-          عندما تفتح الأم هذا الرابط أو تمسح الرمز بكاميرا هاتفها، تنتقل قائمة جميع أساتذة أبنائك فوراً إلى هاتفها وتُحفظ تلقائياً!
+          عند فتح هذا الرابط أو مسح الرمز من جهازك الآخر، ستنتقل قائمة كافة الأساتذة المحفوظين وتُخزّن تلقائياً لتتابع دروسهم وواجباتهم من أي جهاز دون إعادة إدخال الأكواد.
         </div>
 
         {/* رمز QR للمسح المباشر هاتف بهاتف */}
@@ -111,14 +111,14 @@ export function FamilyWalletShareModal({
             )}
           </div>
           <p className="text-[11px] text-slate-500 font-bold text-center">
-            امسح هذا الرمز بكاميرا هاتف الأم لمزامنة المحفظة في ثانية واحدة
+            امسح هذا الرمز بكاميرا جهازك الآخر لمزامنة كافة الأساتذة في ثانية واحدة
           </p>
         </div>
 
         {/* ملخص الأساتذة المشمولين بالمشاركة */}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between text-xs font-bold text-slate-600 px-1">
-            <span>الأساتذة المشمولون في المحفظة ({wallet.length}):</span>
+            <span>كافة الأساتذة المنقولين للمحفظة ({wallet.length}):</span>
             {childrenNames.length > 0 && (
               <span className="text-emerald-700 font-black">
                 👦 {childrenNames.join(" • ")}
@@ -154,7 +154,7 @@ export function FamilyWalletShareModal({
             rel="noopener noreferrer"
             className="w-full py-2.5 px-4 rounded-xl bg-[#25D366] hover:bg-[#20ba59] text-white text-xs font-black flex items-center justify-center gap-2 transition shadow-xs"
           >
-            <span>إرسال عبر واتساب 💬</span>
+            <span>إرسال الرابط عبر واتساب 💬</span>
             <ExternalLink className="w-3.5 h-3.5" />
           </a>
 
@@ -171,7 +171,7 @@ export function FamilyWalletShareModal({
             ) : (
               <>
                 <Copy className="w-4 h-4" />
-                <span>نسخ الرابط لمشاركته</span>
+                <span>نسخ رابط كافة الأساتذة</span>
               </>
             )}
           </button>

@@ -11,11 +11,15 @@ export interface CompactTeacher {
 }
 
 /**
- * تحويل نص آمن إلى Base64URL يدعم الحروف العربية في المتصفح و Node.js
+ * تحويل نص آمن إلى Base64 URL-Safe يدعم الحروف العربية في المتصفح و Node.js
  */
 export function toBase64Url(str: string): string {
   if (typeof Buffer !== "undefined") {
-    return Buffer.from(str, "utf-8").toString("base64url");
+    return Buffer.from(str, "utf-8")
+      .toString("base64")
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/, "");
   }
   const bytes = new TextEncoder().encode(str);
   let bin = "";
@@ -26,16 +30,16 @@ export function toBase64Url(str: string): string {
 }
 
 /**
- * فك تشفير Base64URL مع الحفاظ الكامل على الحروف العربية
+ * فك تشفير Base64 URL-Safe مع الحفاظ الكامل على الحروف العربية
  */
 export function fromBase64Url(b64: string): string {
   try {
-    if (typeof Buffer !== "undefined") {
-      return Buffer.from(b64, "base64url").toString("utf-8");
-    }
-    let base64 = b64.replace(/-/g, "+").replace(/_/g, "/");
+    let base64 = (b64 || "").replace(/-/g, "+").replace(/_/g, "/");
     while (base64.length % 4 !== 0) {
       base64 += "=";
+    }
+    if (typeof Buffer !== "undefined") {
+      return Buffer.from(base64, "base64").toString("utf-8");
     }
     const bin = atob(base64);
     const bytes = new Uint8Array(bin.length);
@@ -104,13 +108,13 @@ export function buildFamilyShareUrl(teachers: SavedTeacher[], origin?: string): 
 }
 
 /**
- * توليد رسالة واتساب أنيقة وجاهزة للإرسال للأم
+ * توليد رسالة مشاركة أنيقة لنقل كافة الأساتذة لجهاز آخر
  */
 export function buildWhatsAppShareUrl(shareUrl: string, childrenNames?: string[]): string {
   const childrenText = childrenNames && childrenNames.length > 0
     ? ` لأبنائنا (${childrenNames.filter(Boolean).join(" و ")})`
     : " لأبنائنا";
 
-  const message = `السلام عليكم 🌹\nهذا رابط محفظة أساتذة التعليم المتوسط${childrenText} لمتابعة دروسهم والواجبات اليومية عبر منصة جسور:\n\n${shareUrl}\n\n(بمجرد النقر على الرابط ستُحفظ قائمة جميع الأساتذة في هاتفك تلقائياً)`;
+  const message = `السلام عليكم 🌹\nهذا رابط نقل ومزامنة كافة أساتذة التعليم المتوسط${childrenText} عبر منصة جسور:\n\n${shareUrl}\n\n(افتح الرابط من جهازك الآخر لتنتقل وتُحفظ قائمة جميع الأساتذة فيه تلقائياً بنقرة واحدة دون الحاجة لإعادة كتابة الأكواد)`;
   return `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`;
 }
