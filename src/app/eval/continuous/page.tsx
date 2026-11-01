@@ -982,7 +982,7 @@ export default function ContinuousEvalMobilePage() {
                         <span className="text-[11px] font-black text-slate-700 block">
                           رصد المعايير والكراريس:
                         </span>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5">
                           {columns.map((col) => {
                             const currentScore = customScores[col.id] ?? 0;
                             const isMissing = customScores[`missing_${col.id}`] === 1;
@@ -990,23 +990,84 @@ export default function ContinuousEvalMobilePage() {
                             return (
                               <div
                                 key={col.id}
-                                className={`p-2.5 rounded-xl border transition ${
+                                className={`p-2.5 rounded-2xl border transition space-y-2 ${
                                   isMissing
-                                    ? "bg-red-50/90 border-red-300"
+                                    ? "bg-red-50/95 border-red-300 ring-1 ring-red-300"
                                     : currentScore > 0
                                     ? "bg-emerald-50/40 border-emerald-300"
-                                    : "bg-slate-50/80 border-slate-200"
+                                    : "bg-slate-50/90 border-slate-200"
                                 }`}
                               >
-                                <div className="flex items-center justify-between text-xs font-black text-slate-800 mb-1.5">
+                                {/* رأس معيار الرصد */}
+                                <div className="flex items-center justify-between text-xs font-black text-slate-800">
                                   <span className="truncate">{col.title}</span>
-                                  <span className="font-mono text-[11px] text-slate-600 font-bold">
-                                    {currentScore} / {col.maxScore}ن
+                                  <span className="font-mono text-[10px] bg-white border border-slate-200 px-1.5 py-0.5 rounded-md text-slate-600 font-bold">
+                                    من {col.maxScore}ن
                                   </span>
                                 </div>
 
-                                <div className="flex items-center gap-1.5">
-                                  {/* زر أحضر العلامة الكاملة بنقرة */}
+                                {/* سطر الإدخال اليدوي وأزرار +/- بمقدار 0.5ن */}
+                                <div className="flex items-center justify-between gap-1.5 bg-white p-1 rounded-xl border border-slate-200 shadow-2xs">
+                                  {/* زر خصم -0.5 */}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const nextVal = Math.max(0, Math.round((currentScore - 0.5) * 100) / 100);
+                                      handleColumnScoreChange(st.studentName, col.id, nextVal, false);
+                                    }}
+                                    className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-rose-100 text-slate-700 hover:text-rose-800 font-black text-xs flex items-center justify-center transition cursor-pointer active:scale-95"
+                                    title="إنقاص -0.5"
+                                  >
+                                    -
+                                  </button>
+
+                                  {/* حقل كتابة العلامة يدوياً بحرية (مثلاً 1.75 أو 1.5) */}
+                                  <div className="flex-1 flex items-center justify-center">
+                                    <input
+                                      type="number"
+                                      inputMode="decimal"
+                                      step="any"
+                                      min="0"
+                                      max={col.maxScore}
+                                      value={currentScore}
+                                      placeholder="0"
+                                      onChange={(e) => {
+                                        const val = parseFloat(e.target.value);
+                                        handleColumnScoreChange(
+                                          st.studentName,
+                                          col.id,
+                                          isNaN(val) ? 0 : Math.min(col.maxScore, Math.max(0, val)),
+                                          false
+                                        );
+                                      }}
+                                      className={`w-14 text-center py-1 font-mono font-black text-sm rounded-lg border transition focus:outline-hidden focus:ring-2 ${
+                                        isMissing
+                                          ? "bg-red-50 text-red-900 border-red-300 focus:ring-red-400"
+                                          : currentScore > 0
+                                          ? "bg-emerald-50/60 text-emerald-950 border-emerald-300 focus:ring-emerald-400"
+                                          : "bg-slate-50 text-slate-800 border-slate-200 focus:ring-emerald-400"
+                                      }`}
+                                      title="يمكنك كتابة أي علامة يدوياً (مثل 1.75 أو 1.5)"
+                                    />
+                                  </div>
+
+                                  {/* زر زيادة +0.5 */}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const nextVal = Math.min(col.maxScore, Math.round((currentScore + 0.5) * 100) / 100);
+                                      handleColumnScoreChange(st.studentName, col.id, nextVal, false);
+                                    }}
+                                    className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-emerald-100 text-slate-700 hover:text-emerald-800 font-black text-xs flex items-center justify-center transition cursor-pointer active:scale-95"
+                                    title="زيادة +0.5"
+                                  >
+                                    +
+                                  </button>
+                                </div>
+
+                                {/* أزرار الإجراءات السريعة (العلامة الكاملة / لم يحضر) */}
+                                <div className="flex items-center gap-1.5 pt-0.5">
+                                  {/* زر العلامة الكاملة بنقرة */}
                                   <button
                                     type="button"
                                     onClick={() =>
@@ -1017,15 +1078,15 @@ export default function ContinuousEvalMobilePage() {
                                         false
                                       )
                                     }
-                                    className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-black transition flex items-center justify-center gap-1 cursor-pointer ${
+                                    className={`flex-1 py-1 px-1.5 rounded-lg text-[10px] font-black transition flex items-center justify-center gap-1 cursor-pointer ${
                                       currentScore === col.maxScore && !isMissing
-                                        ? "bg-emerald-600 text-white shadow-xs"
-                                        : "bg-white hover:bg-emerald-100 text-emerald-800 border border-emerald-200"
+                                        ? "bg-emerald-600 text-white shadow-2xs"
+                                        : "bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-200"
                                     }`}
-                                    title={`أحضر المطلوب ومنحه (${col.maxScore}ن)`}
+                                    title={`منح العلامة الكاملة (${col.maxScore}ن)`}
                                   >
-                                    <span>✓ أحضر</span>
-                                    <span className="font-mono text-[10px]">({col.maxScore})</span>
+                                    <span>✓ كاملة</span>
+                                    <span className="font-mono">({col.maxScore})</span>
                                   </button>
 
                                   {/* زر لم يحضر بالأحمر */}
@@ -1039,10 +1100,10 @@ export default function ContinuousEvalMobilePage() {
                                         !isMissing
                                       )
                                     }
-                                    className={`py-1.5 px-2.5 rounded-lg text-xs font-black transition cursor-pointer ${
+                                    className={`py-1 px-2 rounded-lg text-[10px] font-black transition cursor-pointer ${
                                       isMissing
-                                        ? "bg-red-600 text-white animate-pulse"
-                                        : "bg-white hover:bg-red-100 text-red-700 border border-red-200"
+                                        ? "bg-red-600 text-white animate-pulse shadow-2xs"
+                                        : "bg-white hover:bg-red-50 text-red-700 border border-red-200"
                                     }`}
                                     title="تحديد كـ (لم يحضر) باللون الأحمر"
                                   >
@@ -1350,12 +1411,38 @@ export default function ContinuousEvalMobilePage() {
                                   : ""
                               }`}
                             >
-                              <div className="flex items-center justify-center gap-1">
-                                {/* حقل إدخال النقطة */}
+                              <div className="flex items-center justify-center gap-0.5">
+                                {/* أزرار +/- لتعديل 0.5ن سريعا */}
+                                <div className="flex flex-col gap-0.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const nextVal = Math.min(col.maxScore, Math.round((currentScore + 0.5) * 100) / 100);
+                                      handleColumnScoreChange(st.studentName, col.id, nextVal, false);
+                                    }}
+                                    className="w-4 h-3 rounded bg-slate-100 hover:bg-emerald-100 text-slate-700 hover:text-emerald-800 text-[9px] font-black flex items-center justify-center cursor-pointer transition"
+                                    title="زيادة +0.5"
+                                  >
+                                    +
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const nextVal = Math.max(0, Math.round((currentScore - 0.5) * 100) / 100);
+                                      handleColumnScoreChange(st.studentName, col.id, nextVal, false);
+                                    }}
+                                    className="w-4 h-3 rounded bg-slate-100 hover:bg-rose-100 text-slate-700 hover:text-rose-800 text-[9px] font-black flex items-center justify-center cursor-pointer transition"
+                                    title="إنقاص -0.5"
+                                  >
+                                    -
+                                  </button>
+                                </div>
+
+                                {/* حقل إدخال النقطة يدوياً بحرية */}
                                 <input
                                   type="number"
                                   inputMode="decimal"
-                                  step="0.25"
+                                  step="any"
                                   min="0"
                                   max={col.maxScore}
                                   value={currentScore}
@@ -1375,6 +1462,7 @@ export default function ContinuousEvalMobilePage() {
                                       ? "bg-emerald-50 text-emerald-900 border border-emerald-300 focus:bg-white"
                                       : "bg-slate-50 text-slate-700 border border-slate-200 focus:bg-white focus:border-emerald-500"
                                   } focus:outline-hidden focus:ring-2`}
+                                  title="يمكنك كتابة أي علامة يدوياً (مثلاً 1.75)"
                                 />
 
                                 {/* زر الذكاء: تبديل حالة الإحضار (أخضر أحضر / أحمر لم يحضر) */}
