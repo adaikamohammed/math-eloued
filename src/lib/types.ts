@@ -389,22 +389,33 @@ export const OFFICIAL_SUBJECT_COEFFICIENTS: Record<string, Record<number, number
   amazigh: { 1: 2, 2: 2, 3: 2, 4: 2 },
 };
 
-// دالة ذكية لحساب معامل المادة حسب المستوى
-export function getOfficialSubjectCoefficient(subjectNameOrId: string, levelNum: number): number {
-  const norm = (subjectNameOrId || "").trim().toLowerCase();
+// دالة ذكية لحساب معامل المادة حسب المستوى (مقاومة للقيم غير النصية والكائنات)
+export function getOfficialSubjectCoefficient(subjectNameOrId: any, levelNum: number = 1): number {
+  let str = "";
+  if (typeof subjectNameOrId === "string") {
+    str = subjectNameOrId;
+  } else if (typeof subjectNameOrId === "object" && subjectNameOrId !== null) {
+    str = subjectNameOrId.name || subjectNameOrId.id || subjectNameOrId.title || "";
+  } else if (subjectNameOrId != null) {
+    str = String(subjectNameOrId);
+  }
+
+  const norm = str.trim().toLowerCase();
   const found = MIDDLE_SCHOOL_SUBJECTS.find(
-    (s) => s.id === norm || s.name.includes(norm) || norm.includes(s.name)
+    (s) => s.id === norm || s.name.includes(norm) || (norm.length > 0 && norm.includes(s.name))
   );
   const subjId = found?.id || "mathematics";
   const map = OFFICIAL_SUBJECT_COEFFICIENTS[subjId];
   if (!map) return 2;
-  return map[levelNum] || map[1] || 2;
+  const lvl = typeof levelNum === "number" && !isNaN(levelNum) ? levelNum : 1;
+  return map[lvl] || map[1] || 2;
 }
 
 // استخراج رقم المستوى من اسم القسم (مثلاً: "1م1" -> 1، "2م3" -> 2)
-export function getLevelFromClassName(className: string): number {
+export function getLevelFromClassName(className: any): number {
   if (!className) return 1;
-  const match = className.match(/([1-4])/);
+  const str = typeof className === "string" ? className : String(className || "");
+  const match = str.match(/([1-4])/);
   if (match) return parseInt(match[1], 10);
   return 1;
 }

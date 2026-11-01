@@ -173,7 +173,10 @@ export default function GradebookEvaluationPage() {
           setGradeRecords(parsed.records);
         }
         if (parsed.subject) {
-          setTeacherSubject(parsed.subject);
+          const rawSubj = typeof parsed.subject === "string"
+            ? parsed.subject
+            : (parsed.subject?.name || parsed.subject?.id || "الرياضيات");
+          setTeacherSubject(rawSubj);
         }
         if (parsed.rubricConfig) {
           setRubricConfig(parsed.rubricConfig);
@@ -206,11 +209,14 @@ export default function GradebookEvaluationPage() {
 
         // المادة
         if (data.subject) {
+          const rawSubj = typeof data.subject === "string"
+            ? data.subject
+            : ((data.subject as any)?.name || (data.subject as any)?.id || "الرياضيات");
           const found = MIDDLE_SCHOOL_SUBJECTS.find(
-            (s) => s.id === data.subject || s.name === data.subject
+            (s) => s.id === rawSubj || s.name === rawSubj
           );
           if (found) setTeacherSubject(found.name);
-          else if (typeof data.subject === "string") setTeacherSubject(data.subject);
+          else setTeacherSubject(rawSubj);
         }
 
         // إعدادات سلم التقويم
