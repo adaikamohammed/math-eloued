@@ -78,12 +78,33 @@ const COLUMN_PRESETS = [
   },
 ];
 
+// دالة تطبيع النصوص العربية لتسهيل البحث (تجاوز الهمزات، التاء المربوطة، التشكيل، الألف اللينة)
+export function normalizeArabicText(text: string): string {
+  if (!text) return "";
+  return text
+    .trim()
+    .toLowerCase()
+    .replace(/[\u064B-\u065F\u0670]/g, "") // إزالة التشكيل
+    .replace(/[إأآا]/g, "ا")
+    .replace(/[يى]/g, "ي")
+    .replace(/ة/g, "ه")
+    .replace(/ؤ/g, "و")
+    .replace(/ئ/g, "ي");
+}
+
 export default function ContinuousEvalMobilePage() {
+  // حالة تثبيت المكون (تمنع تماماً أي خطأ Hydration بين السيرفر والمتصفح)
+  const [mounted, setMounted] = useState(false);
+
   // حالة المصادقة والتحميل
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [lastEditedStudent, setLastEditedStudent] = useState<string | null>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     fetch("/api/auth")
@@ -603,12 +624,26 @@ export default function ContinuousEvalMobilePage() {
       .sort((a, b) => a.studentName.localeCompare(b.studentName, "ar"));
   }, [studentRoster, selectedClass]);
 
-  // التلاميذ المصفين بالبحث
+  // التلاميذ المصفين بالبحث الذكي (تطبيع الحروف العربية وتجاوز الهمزات والتاء المربوطة بمجرد كتابة حرفين)
   const filteredStudents = useMemo(() => {
     if (!searchQuery.trim()) return classStudents;
-    const q = searchQuery.trim().toLowerCase();
-    return classStudents.filter((st) => st.studentName.toLowerCase().includes(q));
+    const qNorm = normalizeArabicText(searchQuery);
+    return classStudents.filter((st) => normalizeArabicText(st.studentName).includes(qNorm));
   }, [classStudents, searchQuery]);
+
+  // تلاميذ من أفواج أخرى يطابقون البحث في حال كتب الأستاذ اسماً من فوج آخر
+  const otherClassMatches = useMemo(() => {
+    if (!searchQuery.trim() || searchQuery.trim().length < 2) return [];
+    const qNorm = normalizeArabicText(searchQuery);
+    const normCurrentClass = selectedClass.replace(/\s+/g, "");
+    return studentRoster
+      .filter((s) => {
+        const clsNorm = (s.className || "").replace(/\s+/g, "");
+        if (clsNorm === normCurrentClass) return false;
+        return normalizeArabicText(s.studentName).includes(qNorm);
+      })
+      .slice(0, 3);
+  }, [studentRoster, searchQuery, selectedClass]);
 
   // إحصائيات سريعة للفوج
   const classStats = useMemo(() => {
@@ -640,6 +675,15 @@ export default function ContinuousEvalMobilePage() {
       missingTotal,
     };
   }, [classStudents, getRecord]);
+
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4" dir="rtl">
+        <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin mb-3" />
+        <span className="text-sm font-black text-slate-700">جاري تحميل دفتر التقويم المستمر...</span>
+      </div>
+    );
+  }
 
   if (authenticated === false) {
     return <LoginRequired next="/eval/continuous" title="دفتر التقويم المستمر الصفي" />;
@@ -756,22 +800,24 @@ export default function ContinuousEvalMobilePage() {
               ))}
             </div>
 
-            {/* مربع البحث عن تلميذ */}
-            <div className="relative flex-1 sm:flex-initial sm:min-w-[200px]">
+            {/* مربع البحث السريع والذكي عن تلميذ */}
+            <div className="relative flex-1 sm:flex-initial sm:min-w-[260px]">
               <input
                 type="text"
-                placeholder="ابحث عن اسم تلميذ..."
+                placeholder="ابحث عن تلميذ (اكتب حرفين)..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full py-1.5 pr-8 pl-3 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20"
+                className="w-full py-2 pr-9 pl-8 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:border-emerald-500 rounded-xl text-xs font-bold transition focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 shadow-2xs"
               />
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-2.5 pointer-events-none" />
+              <Search className="w-4 h-4 text-slate-400 absolute right-3 top-2.5 pointer-events-none" />
               {searchQuery && (
                 <button
+                  type="button"
                   onClick={() => setSearchQuery("")}
-                  className="absolute left-2.5 top-2 text-slate-400 hover:text-slate-600"
+                  className="absolute left-2.5 top-2 w-5 h-5 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-600 flex items-center justify-center transition cursor-pointer"
+                  title="مسح البحث"
                 >
-                  <X className="w-3.5 h-3.5" />
+                  <X className="w-3 h-3" />
                 </button>
               )}
             </div>
@@ -818,6 +864,250 @@ export default function ContinuousEvalMobilePage() {
             </div>
           </div>
         </div>
+
+        {/* ─── تنبيه البحث الذكي في حال وجود التلميذ في فوج آخر ─── */}
+        {searchQuery.trim().length >= 2 && otherClassMatches.length > 0 && (
+          <div className="bg-amber-50/90 border border-amber-200 rounded-2xl p-3 flex flex-wrap items-center justify-between gap-2 text-xs text-amber-950 animate-in fade-in duration-150">
+            <div className="flex items-center gap-2">
+              <span className="text-base">💡</span>
+              <div>
+                <span className="font-bold">هل تبحث في فوج آخر؟</span>
+                <span className="mr-1">
+                  وجِد تطابق لنفس الاسم في:{" "}
+                  {otherClassMatches.map((m) => `${m.studentName} (${m.className})`).join("، ")}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              {otherClassMatches.map((m) => (
+                <button
+                  key={`${m.className}_${m.studentName}`}
+                  type="button"
+                  onClick={() => setSelectedClass(m.className)}
+                  className="py-1 px-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-black text-xs transition cursor-pointer shadow-2xs"
+                >
+                  الانتقال لفوج {m.className}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ─── لوحة الرصد السريع المباشر عند البحث (كتابة حرفين للتنقيط الفوري) ─── */}
+        {searchQuery.trim().length > 0 && (
+          <div className="bg-gradient-to-br from-emerald-50/90 to-teal-50/60 border-2 border-emerald-300 rounded-2xl p-3.5 sm:p-5 shadow-sm space-y-3 animate-in fade-in zoom-in-98 duration-150">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-200/80 pb-2.5">
+              <div className="flex items-center gap-2">
+                <span className="w-7 h-7 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-black text-xs shadow-xs">
+                  ⚡
+                </span>
+                <div>
+                  <h3 className="font-black text-slate-900 text-xs sm:text-sm flex items-center gap-1.5">
+                    <span>نتائج الرصد السريع: &quot;{searchQuery}&quot;</span>
+                    <span className="text-emerald-800 bg-emerald-200/70 text-[11px] font-bold px-2 py-0.5 rounded-full">
+                      {filteredStudents.length} تلميذ
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-slate-600">
+                    رصد الكراس، الواجبات، أو نقاط الحصص بنقرة زر واحدة ومباشرة دون عناء التمرير
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="py-1 px-3 rounded-xl bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 text-xs font-bold transition flex items-center gap-1 cursor-pointer shadow-2xs"
+              >
+                <X className="w-3.5 h-3.5" />
+                <span>مسح البحث والعودة للجدول الكامل</span>
+              </button>
+            </div>
+
+            {/* بطاقات التلاميذ المطابقين للبحث */}
+            <div className="space-y-3">
+              {filteredStudents.length === 0 ? (
+                <div className="py-6 text-center text-slate-500 bg-white/70 rounded-xl text-xs">
+                  لا يوجد تلميذ في فوج {selectedClass} يحتوي اسمه على &quot;{searchQuery}&quot;
+                </div>
+              ) : (
+                filteredStudents.map((st) => {
+                  const rec = getRecord(st.studentName);
+                  const finalScore = rec.continuousScore ?? 0;
+                  const customScores = rec.customScores || {};
+
+                  return (
+                    <div
+                      key={st.id || st.studentName}
+                      className="bg-white rounded-2xl border border-emerald-200 p-3.5 sm:p-4 shadow-xs space-y-3"
+                    >
+                      {/* رأس بطاقة التلميذ ومجموعه الحالي */}
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+                        <div className="flex items-center gap-2">
+                          <span className="w-8 h-8 rounded-xl bg-slate-900 text-white text-xs font-black flex items-center justify-center">
+                            {st.studentName.charAt(0)}
+                          </span>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-black text-slate-900 text-sm sm:text-base">
+                                {st.studentName}
+                              </span>
+                              {st.groupName && (
+                                <span className="text-[10px] text-slate-500 font-bold bg-slate-100 px-1.5 py-0.5 rounded">
+                                  {st.groupName}
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[10px] text-slate-500">الفوج: {selectedClass}</span>
+                          </div>
+                        </div>
+
+                        {/* شارة المجموع النهائي المحسوب */}
+                        <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl">
+                          <span className="text-xs font-bold text-emerald-900">المجموع الحالي:</span>
+                          <span className="text-sm font-black font-mono text-emerald-700">
+                            {finalScore.toFixed(1)} / 20
+                          </span>
+                          {(rec.bonusPoints || 0) > 0 && (
+                            <span className="text-[10px] text-amber-700 font-bold bg-amber-100 px-1.5 py-0.5 rounded">
+                              +{rec.bonusPoints}ن حصص
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* أزرار الرصد المباشر للأعمدة (الكراس، الواجب، إلخ) */}
+                      <div className="space-y-1.5">
+                        <span className="text-[11px] font-black text-slate-700 block">
+                          رصد المعايير والكراريس:
+                        </span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                          {columns.map((col) => {
+                            const currentScore = customScores[col.id] ?? 0;
+                            const isMissing = customScores[`missing_${col.id}`] === 1;
+
+                            return (
+                              <div
+                                key={col.id}
+                                className={`p-2.5 rounded-xl border transition ${
+                                  isMissing
+                                    ? "bg-red-50/90 border-red-300"
+                                    : currentScore > 0
+                                    ? "bg-emerald-50/40 border-emerald-300"
+                                    : "bg-slate-50/80 border-slate-200"
+                                }`}
+                              >
+                                <div className="flex items-center justify-between text-xs font-black text-slate-800 mb-1.5">
+                                  <span className="truncate">{col.title}</span>
+                                  <span className="font-mono text-[11px] text-slate-600 font-bold">
+                                    {currentScore} / {col.maxScore}ن
+                                  </span>
+                                </div>
+
+                                <div className="flex items-center gap-1.5">
+                                  {/* زر أحضر العلامة الكاملة بنقرة */}
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleColumnScoreChange(
+                                        st.studentName,
+                                        col.id,
+                                        col.maxScore,
+                                        false
+                                      )
+                                    }
+                                    className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-black transition flex items-center justify-center gap-1 cursor-pointer ${
+                                      currentScore === col.maxScore && !isMissing
+                                        ? "bg-emerald-600 text-white shadow-xs"
+                                        : "bg-white hover:bg-emerald-100 text-emerald-800 border border-emerald-200"
+                                    }`}
+                                    title={`أحضر المطلوب ومنحه (${col.maxScore}ن)`}
+                                  >
+                                    <span>✓ أحضر</span>
+                                    <span className="font-mono text-[10px]">({col.maxScore})</span>
+                                  </button>
+
+                                  {/* زر لم يحضر بالأحمر */}
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleColumnScoreChange(
+                                        st.studentName,
+                                        col.id,
+                                        0,
+                                        !isMissing
+                                      )
+                                    }
+                                    className={`py-1.5 px-2.5 rounded-lg text-xs font-black transition cursor-pointer ${
+                                      isMissing
+                                        ? "bg-red-600 text-white animate-pulse"
+                                        : "bg-white hover:bg-red-100 text-red-700 border border-red-200"
+                                    }`}
+                                    title="تحديد كـ (لم يحضر) باللون الأحمر"
+                                  >
+                                    🔴 لم يُحضر
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* خانات رصد الحصص الإضافية المباشرة */}
+                      {bonusSessions.length > 0 && (
+                        <div className="pt-2 border-t border-slate-100 flex items-center gap-2 flex-wrap">
+                          <span className="text-[11px] font-black text-amber-900 ml-1">
+                            نقاط الحصص الإضافية:
+                          </span>
+                          {bonusSessions.map((sess) => {
+                            const sessScore = customScores[sess.id] ?? 0;
+                            return (
+                              <div
+                                key={sess.id}
+                                className="inline-flex items-center gap-1.5 bg-amber-50 border border-amber-200/80 px-2.5 py-1 rounded-xl"
+                              >
+                                <span className="text-xs font-bold text-amber-950">
+                                  {sess.title}:
+                                </span>
+                                <span className="font-mono text-xs font-black text-amber-900 bg-amber-200/70 px-1.5 py-0.2 rounded">
+                                  {sessScore > 0 ? `+${sessScore}` : sessScore}
+                                </span>
+                                <div className="flex items-center gap-0.5 mr-1">
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleSessionScoreChange(st.studentName, sess.id, 0.5)
+                                    }
+                                    className="w-5 h-5 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded font-black text-[10px] flex items-center justify-center cursor-pointer"
+                                    title="إضافة +0.5"
+                                  >
+                                    +
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleSessionScoreChange(st.studentName, sess.id, -0.5)
+                                    }
+                                    className="w-5 h-5 bg-rose-100 hover:bg-rose-200 text-rose-800 rounded font-black text-[10px] flex items-center justify-center cursor-pointer"
+                                    title="خصم -0.5"
+                                  >
+                                    -
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        )}
 
         {/* ══════════════════════════════════════════════════════════════
            الجدول الأساسي المرن للتقويم والتنقيط الميداني
