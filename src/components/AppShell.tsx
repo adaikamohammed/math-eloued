@@ -31,7 +31,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 }
 
 function AppShellContent({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname() || "/";
+  const routerPathname = usePathname();
+  const pathname =
+    routerPathname ||
+    (typeof window !== "undefined" ? window.location.pathname : "/");
 
   // فحص ما إذا كان المسار الحالي لوحة تحكم داخلية للأستاذ/المفتش
   // ملاحظة: /messages/send هي صفحة عامة مخصصة لإرسال التلاميذ والأولياء لرسائلهم، دون شريط الأستاذ
@@ -45,7 +48,11 @@ function AppShellContent({ children }: { children: React.ReactNode }) {
   // لا يظهر فيها الشريط الجانبي ولا أدوات الإدارة؛ فقط محتوى الصفحة المستقل
   if (!isDashboardRoute) {
     return (
-      <div className="min-h-screen bg-[#fafaf7] text-[#1a1a2e] font-sans antialiased" dir="rtl">
+      <div
+        className="min-h-screen bg-[#fafaf7] text-[#1a1a2e] font-sans antialiased"
+        dir="rtl"
+        suppressHydrationWarning
+      >
         {children}
       </div>
     );
@@ -58,6 +65,7 @@ function AppShellContent({ children }: { children: React.ReactNode }) {
     <div
       className="flex h-screen bg-[#fafaf7] text-[#1a1a2e] overflow-hidden"
       dir="rtl"
+      suppressHydrationWarning
     >
       {/* ── الشريط الجانبي (على اليمين، بكامل الارتفاع h-screen) ── */}
       <DesktopSidebar />

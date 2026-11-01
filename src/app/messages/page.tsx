@@ -210,7 +210,11 @@ export default function MessagesInboxPage() {
 
   if (!mounted || authLoading) {
     return (
-      <div className="py-20 flex flex-col items-center justify-center space-y-3" dir="rtl">
+      <div
+        className="py-20 flex flex-col items-center justify-center space-y-3"
+        dir="rtl"
+        suppressHydrationWarning
+      >
         <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin" />
         <span className="text-xs font-black text-slate-700">جاري تحميل صندوق الرسائل...</span>
       </div>
@@ -220,7 +224,11 @@ export default function MessagesInboxPage() {
   // إذا لم يكن مسجلاً كأستاذ، تظهر شاشة تسجيل الدخول أو رابط الإرسال
   if (!isTeacher) {
     return (
-      <div className="py-12 max-w-md mx-auto space-y-6 text-center" dir="rtl">
+      <div
+        className="py-12 max-w-md mx-auto space-y-6 text-center"
+        dir="rtl"
+        suppressHydrationWarning
+      >
         <LoginRequired next="/messages" title="صندوق رسائل ومقترحات الأستاذ" />
         <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-600 space-y-2">
           <p className="font-bold">هل أنت تلميذ أو ولي أمر وترغب في مراسلة الأستاذ؟</p>
@@ -236,7 +244,11 @@ export default function MessagesInboxPage() {
   }
 
   return (
-    <div className="space-y-5 animate-in fade-in duration-200" dir="rtl">
+    <div
+      className="space-y-5 animate-in fade-in duration-200"
+      dir="rtl"
+      suppressHydrationWarning
+    >
       {/* ─── شريط الأدوات العلوي المدمج (Toolbar) ─── */}
       <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200/90 shadow-2xs flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2.5 min-w-0">
