@@ -18,6 +18,11 @@ import {
   Camera,
   Check,
   Eye,
+  Layers,
+  FileText,
+  Quote,
+  CheckCircle2,
+  Lock,
 } from "lucide-react";
 import { UserProfile, LEVELS, MIDDLE_SCHOOL_SUBJECTS } from "@/lib/types";
 import SaveToWalletButton from "@/components/SaveToWalletButton";
@@ -64,7 +69,7 @@ export default async function TeacherPublicSpace({ params, searchParams }: Teach
   const showContinuousAssessment = flags.continuousAssessment !== false;
   const showMessages = flags.messages !== false;
 
-  // التحقق من تعيين ساعة الاستقبال ولوحة الشرف: إذا لم يحددهما الأستاذ فلا يتم إظهارهما
+  // التحقق من تعيين ساعة الاستقبال ولوحة الشرف
   const hasConfiguredReception = Boolean(profile.reception?.officialDay || profile.reception?.guidance);
   const showReception = flags.reception !== false && hasConfiguredReception;
 
@@ -86,15 +91,15 @@ export default async function TeacherPublicSpace({ params, searchParams }: Teach
   const subjectName = subjectObj.name;
   const subjectIcon = subjectObj.icon;
 
-  const levelTitles: Record<number, { title: string; tag: string }> = {
-    1: { title: "السنة الأولى متوسط", tag: "1م" },
-    2: { title: "السنة الثانية متوسط", tag: "2م" },
-    3: { title: "السنة الثالثة متوسط", tag: "3م" },
-    4: { title: "السنة الرابعة متوسط (BEM)", tag: "4م" },
+  const levelTitles: Record<number, { title: string; tag: string; color: string; bg: string }> = {
+    1: { title: "السنة الأولى متوسط", tag: "1م", color: "text-emerald-700", bg: "from-emerald-600 to-teal-700" },
+    2: { title: "السنة الثانية متوسط", tag: "2م", color: "text-blue-700", bg: "from-blue-600 to-indigo-700" },
+    3: { title: "السنة الثالثة متوسط", tag: "3م", color: "text-amber-700", bg: "from-amber-600 to-orange-700" },
+    4: { title: "السنة الرابعة متوسط (BEM)", tag: "4م", color: "text-purple-700", bg: "from-purple-600 to-indigo-800" },
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-16" dir="rtl">
+    <div className="min-h-screen bg-slate-50/80 text-slate-800 font-sans pb-20" dir="rtl">
       {/* الحفظ التلقائي في محفظة الولي بمجرد فتح الصفحة */}
       <AutoSaveTeacherWallet
         profile={{
@@ -103,19 +108,24 @@ export default async function TeacherPublicSpace({ params, searchParams }: Teach
         }}
       />
 
-      {/* رأس الصفحة والهوية البصرية للأستاذ */}
-      <div className="bg-gradient-to-b from-emerald-800 via-emerald-700 to-teal-800 text-white px-4 pt-8 pb-12 rounded-b-3xl shadow-lg">
-        <div className="max-w-2xl mx-auto space-y-4">
-          <div className="flex items-center justify-between text-xs text-emerald-200">
+      {/* رأس الصفحة والهوية البصرية للأستاذ بشاشة عريضة للحاسوب والهاتف */}
+      <div className="bg-gradient-to-r from-emerald-950 via-emerald-800 to-teal-900 text-white relative overflow-hidden shadow-lg">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-96 h-96 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-14 sm:pb-16 relative z-10 space-y-6">
+          {/* شريط الإجراءات العلوي */}
+          <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
             <Link
               href="/"
-              className="inline-flex items-center gap-1 hover:text-white transition bg-white/10 px-2.5 py-1 rounded-full backdrop-blur-xs"
+              className="inline-flex items-center gap-1.5 hover:text-white transition bg-white/10 hover:bg-white/15 px-3 py-1.5 rounded-full backdrop-blur-md text-emerald-100 border border-white/10 font-bold"
             >
               <ArrowRight className="w-3.5 h-3.5" />
-              العودة لبوابة منصة جسور
+              <span>العودة لبوابة منصة جسور</span>
             </Link>
+
             <div className="flex items-center gap-2">
-              <span className="font-mono bg-white/15 px-2.5 py-0.5 rounded-md font-bold text-[11px]">
+              <span className="font-mono bg-white/15 backdrop-blur-md px-3 py-1 rounded-xl font-black text-xs text-emerald-100 border border-white/20">
                 {isValidLevel ? `${profile.teacher_code || "MTH"}-${requestedLevel}` : profile.teacher_code || "MTH"}
               </span>
               <SaveToWalletButton
@@ -127,46 +137,88 @@ export default async function TeacherPublicSpace({ params, searchParams }: Teach
             </div>
           </div>
 
-          <div className="text-center space-y-2 pt-2">
-            <div className="w-16 h-16 rounded-2xl bg-white/15 backdrop-blur-md border border-white/20 mx-auto flex items-center justify-center text-2xl font-black shadow-inner">
-              {subjectIcon}
+          {/* بطاقة تعريف الأستاذ الرئيسية */}
+          <div className="flex flex-col lg:flex-row items-center lg:items-center justify-between gap-6 pt-2">
+            <div className="flex flex-col sm:flex-row items-center text-center sm:text-right gap-4 sm:gap-5">
+              <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-3xl bg-white/15 backdrop-blur-md border border-white/25 flex items-center justify-center text-4xl sm:text-5xl font-black shadow-xl shrink-0">
+                {subjectIcon}
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                  <span className="inline-flex items-center gap-1 bg-white/15 backdrop-blur-md px-3 py-0.5 rounded-full text-xs font-bold text-emerald-100 border border-white/20">
+                    مادة {subjectName}
+                  </span>
+
+                  {isValidLevel && (
+                    <span className="inline-flex items-center gap-1 bg-amber-400/25 px-3 py-0.5 rounded-full text-xs font-black text-amber-200 border border-amber-300/40">
+                      ⭐ فضاء {levelTitles[requestedLevel]?.title || `السنة ${requestedLevel}م`}
+                    </span>
+                  )}
+                </div>
+
+                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white tracking-tight">
+                  {profile.full_name}
+                </h1>
+
+                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 text-xs sm:text-sm text-emerald-100/90 font-medium">
+                  <span className="flex items-center gap-1.5">
+                    <Building2 className="w-4 h-4 text-emerald-300" />
+                    <span>{profile.school_custom_name || "متوسطة التعليم المتوسط"}</span>
+                  </span>
+                  {profile.district_id && (
+                    <>
+                      <span>•</span>
+                      <span className="flex items-center gap-1">
+                        <MapPin className="w-3.5 h-3.5 text-emerald-300" />
+                        <span>المقاطعة {profile.district_id}</span>
+                      </span>
+                    </>
+                  )}
+                </div>
+
+                {profile.bio && (
+                  <p className="text-xs text-emerald-100/90 font-medium leading-relaxed max-w-2xl pt-1 bg-white/10 backdrop-blur-sm p-3 rounded-2xl border border-white/10 text-right">
+                    « {profile.bio} »
+                  </p>
+                )}
+              </div>
             </div>
 
-            {isValidLevel ? (
-              <div className="inline-flex items-center gap-1.5 bg-amber-400/25 px-3 py-1 rounded-full text-xs font-black text-amber-200 border border-amber-300/40 shadow-xs">
-                <span>⭐</span>
-                <span>فضاء أولياء وتلاميذ {levelTitles[requestedLevel]?.title || `السنة ${requestedLevel}م`}</span>
+            {/* إحصائيات سريعة للأستاذ تظهر بوضوح في شاشات الحاسوب */}
+            <div className="flex flex-wrap items-center justify-center gap-2.5 shrink-0 bg-white/10 backdrop-blur-md p-3 rounded-2xl border border-white/10">
+              <div className="px-3 py-1.5 rounded-xl bg-white/10 text-center">
+                <span className="block text-xs font-black text-emerald-200">{activeLevels.length}</span>
+                <span className="text-[10px] text-emerald-100/80">مستويات مسندة</span>
               </div>
-            ) : (
-              <div className="inline-block bg-white/15 px-3 py-0.5 rounded-full text-xs font-bold text-emerald-100 border border-white/20">
-                مادة {subjectName}
+              <div className="px-3 py-1.5 rounded-xl bg-white/10 text-center">
+                <span className="block text-xs font-black text-emerald-200">{teacherLessons.length}</span>
+                <span className="text-[10px] text-emerald-100/80">درساً وواجباً</span>
               </div>
-            )}
-
-            <h1 className="text-xl sm:text-2xl font-black tracking-tight">{profile.full_name}</h1>
-            <p className="text-xs sm:text-sm text-emerald-100 flex items-center justify-center gap-1.5 font-medium">
-              <Building2 className="w-4 h-4 text-emerald-300" />
-              {profile.school_custom_name || "متوسطة التعليم المتوسط"}
-            </p>
-            {profile.district_id && (
-              <p className="text-[11px] text-emerald-200/90 flex items-center justify-center gap-1">
-                <MapPin className="w-3 h-3 text-emerald-300" />
-                المقاطعة {profile.district_id}
-              </p>
-            )}
+              {flags.boardLessons !== false && (
+                <Link
+                  href={isValidLevel ? `/t/${slug}/board?lvl=${requestedLevel}` : `/t/${slug}/board`}
+                  className="px-3 py-1.5 rounded-xl bg-emerald-500/30 hover:bg-emerald-500/40 text-center transition border border-emerald-400/30 flex items-center gap-1.5 text-xs font-bold text-white"
+                >
+                  <Camera className="w-3.5 h-3.5 text-emerald-300" />
+                  <span>السبورة الرقمية 📸</span>
+                </Link>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto px-4 -mt-6 space-y-5">
+      {/* ─── الحاوية الرئيسية للشاشات الكبيرة والمحمولة ─── */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-6 sm:-mt-8 space-y-6 relative z-20">
         {/* تنبيه المستوى المخصص إذا دخل الولي برمز مستوى */}
         {isValidLevel && (
-          <div className="bg-white rounded-2xl p-3.5 border border-emerald-200 shadow-sm flex items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-2 text-emerald-800">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+          <div className="bg-white rounded-3xl p-4 border border-emerald-200 shadow-sm flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2.5 text-emerald-900 font-bold">
+              <span className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
               <span>
-                أنت تتصفح حصراً محتوى <strong>{levelTitles[requestedLevel]?.title}</strong> (الرمز:{" "}
-                <code className="font-mono font-bold text-emerald-700 bg-emerald-50 px-1 py-0.5 rounded">
+                أنت تتصفح حالياً المحتوى المخصص لـ <strong>{levelTitles[requestedLevel]?.title}</strong> (الرمز:{" "}
+                <code className="font-mono font-black text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-200">
                   {profile.teacher_code}-{requestedLevel}
                 </code>
                 )
@@ -175,201 +227,304 @@ export default async function TeacherPublicSpace({ params, searchParams }: Teach
             {teacherDeclaredLevels.length > 1 && (
               <Link
                 href={`/t/${slug}`}
-                className="text-[11px] text-slate-500 hover:text-emerald-700 underline font-medium shrink-0"
+                className="text-xs text-emerald-700 hover:text-emerald-900 font-black underline shrink-0 flex items-center gap-1"
               >
-                عرض باقي المستويات
+                <span>عرض جميع المستويات المسندة للأستاذ</span>
+                <ArrowRight className="w-3.5 h-3.5 rotate-180" />
               </Link>
             )}
           </div>
         )}
 
-        {/* شريط الإعلانات للأستاذ */}
-        {showAnnouncements && announcements && announcements.length > 0 && (
-          <div className="bg-white rounded-2xl p-4 border border-emerald-100 shadow-md space-y-2">
-            <div className="flex items-center gap-2 text-xs font-bold text-emerald-700">
-              <Sparkles className="w-4 h-4" />
-              إعلانات وتنبيهات الأستاذ
-            </div>
-            {announcements.map((a) => (
-              <div key={a.id} className="p-3 bg-emerald-50/50 rounded-xl border border-emerald-100/60 text-xs">
-                <p className="font-bold text-slate-800">{a.title}</p>
-                <p className="text-slate-600 mt-1 whitespace-pre-wrap">{a.content}</p>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* كراس الدروس وصور السبورة الرقمية */}
-        {flags.boardLessons !== false && (
-          <div className="bg-gradient-to-r from-emerald-700 via-teal-700 to-emerald-800 text-white rounded-3xl p-5 shadow-md space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-white/15 backdrop-blur-xs flex items-center justify-center text-white border border-white/20 shadow-inner">
-                  <Camera className="w-5 h-5 text-emerald-200" />
-                </div>
+        {/* تخطيط شاشة الحاسوب: عمود رئيسي للدروس + عمود جانبي للمعلومات والتواصل */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-start">
+          {/* ═════════ العمود الرئيسي (8 من 12 في الحاسوب) ═════════ */}
+          <main className="lg:col-span-8 space-y-6">
+            {/* 1. شبكة المستويات والمناهج الدراسية للأستاذ */}
+            <section className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/90 shadow-2xs space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
                 <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-sm sm:text-base font-black">
-                      كراس الدروس والسبورة الرقمية
-                    </h2>
-                    <span className="text-[10px] bg-white/20 text-white px-2 py-0.5 rounded-full font-bold">
-                      {isValidLevel ? `${requestedLevel}م 📸` : "جديد 📸"}
+                  <h2 className="text-sm sm:text-base font-black text-slate-900 flex items-center gap-2">
+                    <BookOpen className="w-5 h-5 text-emerald-600" />
+                    <span>
+                      {isValidLevel
+                        ? `الدروس والمذكرات المقررة للسنة ${requestedLevel} متوسط:`
+                        : "اختر السنة الدراسية لمشاهدة الدروس والواجبات:"}
                     </span>
-                  </div>
-                  <p className="text-[11px] text-emerald-100 font-medium mt-0.5">
-                    {isValidLevel
-                      ? `صور السبورة اليومية والواجبات الخاصة بالسنة ${requestedLevel} متوسط`
-                      : "صور السبورة اليومية، الملخصات، وتوجيهات الأستاذ"}
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-0.5 font-medium">
+                    انقر على أي سنة دراسية لاستعراض المذكرات، الملخصات، وسلاسل التمارين مع حلولها
                   </p>
                 </div>
+                <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-xl">
+                  {activeLevels.length} مستويات
+                </span>
               </div>
-              <Link
-                href={isValidLevel ? `/t/${slug}/board?lvl=${requestedLevel}` : `/t/${slug}/board`}
-                className="bg-white text-emerald-900 hover:bg-emerald-50 px-3.5 py-2 rounded-xl text-xs font-black transition shadow-sm shrink-0 flex items-center gap-1 active:scale-95"
+
+              {/* بطاقات المستويات في شبكة متجاوبة كاملة في الحاسوب */}
+              <div
+                className={`grid grid-cols-1 sm:grid-cols-2 ${
+                  activeLevels.length >= 3 ? "xl:grid-cols-3" : ""
+                } gap-4 pt-1`}
               >
-                <span>تصفح السبورة</span>
-                <ChevronLeft className="w-4 h-4" />
-              </Link>
-            </div>
-            <p className="text-[11px] text-emerald-100/90 leading-relaxed bg-black/10 p-2.5 rounded-xl border border-white/10">
-              💡 <strong>خدمة التلميذ الغائب:</strong> إذا غاب ابنك عن الحصة، يستطيع فتح كراس السبورة ونقل عناصر الدرس والأنشطة والواجبات بدقة دون الحاجة لاستعارة كراس زميله.
-            </p>
-          </div>
-        )}
+                {activeLevels.map((lvl: number) => {
+                  const levelCount = teacherLessons.filter((l) => l.level === lvl).length;
+                  const item = levelTitles[lvl] || {
+                    title: `السنة ${lvl} متوسط`,
+                    tag: `${lvl}م`,
+                    color: "text-emerald-700",
+                    bg: "from-emerald-600 to-teal-700",
+                  };
 
-        {/* السنوات الدراسية للأستاذ: تعرض فقط المستويات المحددة */}
-        <div className="space-y-3">
-          <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2 px-1">
-            <BookOpen className="w-4 h-4 text-emerald-600" />
-            {isValidLevel
-              ? `الدروس والمذكرات المقررة للسنة ${requestedLevel} متوسط:`
-              : "اختر السنة الدراسية لمشاهدة الدروس والواجبات:"}
-          </h2>
+                  return (
+                    <div
+                      key={lvl}
+                      className="bg-slate-50/70 hover:bg-white rounded-2xl p-4 border border-slate-200/90 hover:border-emerald-300 shadow-2xs hover:shadow-md transition-all duration-200 flex flex-col justify-between gap-4 group"
+                    >
+                      <div className="flex items-start gap-3.5">
+                        <div
+                          className={`w-12 h-12 rounded-2xl bg-gradient-to-tr ${item.bg} text-white flex items-center justify-center text-lg font-black shrink-0 shadow-md shadow-emerald-700/20 group-hover:scale-105 transition-transform`}
+                        >
+                          {item.tag}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h3 className="text-sm font-black text-slate-900 group-hover:text-emerald-800 transition">
+                            {item.title}
+                          </h3>
+                          <p className="text-[11px] text-slate-500 mt-0.5 font-medium flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+                            <span>{levelCount > 0 ? `${levelCount} درس ومنشور` : "بانتظار نشر الدروس"}</span>
+                          </p>
+                        </div>
+                      </div>
 
-          <div className="space-y-2.5">
-            {activeLevels.map((lvl: number) => {
-              const levelCount = teacherLessons.filter((l) => l.level === lvl).length;
-              const item = levelTitles[lvl] || { title: `السنة ${lvl} متوسط`, tag: `${lvl}م` };
+                      {/* أزرار الإجراء السريع لكل سنة دراسية */}
+                      <div className="grid grid-cols-1 gap-1.5 pt-2 border-t border-slate-200/60">
+                        <Link
+                          href={`/year/${lvl}?teacher=${profile.id}`}
+                          className="w-full py-2 px-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-black flex items-center justify-center gap-1.5 transition shadow-2xs"
+                        >
+                          <span>عرض الدروس والواجبات</span>
+                          <ChevronLeft className="w-3.5 h-3.5" />
+                        </Link>
 
-              return (
-                <Link
-                  key={lvl}
-                  href={`/year/${lvl}?teacher=${profile.id}`}
-                  className="flex items-center gap-3.5 bg-white rounded-2xl p-4 border border-slate-100 shadow-2xs hover:border-emerald-300 hover:shadow-sm active:scale-[0.98] transition group"
-                >
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-600 text-white flex items-center justify-center text-lg font-black shrink-0 shadow-sm shadow-emerald-600/20 group-hover:scale-105 transition-transform">
-                    {item.tag}
+                        {flags.boardLessons !== false && (
+                          <Link
+                            href={`/t/${slug}/board?lvl=${lvl}`}
+                            className="w-full py-1.5 px-3 rounded-xl bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold flex items-center justify-center gap-1.5 transition shadow-2xs"
+                          >
+                            <Camera className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>كراس السبورة {item.tag} 📸</span>
+                          </Link>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+
+            {/* 2. كراس الدروس وصور السبورة الرقمية اليومية */}
+            {flags.boardLessons !== false && (
+              <section className="bg-gradient-to-r from-emerald-800 via-teal-800 to-emerald-900 text-white rounded-3xl p-5 sm:p-6 shadow-md space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-12 h-12 rounded-2xl bg-white/15 backdrop-blur-md flex items-center justify-center text-white border border-white/20 shadow-inner shrink-0">
+                      <Camera className="w-6 h-6 text-emerald-200" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-base sm:text-lg font-black text-white">
+                          كراس الدروس والسبورة الرقمية اليومية
+                        </h2>
+                        <span className="text-[10px] bg-white/20 text-white px-2.5 py-0.5 rounded-full font-bold">
+                          {isValidLevel ? `${requestedLevel}م 📸` : "جديد 📸"}
+                        </span>
+                      </div>
+                      <p className="text-xs text-emerald-100 font-medium mt-0.5">
+                        {isValidLevel
+                          ? `توثيق السبورة اليومية والملخصات لجميع حصص السنة ${requestedLevel} متوسط`
+                          : "توثيق صور السبورة اليومية، كراس القسم، والواجبات المنزلية بدقة"}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-black text-slate-900">{item.title}</h3>
-                    <p className="text-[11px] text-slate-400 mt-0.5 font-medium">
-                      {levelCount > 0 ? `${levelCount} درس منشور` : "لا توجد دروس منشورة حالياً"}
+
+                  <Link
+                    href={isValidLevel ? `/t/${slug}/board?lvl=${requestedLevel}` : `/t/${slug}/board`}
+                    className="bg-white text-emerald-950 hover:bg-emerald-50 px-4 py-2.5 rounded-2xl text-xs font-black transition shadow-sm shrink-0 flex items-center justify-center gap-1.5 active:scale-95"
+                  >
+                    <span>تصفح كراس السبورة الشامل</span>
+                    <ChevronLeft className="w-4 h-4" />
+                  </Link>
+                </div>
+
+                <div className="text-xs text-emerald-100/90 leading-relaxed bg-black/15 p-3.5 rounded-2xl border border-white/10 flex items-start gap-2.5">
+                  <span className="text-base shrink-0">💡</span>
+                  <div>
+                    <strong className="text-white block font-black">خدمة التلميذ الغائب وحفظ الحق البيداغوجي:</strong>
+                    <span>
+                      إذا غاب ابنك عن الحصة، يستطيع فتح كراس السبورة اليومي ونقل عناصر الدرس والأنشطة والواجبات بدقة دون
+                      الحاجة لاستعارة كراس زميله أو الوقوع في أخطاء النقل.
+                    </span>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* 3. شريط إعلانات وتنبيهات الأستاذ */}
+            {showAnnouncements && announcements && announcements.length > 0 && (
+              <section className="bg-white rounded-3xl p-5 sm:p-6 border border-emerald-100 shadow-2xs space-y-3">
+                <div className="flex items-center gap-2 text-xs font-black text-emerald-800 border-b border-slate-100 pb-2">
+                  <Sparkles className="w-4 h-4 text-emerald-600" />
+                  <span>إعلانات وتنبيهات الأستاذ الهامة للأولياء</span>
+                </div>
+                <div className="space-y-2.5">
+                  {announcements.map((a) => (
+                    <div
+                      key={a.id}
+                      className="p-3.5 bg-emerald-50/60 rounded-2xl border border-emerald-100 text-xs space-y-1"
+                    >
+                      <p className="font-black text-slate-900">{a.title}</p>
+                      <p className="text-slate-600 leading-relaxed whitespace-pre-wrap font-medium">{a.content}</p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* 4. ميثاق ونقاط التقويم المستمر (20 / 20) */}
+            {showContinuousAssessment && (
+              <section className="bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 rounded-3xl p-5 sm:p-6 border border-emerald-200/90 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex items-start gap-3.5">
+                  <div className="w-11 h-11 rounded-2xl bg-emerald-700 text-white flex items-center justify-center font-bold shadow-xs shrink-0">
+                    <Scale className="w-5 h-5 text-emerald-100" />
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-xs sm:text-sm font-black text-slate-900">
+                        ميثاق ونقاط التقويم المستمر الشفاف (20 / 20)
+                      </h3>
+                      <span className="text-[10px] bg-emerald-700 text-white px-2 py-0.5 rounded-md font-bold">
+                        شفافية ⚖️
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-600 leading-relaxed font-medium">
+                      معايير المتابعة الدقيقة: كراس القسم المنظم • السلوك والانضباط الصفي • إنجاز الواجبات • الاستجوابات والفروض.
                     </p>
                   </div>
-                  <div className="w-8 h-8 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:text-emerald-700 group-hover:bg-emerald-50 transition shrink-0">
-                    <ChevronLeft className="w-4 h-4" />
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* ميثاق ونقاط التقويم المستمر الشفاف (خاصية الأستاذ المتقدمة) */}
-        {showContinuousAssessment && (
-          <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 rounded-2xl p-4 border border-emerald-200/90 shadow-2xs flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-700 text-white flex items-center justify-center font-bold shadow-xs">
-                <Scale className="w-5 h-5 text-emerald-100" />
-              </div>
-              <div>
-                <div className="flex items-center gap-1.5">
-                  <p className="text-xs font-black text-slate-900">ميثاق ونقاط التقويم المستمر (20 / 20)</p>
-                  <span className="text-[10px] bg-emerald-600 text-white px-1.5 py-0.5 rounded font-bold">
-                    شفافية ⚖️
-                  </span>
                 </div>
-                <p className="text-[11px] text-slate-500 mt-0.5 font-medium">
-                  شبكة التقييم: كراس • سلوك وانضباط • واجبات • استجوابات
+
+                <Link
+                  href="/my-children"
+                  className="w-full sm:w-auto text-xs font-black text-emerald-900 bg-white border border-emerald-200 px-4 py-2.5 rounded-xl hover:bg-emerald-100 active:scale-95 transition shadow-2xs text-center shrink-0 flex items-center justify-center gap-1.5"
+                >
+                  <span>متابعة تقويم ابنك</span>
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </Link>
+              </section>
+            )}
+          </main>
+
+          {/* ═════════ العمود الجانبي (4 من 12 في الحاسوب) ═════════ */}
+          <aside className="lg:col-span-4 space-y-5">
+            {/* بطاقة قنوات التواصل الخاصة بالولي: ساعة الاستقبال والرسالة السرية */}
+            <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-2xs space-y-3.5">
+              <h3 className="text-xs font-black text-slate-900 flex items-center gap-2 border-b border-slate-100 pb-2">
+                <MessageCircle className="w-4 h-4 text-emerald-600" />
+                <span>قنوات التواصل الرسمية مع الأستاذ</span>
+              </h3>
+
+              <div className="space-y-2.5">
+                {showMessages && (
+                  <Link
+                    href={`/messages/send?teacher=${profile.id}${isValidLevel ? `&lvl=${requestedLevel}` : ""}`}
+                    className="p-3.5 rounded-2xl bg-slate-50 hover:bg-emerald-50/70 border border-slate-200 hover:border-emerald-300 transition flex items-start gap-3 group shadow-2xs"
+                  >
+                    <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                      <MessageCircle className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1 min-w-0 text-right">
+                      <strong className="block text-xs font-black text-slate-900 group-hover:text-emerald-800">
+                        رسالة سرية ومباشرة للأستاذ 🔒
+                      </strong>
+                      <span className="text-[11px] text-slate-500 leading-relaxed font-medium block mt-0.5">
+                        استفسار أو تنبيه حول استيعاب ابنك بسرية تامة دون أي حرج
+                      </span>
+                    </div>
+                  </Link>
+                )}
+
+                {showReception && (
+                  <div className="p-3.5 rounded-2xl bg-teal-50/60 border border-teal-200/80 flex items-start gap-3 text-right">
+                    <div className="w-9 h-9 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center shrink-0">
+                      <CalendarClock className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <strong className="block text-xs font-black text-teal-950">
+                        ساعة استقبال الأولياء الرسمية
+                      </strong>
+                      <span className="text-[11px] text-teal-800 font-bold block mt-0.5">
+                        {profile.reception?.officialDay
+                          ? `كل يوم ${profile.reception.officialDay} (${profile.reception.officialTime || "صباحاً"})`
+                          : "خلال أوقات الدوام الرسمي المعتمد بالمؤسسة"}
+                      </span>
+                      <span className="text-[10px] text-teal-600 font-medium block mt-0.5">
+                        بمقر {profile.school_custom_name || "المتوسطة"}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* لوحة الشرف وتكريم النوابغ */}
+            {showHonors && (
+              <div className="bg-gradient-to-br from-amber-500/10 via-amber-50 to-yellow-50 rounded-3xl p-5 border border-amber-200/90 shadow-2xs space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold shadow-xs">
+                      <Trophy className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-black text-amber-950">لوحة الشرف وتكريم النوابغ</h3>
+                      <p className="text-[10px] text-amber-700 font-medium">المتميزون في مادة {subjectName}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-[11px] text-slate-600 leading-relaxed font-medium">
+                  تكريم دوري للتلاميذ المتفوقين في التقييمات الصفيّة والمواظبة على إنجاز الواجبات والأنشطة النموذجية.
                 </p>
-              </div>
-            </div>
-            <Link
-              href="/my-children"
-              className="text-xs font-bold text-emerald-800 bg-white border border-emerald-200 px-3.5 py-2 rounded-xl hover:bg-emerald-100 active:scale-95 transition shadow-2xs shrink-0"
-            >
-              متابعة الولي 🔍
-            </Link>
-          </div>
-        )}
 
-        {/* لوحة الشرف للأستاذ: تظهر فقط إذا أضاف الأستاذ تلاميذ متميزين */}
-        {showHonors && (
-          <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-2xs flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
-                <Trophy className="w-5 h-5" />
+                <Link
+                  href={`/honor?teacher=${profile.id}${isValidLevel ? `&lvl=${requestedLevel}` : ""}`}
+                  className="w-full py-2 px-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-black flex items-center justify-center gap-1.5 transition shadow-2xs"
+                >
+                  <span>مشاهدة المتفوقين وشهادات التقدير</span>
+                  <span>🌟</span>
+                </Link>
               </div>
-              <div>
-                <p className="text-xs font-bold text-slate-800">لوحة الشرف وتكريم النوابغ</p>
-                <p className="text-[11px] text-slate-400">التلاميذ المتميزون في مادة {subjectName}</p>
-              </div>
-            </div>
-            <Link
-              href={`/honor?teacher=${profile.id}${isValidLevel ? `&lvl=${requestedLevel}` : ""}`}
-              className="text-xs font-bold text-amber-700 bg-amber-50 px-3 py-1.5 rounded-lg hover:bg-amber-100 transition"
-            >
-              مشاهدة 🌟
-            </Link>
-          </div>
-        )}
+            )}
 
-        {/* قنوات التواصل الخاصة بالولي: ساعة الاستقبال المعتمدة والرسالة السرية */}
-        <div className={`grid grid-cols-1 ${showReception && showMessages ? "sm:grid-cols-2" : ""} gap-2.5`}>
-          {showReception && (
-            <div className="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3">
-              <span className="w-9 h-9 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center shrink-0">
-                <CalendarClock className="w-4 h-4" />
-              </span>
-              <span className="text-xs">
-                <strong className="block text-slate-800">ساعة استقبال الأولياء</strong>
-                <span className="text-slate-500">
-                  {profile.reception?.officialDay ? `كل ${profile.reception.officialDay} (${profile.reception.officialTime || "صباحاً"})` : "خلال أوقات الدوام الرسمي"}
-                </span>
-              </span>
+            {/* بطاقة رمز الاستجابة السريع لمشاركة الفضاء */}
+            <div className="bg-white rounded-3xl p-2 border border-slate-200/90 shadow-2xs">
+              <TeacherQR
+                path={`/t/${profile.slug || profile.id}${isValidLevel ? `?lvl=${requestedLevel}` : ""}`}
+                teacherName={profile.full_name || "الأستاذ"}
+                code={isValidLevel ? `${profile.teacher_code || "MTH"}-${requestedLevel}` : profile.teacher_code}
+                schoolName={profile.school_custom_name || ""}
+                levelsTaught={isValidLevel ? [requestedLevel] : (profile.levels_taught || [1, 2, 3, 4])}
+              />
             </div>
-          )}
 
-          {showMessages && (
-            <Link
-              href={`/messages/send?teacher=${profile.id}${isValidLevel ? `&lvl=${requestedLevel}` : ""}`}
-              className="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-sm hover:border-emerald-300 transition flex items-center gap-3"
-            >
-              <span className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                <MessageCircle className="w-4 h-4" />
-              </span>
-              <span className="text-xs">
-                <strong className="block text-slate-800">رسالة سرية للأستاذ</strong>
-                <span className="text-slate-500">ملاحظة أو استفسار سري ومجهول الهوية 🔒</span>
-              </span>
-            </Link>
-          )}
+            {/* درع الحماية وإخلاء المسؤولية القانونية */}
+            <SafeHarborDisclaimer
+              teacherName={profile.full_name}
+              schoolName={profile.school_custom_name}
+              subjectName={(profile as any).subject || "مادة الرياضيات"}
+            />
+          </aside>
         </div>
-
-        <TeacherQR
-          path={`/t/${profile.slug || profile.id}${isValidLevel ? `?lvl=${requestedLevel}` : ""}`}
-          teacherName={profile.full_name || "الأستاذ"}
-          code={isValidLevel ? `${profile.teacher_code || "MTH"}-${requestedLevel}` : profile.teacher_code}
-          schoolName={profile.school_custom_name || ""}
-          levelsTaught={isValidLevel ? [requestedLevel] : (profile.levels_taught || [1, 2, 3, 4])}
-        />
-
-        {/* شريط درع الحماية القانونية وإخلاء المسؤولية */}
-        <SafeHarborDisclaimer
-          teacherName={profile.full_name}
-          schoolName={profile.school_custom_name}
-          subjectName={(profile as any).subject || "مادة الرياضيات"}
-        />
       </div>
     </div>
   );
