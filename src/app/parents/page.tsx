@@ -225,7 +225,11 @@ export default function ParentsPage() {
   const backHref = teacherHomeHref(teacherId) + (urlLvl ? `?lvl=${urlLvl}` : "");
 
   return (
-    <div className="pb-16 pt-3 fade-up space-y-5 max-w-3xl mx-auto px-4 font-sans text-right" dir="rtl">
+    <div
+      className="pb-16 pt-3 fade-up space-y-5 max-w-4xl mx-auto px-4 font-sans text-right"
+      dir="rtl"
+      suppressHydrationWarning
+    >
       {/* ── رأس الصفحة وزر الرجوع ── */}
       <div className="flex items-center gap-3 bg-white p-3.5 rounded-2xl border border-sky-100 shadow-2xs">
         <Link
