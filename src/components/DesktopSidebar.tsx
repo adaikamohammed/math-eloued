@@ -175,21 +175,6 @@ export function DesktopSidebar() {
         });
       }
 
-      if (flags.penalties !== false) {
-        followupItems.push({
-          label: "سجل الخصومات والملاحظات",
-          href: "/penalties",
-          icon: FileWarning,
-        });
-      }
-
-      if (flags.announcements !== false) {
-        followupItems.push({
-          label: "شريط الإعلانات والتنبيهات",
-          href: "/announcement",
-          icon: Megaphone,
-        });
-      }
 
       if (flags.messages !== false) {
         followupItems.push({

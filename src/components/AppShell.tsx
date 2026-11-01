@@ -18,7 +18,6 @@ const DASHBOARD_ROUTES = [
   "/settings",
   "/forum",
   "/pedagogy",
-  "/penalties",
   "/eval",
 ];
 

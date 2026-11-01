@@ -96,17 +96,9 @@ const PAGE_INFO: Record<string, { title: string; subtitle: string }> = {
     title: "إنشاء حساب أستاذ",
     subtitle: "الانضمام إلى الأسرة التربوية في منصة جسور",
   },
-  "/announcement": {
-    title: "الإعلانات والمستجدات",
-    subtitle: "آخر التنبيهات والبلاغات المدرسية والتربوية",
-  },
   "/pedagogy": {
     title: "الموارد البيداغوجية",
     subtitle: "المذكرات النموذجية والتوزيعات السنوية المعتمدة",
-  },
-  "/penalties": {
-    title: "سجل الانضباط والملاحظات",
-    subtitle: "متابعة السلوك والمواظبة داخل المؤسسة",
   },
   "/messages": {
     title: "الرسائل والتواصل",

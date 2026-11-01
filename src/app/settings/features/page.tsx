@@ -124,15 +124,6 @@ const FEATURE_DEFINITIONS: FeatureCardDef[] = [
     parentsDescription: "لوحة فخر عامة تظهر للتلميذ والولي لتشجيع التنافس الإيجابي الشريف.",
   },
   {
-    key: "announcements",
-    label: "شريط الإعلانات والتنبيهات",
-    description: "نشر التنبيهات المدرسية العاجلة ومواعيد الفروض والأنشطة الخاصة بالمؤسسة.",
-    icon: Megaphone,
-    group: "followup",
-    forParentsToo: true,
-    parentsDescription: "إشعارات فورية تظهر في أعلى فضاء الأستاذ للتلاميذ والأولياء.",
-  },
-  {
     key: "messages",
     label: "صندوق الرسائل والمقترحات",
     description: "استقبال استفسارات ورسائل الأولياء والتلاميذ المشفرة مع الحفاظ على الخصوصية.",
@@ -149,14 +140,6 @@ const FEATURE_DEFINITIONS: FeatureCardDef[] = [
     group: "followup",
     forParentsToo: true,
     parentsDescription: "تنبيه الولي بموعد ومكان الاستقبال الرسمي المعتمد داخل المتوسطة.",
-  },
-  {
-    key: "penalties",
-    label: "سجل الخصومات والملاحظات",
-    description: "توثيق التنبيهات الموجهة والملاحظات السلوكية مع بيان التاريخ والتفاصيل.",
-    icon: FileWarning,
-    group: "followup",
-    forParentsToo: false,
   },
 
   // فضاء التفتيش والملتقى
@@ -582,17 +565,6 @@ export default function FeaturesCustomizationPage() {
             </span>
           )}
 
-          {flags.penalties !== false && (
-            <span className="px-3 py-1.5 rounded-xl bg-rose-50 text-rose-800 border border-rose-200 text-xs font-bold flex items-center gap-1.5">
-              <FileWarning className="w-3.5 h-3.5 text-rose-600" /> سجل الخصومات
-            </span>
-          )}
-
-          {flags.announcements !== false && (
-            <span className="px-3 py-1.5 rounded-xl bg-orange-50 text-orange-800 border border-orange-200 text-xs font-bold flex items-center gap-1.5">
-              <Megaphone className="w-3.5 h-3.5 text-orange-600" /> شريط الإعلانات
-            </span>
-          )}
 
           {flags.messages !== false && (
             <span className="px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-800 border border-indigo-200 text-xs font-bold flex items-center gap-1.5">
