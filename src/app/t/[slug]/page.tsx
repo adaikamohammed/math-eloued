@@ -295,7 +295,7 @@ export default async function TeacherPublicSpace({ params, searchParams }: Teach
               </div>
             </div>
             <Link
-              href={`/parents?teacher=${profile.id}${isValidLevel ? `&lvl=${requestedLevel}` : ""}`}
+              href="/my-children"
               className="text-xs font-bold text-emerald-800 bg-white border border-emerald-200 px-3.5 py-2 rounded-xl hover:bg-emerald-100 active:scale-95 transition shadow-2xs shrink-0"
             >
               متابعة الولي 🔍
@@ -327,25 +327,22 @@ export default async function TeacherPublicSpace({ params, searchParams }: Teach
         {/* قنوات التواصل الخاصة بالولي: ساعة الاستقبال المعتمدة والرسالة السرية */}
         <div className={`grid grid-cols-1 ${showReception && showMessages ? "sm:grid-cols-2" : ""} gap-2.5`}>
           {showReception && (
-            <Link
-              href={`/parents?teacher=${profile.id}${isValidLevel ? `&lvl=${requestedLevel}` : ""}`}
-              className="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-sm hover:border-teal-300 transition flex items-center gap-3"
-            >
+            <div className="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3">
               <span className="w-9 h-9 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center shrink-0">
                 <CalendarClock className="w-4 h-4" />
               </span>
               <span className="text-xs">
                 <strong className="block text-slate-800">ساعة استقبال الأولياء</strong>
                 <span className="text-slate-500">
-                  {profile.reception?.officialDay ? `كل ${profile.reception.officialDay}` : "المواعيد والتوجيهات"}
+                  {profile.reception?.officialDay ? `كل ${profile.reception.officialDay} (${profile.reception.officialTime || "صباحاً"})` : "خلال أوقات الدوام الرسمي"}
                 </span>
               </span>
-            </Link>
+            </div>
           )}
 
           {showMessages && (
             <Link
-              href={`/messages?teacher=${profile.id}${isValidLevel ? `&lvl=${requestedLevel}` : ""}`}
+              href={`/messages/send?teacher=${profile.id}${isValidLevel ? `&lvl=${requestedLevel}` : ""}`}
               className="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-sm hover:border-emerald-300 transition flex items-center gap-3"
             >
               <span className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">

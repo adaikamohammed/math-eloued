@@ -20,7 +20,6 @@ const DASHBOARD_ROUTES = [
   "/pedagogy",
   "/eval",
   "/messages",
-  "/parents",
   "/honor",
 ];
 

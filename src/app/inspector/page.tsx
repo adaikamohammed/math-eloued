@@ -50,6 +50,10 @@ export default function InspectorDashboardPage() {
   const [loadingData, setLoadingData] = useState(true);
   const [error, setError] = useState("");
 
+  // التحقق من صلاحية المفتش / المشرف
+  const isInspector = profile?.role === "inspector" || profile?.role === "admin";
+  const effectiveViewMode = isInspector ? viewMode : "teacher";
+
   // التحقق من الحساب وتحديد نمط العرض الافتراضي
   useEffect(() => {
     if (profileLoading) return;
@@ -57,11 +61,10 @@ export default function InspectorDashboardPage() {
       const dId = profile.district_id || 1;
       setDistrictId(dId);
 
-      // المفتش أو المشرف يدخل مباشرة للوحة قيادة المفتشية
+      // المفتش أو المشرف فقط يدخل للوحة قيادة المفتشية، أما الأستاذ فملفه الخاص فقط
       if (profile.role === "inspector" || profile.role === "admin") {
         setViewMode("inspector");
       } else {
-        // الأستاذ يدخل لفضاء الأستاذ والمقاطعة
         setViewMode("teacher");
       }
     }
@@ -262,7 +265,11 @@ export default function InspectorDashboardPage() {
                 فضاء التفتيش والمناشير البيداغوجية
               </h1>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
-                {viewMode === "teacher" ? "فضاء الأستاذ" : "لوحة المفتشية"}
+                {isInspector
+                  ? viewMode === "teacher"
+                    ? "معاينة فضاء الأستاذ"
+                    : "لوحة المفتشية"
+                  : "ملف الأستاذ والمقاطعة 📁"}
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
@@ -272,28 +279,30 @@ export default function InspectorDashboardPage() {
         </div>
 
         <div className="flex items-center gap-2 self-end sm:self-center">
-          {/* زر التبديل المباشر بين واجهة الأستاذ وواجهة المفتش */}
-          <button
-            onClick={() => setViewMode(viewMode === "teacher" ? "inspector" : "teacher")}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition border ${
-              viewMode === "inspector"
-                ? "bg-indigo-600 text-white border-indigo-600 shadow-xs"
-                : "bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-200"
-            }`}
-            title="تبديل العرض بين فضاء الأستاذ ولوحة المفتش"
-          >
-            {viewMode === "teacher" ? (
-              <>
-                <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                <span>معاينة لوحة المفتش</span>
-              </>
-            ) : (
-              <>
-                <GraduationCap className="w-4 h-4 text-white" />
-                <span>العودة لفضاء الأستاذ</span>
-              </>
-            )}
-          </button>
+          {/* زر التبديل المباشر بين واجهة الأستاذ وواجهة المفتش - متاح حصرياً للمفتش والمشرف العام */}
+          {isInspector && (
+            <button
+              onClick={() => setViewMode(viewMode === "teacher" ? "inspector" : "teacher")}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition border ${
+                viewMode === "inspector"
+                  ? "bg-indigo-600 text-white border-indigo-600 shadow-xs"
+                  : "bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-200"
+              }`}
+              title="تبديل العرض بين فضاء الأستاذ ولوحة المفتش"
+            >
+              {viewMode === "teacher" ? (
+                <>
+                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                  <span>معاينة لوحة المفتش</span>
+                </>
+              ) : (
+                <>
+                  <GraduationCap className="w-4 h-4 text-white" />
+                  <span>العودة لفضاء الأستاذ</span>
+                </>
+              )}
+            </button>
+          )}
 
           {/* محدد المقاطعة للمشرف العام */}
           {profile.role === "admin" && (
@@ -335,7 +344,7 @@ export default function InspectorDashboardPage() {
           <Loader2 className="w-8 h-8 animate-spin mx-auto text-indigo-600" />
           <p className="text-xs text-slate-500 font-medium">جاري تحميل بيانات المقاطعة...</p>
         </div>
-      ) : viewMode === "teacher" ? (
+      ) : effectiveViewMode === "teacher" ? (
         /* ═══════════════════════════════════════════════════════════════
            1. فضاء الأستاذ والمقاطعة التفتيشية (TeacherPortal)
            ═══════════════════════════════════════════════════════════════ */
@@ -353,7 +362,7 @@ export default function InspectorDashboardPage() {
             }
           }
           onReload={() => load(districtId)}
-          onSwitchToInspector={() => setViewMode("inspector")}
+          onSwitchToInspector={isInspector ? () => setViewMode("inspector") : undefined}
         />
       ) : (
         /* ═══════════════════════════════════════════════════════════════

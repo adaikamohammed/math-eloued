@@ -184,13 +184,6 @@ export function DesktopSidebar() {
         });
       }
 
-      if (flags.reception !== false) {
-        followupItems.push({
-          label: "استقبال الأولياء",
-          href: "/parents",
-          icon: Users,
-        });
-      }
 
       const inspectionItems: NavItem[] = [];
 

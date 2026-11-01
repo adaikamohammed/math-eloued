@@ -70,7 +70,7 @@ export function teacherFeedItems(teacher: FeedTeacher, data: Record<string, unkn
       title: `توجيه خاص بولي التلميذ(ة) ${s.studentName} — ${s.className}`,
       body: s.notes,
       createdAt: s.createdAt,
-      href: `/parents?teacher=${t}`,
+      href: `/t/${t}`,
       urgent: s.isUrgent,
       mentionsChild: true,
     });

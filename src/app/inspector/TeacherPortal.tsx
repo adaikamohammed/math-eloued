@@ -119,7 +119,7 @@ export function TeacherPortal({
 
   // الزيارات المسجلة للأستاذ
   const myVisits = useMemo(() => {
-    return data.visits.filter((v) => v.teacherId === profile.id || v.teacherId === "teacher-default");
+    return data.visits.filter((v) => v.teacherId === profile.id);
   }, [data.visits, profile.id]);
 
   // جدول التوقيت الخاص بالأستاذ
