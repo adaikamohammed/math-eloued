@@ -981,194 +981,260 @@ export default function ContinuousEvalMobilePage() {
       {/* ══════════════════════════════════════════════════════════════
          نافذة تخصيص وإدارة الأعمدة (إضافة / تعديل / حذف / نماذج)
          ══════════════════════════════════════════════════════════════ */}
+      {/* ══════════════════════════════════════════════════════════════
+         نافذة تخصيص وإدارة الأعمدة (موسعة ومتجاوبة مع جميع الشاشات)
+         ══════════════════════════════════════════════════════════════ */}
       {isColumnModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-fade-in">
-          <div className="bg-white rounded-3xl p-5 sm:p-6 max-w-lg w-full shadow-2xl border border-slate-200 space-y-4 text-right max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b pb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold">
-                  <Sliders className="w-4 h-4" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-2 sm:p-4 md:p-6 overflow-y-auto animate-fade-in">
+          <div className="bg-white rounded-2xl sm:rounded-3xl max-w-3xl lg:max-w-4xl w-full shadow-2xl border border-slate-200 text-right flex flex-col max-h-[92vh] sm:max-h-[88vh] my-auto overflow-hidden">
+            {/* رأس النافذة المثبت (Sticky Header) */}
+            <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-slate-200 flex items-center justify-between shrink-0 bg-slate-50/90">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold shrink-0">
+                  <Sliders className="w-5 h-5 text-emerald-700" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-black text-slate-900">
+                  <h3 className="text-sm sm:text-base font-black text-slate-900">
                     إدارة وتخصيص أعمدة التقويم المستمر
                   </h3>
-                  <p className="text-[11px] text-slate-500">
-                    فوج: <strong>{selectedClass}</strong> • مجموع النقاط الحالي: <strong>{totalMaxScore}ن</strong>
+                  <p className="text-[11px] sm:text-xs text-slate-500 font-medium">
+                    فوج: <strong className="text-slate-800">{selectedClass}</strong> • الفصل الدراسي: <strong className="text-slate-800">ف{selectedTrimester}</strong> • عدد الأعمدة: <strong className="text-emerald-700">{columns.length}</strong>
                   </p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setIsColumnModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-700"
+                className="w-8 h-8 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 flex items-center justify-center transition cursor-pointer"
+                title="إغلاق النافذة"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* قسم النماذج الجاهزة */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700 block">نماذج معيارية جاهزة:</label>
-              <div className="space-y-1.5">
-                {COLUMN_PRESETS.map((p, pIdx) => (
-                  <button
-                    key={pIdx}
-                    type="button"
-                    onClick={() => handleApplyPreset(p.columns)}
-                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-emerald-50 hover:border-emerald-300 text-right transition cursor-pointer flex items-center justify-between gap-2"
-                  >
-                    <div>
-                      <span className="text-xs font-black text-slate-800 block">{p.name}</span>
-                      <span className="text-[10px] text-slate-500">{p.description}</span>
-                    </div>
-                    <span className="text-[10px] bg-white border border-slate-200 text-emerald-700 font-bold px-2 py-1 rounded-lg shrink-0">
-                      تطبيق
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
+            {/* محتوى النافذة القابل للتمرير بسلاسة (Scrollable Body) */}
+            <div className="p-4 sm:p-6 overflow-y-auto space-y-5 flex-1">
+              {/* قسم 1: النماذج المعيارية الجاهزة (شبكة أفقية متجاوبة) */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs sm:text-sm font-black text-slate-800 flex items-center gap-1.5">
+                    <span>نماذج معيارية جاهزة بضغطة زر:</span>
+                  </label>
+                  <span className="text-[11px] text-slate-500">اختر نموذجاً لتطبيقه مباشرة</span>
+                </div>
 
-            {/* قائمة الأعمدة الحالية مع إمكانية الحذف والتعديل */}
-            <div className="space-y-2 pt-2 border-t border-slate-100">
-              <label className="text-xs font-bold text-slate-700 block">
-                الأعمدة المعتمدة حالياً ({columns.length}):
-              </label>
-
-              <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-                {columns.map((col, idx) => (
-                  <div
-                    key={col.id}
-                    className="p-2.5 rounded-xl border border-slate-200 bg-white flex items-center justify-between gap-2"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold flex items-center justify-center">
-                        {idx + 1}
-                      </span>
-                      <div>
-                        <span className="text-xs font-black text-slate-800">{col.title}</span>
-                        <span className="text-[10px] font-mono text-emerald-700 font-bold mr-1.5">
-                          (العلامة القصوى: {col.maxScore}ن)
-                        </span>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 sm:gap-3">
+                  {COLUMN_PRESETS.map((p, pIdx) => (
+                    <div
+                      key={pIdx}
+                      className="p-3 sm:p-3.5 rounded-2xl border border-slate-200 bg-slate-50/70 hover:bg-emerald-50/60 hover:border-emerald-300 text-right transition flex flex-col justify-between gap-3 group"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="text-xs font-black text-slate-900 group-hover:text-emerald-800 transition">
+                            {p.name}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 leading-relaxed">
+                          {p.description}
+                        </p>
                       </div>
-                    </div>
 
-                    <div className="flex items-center gap-1">
                       <button
                         type="button"
-                        onClick={() => setEditingColumn({ ...col })}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-700 hover:bg-slate-100 transition"
-                        title="تعديل هذا العمود"
+                        onClick={() => handleApplyPreset(p.columns)}
+                        className="w-full py-1.5 px-3 rounded-xl bg-white border border-slate-200 group-hover:bg-emerald-600 group-hover:border-emerald-600 group-hover:text-white text-emerald-800 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
                       >
-                        <Edit2 className="w-3.5 h-3.5" />
+                        <span>تطبيق هذا النموذج</span>
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteColumn(col.id)}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-red-700 hover:bg-red-50 transition"
-                        title="حذف هذا العمود"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* قسم 2: تعديل عمود نشط إن تم النقر عليه */}
+              {editingColumn && (
+                <div className="p-4 bg-amber-50/90 border-2 border-amber-300 rounded-2xl space-y-3 animate-fade-in shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs sm:text-sm font-black text-amber-950 flex items-center gap-1.5">
+                      <Edit2 className="w-4 h-4 text-amber-700" />
+                      <span>تعديل العمود: <strong className="underline">{editingColumn.title}</strong></span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setEditingColumn(null)}
+                      className="text-amber-700 hover:text-amber-900 text-xs font-bold cursor-pointer"
+                    >
+                      إلغاء التعديل
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    <div className="sm:col-span-2">
+                      <label className="text-[11px] font-bold text-amber-900 block mb-1">اسم أو عنوان العمود:</label>
+                      <input
+                        type="text"
+                        value={editingColumn.title}
+                        onChange={(e) => setEditingColumn({ ...editingColumn, title: e.target.value })}
+                        placeholder="عنوان العمود"
+                        className="w-full p-2.5 rounded-xl border border-amber-300 text-xs sm:text-sm bg-white font-medium focus:ring-2 focus:ring-amber-500/20 focus:outline-hidden"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-bold text-amber-900 block mb-1">العلامة القصوى:</label>
+                      <input
+                        type="number"
+                        min="0.5"
+                        max="20"
+                        step="0.5"
+                        value={editingColumn.maxScore}
+                        onChange={(e) =>
+                          setEditingColumn({
+                            ...editingColumn,
+                            maxScore: parseFloat(e.target.value) || 1,
+                          })
+                        }
+                        placeholder="النقاط القصوى"
+                        className="w-full p-2.5 rounded-xl border border-amber-300 text-xs sm:text-sm bg-white font-mono font-bold text-center focus:ring-2 focus:ring-amber-500/20 focus:outline-hidden"
+                      />
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
 
-            {/* نموذج تعديل عمود محدد إن كان مفتوحاً */}
-            {editingColumn && (
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-2 animate-fade-in">
-                <span className="text-xs font-black text-amber-900 block">
-                  تعديل العمود: {editingColumn.title}
-                </span>
-                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex justify-end gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setEditingColumn(null)}
+                      className="px-4 py-1.5 rounded-xl border border-slate-300 text-slate-700 text-xs font-bold hover:bg-slate-100 transition cursor-pointer"
+                    >
+                      إلغاء
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSaveEditColumn}
+                      className="px-5 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-black shadow-xs transition cursor-pointer"
+                    >
+                      حفظ التعديل وتحديث الجدول
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* قسم 3: الأعمدة المعتمدة حالياً (شبكة متجاوبة 2 أعمدة) */}
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs sm:text-sm font-black text-slate-800 flex items-center gap-1.5">
+                    <span>الأعمدة المعتمدة حالياً في الجدول ({columns.length}):</span>
+                  </label>
+                  <span className="text-[11px] text-slate-500">يمكنك تعديل اسم أي عمود أو حذفه</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {columns.map((col, idx) => (
+                    <div
+                      key={col.id}
+                      className="p-3 rounded-2xl border border-slate-200 bg-white hover:border-slate-300 hover:shadow-xs flex items-center justify-between gap-3 transition"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="w-6 h-6 rounded-xl bg-slate-100 text-slate-700 text-xs font-black flex items-center justify-center shrink-0">
+                          {idx + 1}
+                        </span>
+                        <div className="min-w-0">
+                          <span className="text-xs sm:text-sm font-black text-slate-900 block truncate">
+                            {col.title}
+                          </span>
+                          <span className="text-[11px] font-mono text-emerald-700 font-bold">
+                            العلامة القصوى: {col.maxScore}ن
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setEditingColumn({ ...col })}
+                          className="p-1.5 rounded-xl text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 transition cursor-pointer"
+                          title="تعديل هذا العمود"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteColumn(col.id)}
+                          className="p-1.5 rounded-xl text-slate-400 hover:text-red-600 hover:bg-red-50 transition cursor-pointer"
+                          title="حذف هذا العمود من الجدول"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* قسم 4: إضافة عمود جديد */}
+              <div className="p-4 bg-slate-50/90 border border-slate-200 rounded-2xl space-y-2.5">
+                <label className="text-xs sm:text-sm font-black text-slate-800 block">
+                  إضافة عمود مخصص جديد إلى جدول الرصد:
+                </label>
+
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                   <input
                     type="text"
-                    value={editingColumn.title}
-                    onChange={(e) => setEditingColumn({ ...editingColumn, title: e.target.value })}
-                    placeholder="عنوان العمود"
-                    className="p-2 rounded-lg border border-amber-300 text-xs bg-white"
+                    placeholder="اسم العمود (مثلاً: واجب 3، نشاط صفي، مشروع، تلخيص...)"
+                    value={newColTitle}
+                    onChange={(e) => setNewColTitle(e.target.value)}
+                    className="flex-1 py-2.5 px-3.5 rounded-xl border border-slate-200 text-xs sm:text-sm bg-white focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20"
                   />
-                  <input
-                    type="number"
-                    min="1"
-                    max="20"
-                    step="0.5"
-                    value={editingColumn.maxScore}
-                    onChange={(e) =>
-                      setEditingColumn({
-                        ...editingColumn,
-                        maxScore: parseFloat(e.target.value) || 1,
-                      })
-                    }
-                    placeholder="النقاط القصوى"
-                    className="p-2 rounded-lg border border-amber-300 text-xs bg-white font-mono text-center"
-                  />
-                </div>
-                <div className="flex justify-end gap-1.5 pt-1">
+                  <div className="flex items-center gap-1.5 shrink-0 justify-between sm:justify-start">
+                    <span className="text-xs text-slate-600 font-bold">النقاط القصوى:</span>
+                    <input
+                      type="number"
+                      min="0.5"
+                      max="20"
+                      step="0.5"
+                      value={newColMax}
+                      onChange={(e) => setNewColMax(parseFloat(e.target.value) || 1)}
+                      className="w-16 py-2 text-center rounded-xl border border-slate-200 text-xs sm:text-sm font-mono font-bold bg-white"
+                    />
+                    <span className="text-xs text-slate-600 font-bold">ن</span>
+                  </div>
                   <button
                     type="button"
-                    onClick={() => setEditingColumn(null)}
-                    className="px-3 py-1 rounded-lg border border-slate-300 text-slate-600 text-xs"
+                    onClick={handleAddColumn}
+                    disabled={!newColTitle.trim()}
+                    className="py-2.5 px-5 rounded-xl bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white font-black text-xs sm:text-sm shrink-0 flex items-center justify-center gap-1.5 transition cursor-pointer shadow-xs"
                   >
-                    إلغاء
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSaveEditColumn}
-                    className="px-3 py-1 rounded-lg bg-emerald-600 text-white text-xs font-bold"
-                  >
-                    حفظ التعديل
+                    <Plus className="w-4 h-4" />
+                    <span>إضافة العمود</span>
                   </button>
                 </div>
-              </div>
-            )}
-
-            {/* قسم إضافة عمود جديد */}
-            <div className="pt-2 border-t border-slate-100 space-y-2">
-              <label className="text-xs font-bold text-slate-700 block">إضافة عمود جديد:</label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  placeholder="اسم العمود (مثال: واجب 3 أو مشروع)..."
-                  value={newColTitle}
-                  onChange={(e) => setNewColTitle(e.target.value)}
-                  className="flex-1 py-2 px-3 rounded-xl border border-slate-200 text-xs bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20"
-                />
-                <div className="flex items-center gap-1 shrink-0">
-                  <span className="text-xs text-slate-500 font-bold">من:</span>
-                  <input
-                    type="number"
-                    min="1"
-                    max="20"
-                    step="0.5"
-                    value={newColMax}
-                    onChange={(e) => setNewColMax(parseFloat(e.target.value) || 1)}
-                    className="w-14 py-2 text-center rounded-xl border border-slate-200 text-xs font-mono font-bold bg-slate-50"
-                  />
-                  <span className="text-xs text-slate-500 font-bold">ن</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleAddColumn}
-                  disabled={!newColTitle.trim()}
-                  className="py-2 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-black text-xs shrink-0 flex items-center gap-1 transition"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>إضافة</span>
-                </button>
               </div>
             </div>
 
-            <div className="pt-2 flex justify-end">
+            {/* تذييل النافذة المثبت (Sticky Footer) */}
+            <div className="px-4 sm:px-6 py-3.5 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 bg-slate-50/90 shrink-0">
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <span className="text-xs font-bold text-slate-600">
+                  المجموع الحالي: <strong className="font-mono text-slate-900 text-sm font-black">{totalMaxScore}ن</strong>
+                </span>
+                {totalMaxScore === 20 ? (
+                  <span className="text-emerald-800 bg-emerald-100/80 border border-emerald-300 px-2.5 py-1 rounded-xl text-xs font-bold flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
+                    <span>المجموع 20/20 مطابق تماماً للشبكة الرسمية</span>
+                  </span>
+                ) : (
+                  <span className="text-indigo-800 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-xl text-xs font-bold flex items-center gap-1">
+                    <span>💡 تحويل آلي نسبي دقيق لـ 20/20 في شبكة الرصد</span>
+                  </span>
+                )}
+              </div>
+
               <button
                 type="button"
                 onClick={() => setIsColumnModalOpen(false)}
-                className="py-2 px-5 rounded-xl bg-slate-800 text-white text-xs font-black cursor-pointer"
+                className="py-2 px-6 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-black transition cursor-pointer shadow-sm flex items-center gap-1.5"
               >
-                تم والعودة للجدول
+                <span>تم والعودة للجدول</span>
               </button>
             </div>
           </div>
