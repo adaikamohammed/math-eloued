@@ -12,10 +12,13 @@ import {
   GraduationCap,
   Building2,
   Sparkles,
+  Share2,
 } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { MIDDLE_SCHOOL_SUBJECTS } from "@/lib/types";
+import { FamilyWalletShareModal } from "./FamilyWalletShareModal";
+import { decodeFamilyWallet } from "@/lib/familyWallet";
 
 export interface SavedTeacher {
   slug: string;
@@ -150,9 +153,37 @@ export default function TeacherWallet() {
   const [newCode, setNewCode] = useState("");
   const [addingLoading, setAddingLoading] = useState(false);
   const [addMsg, setAddMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [shareModalOpen, setShareModalOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
+
+    // التحقق من وجود رابط استيراد محفظة عائلية قادم من هاتف آخر (مثل الأم)
+    try {
+      if (typeof window !== "undefined") {
+        const params = new URLSearchParams(window.location.search);
+        const importData = params.get("import_wallet");
+        if (importData) {
+          const imported = decodeFamilyWallet(importData);
+          if (imported.length > 0) {
+            let count = 0;
+            imported.forEach((t) => {
+              if (autoSaveTeacherToWallet(t)) count++;
+            });
+            setAddMsg({
+              type: "success",
+              text: `🎉 تم استيراد محفظة العائلة بنجاح! تم حفظ (${count}) أساتذة على هذا الجهاز تلقائياً.`,
+            });
+            // تنظيف الرابط بعد نجاح الاستيراد
+            const cleanUrl = window.location.pathname;
+            window.history.replaceState({}, document.title, cleanUrl);
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Family wallet import error:", err);
+    }
+
     setWallet(loadWallet());
 
     const handleUpdate = () => {
@@ -273,7 +304,17 @@ export default function TeacherWallet() {
           </div>
         </div>
 
-
+        {wallet.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setShareModalOpen(true)}
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 hover:from-emerald-100 hover:to-teal-100 text-[#107a57] border border-emerald-200 text-xs font-black transition shadow-2xs cursor-pointer self-start sm:self-auto shrink-0 active:scale-95"
+            title="مشاركة كل أساتذة المحفظة دفعة واحدة مع الأم أو هاتف آخر"
+          >
+            <Share2 className="w-4 h-4 text-[#107a57]" />
+            <span>مشاركة مع الأم / جهاز آخر 📲</span>
+          </button>
+        )}
       </div>
 
       {/* رسالة التنبيه إن وجدت */}
@@ -358,6 +399,13 @@ export default function TeacherWallet() {
         <span>•</span>
         <span>لا يلزم أي تسجيل حساب للولي</span>
       </div>
+
+      {/* نافذة المشاركة العائلية الفورية مع الأم أو جهاز آخر */}
+      <FamilyWalletShareModal
+        isOpen={shareModalOpen}
+        onClose={() => setShareModalOpen(false)}
+        wallet={wallet}
+      />
     </div>
   );
 }
