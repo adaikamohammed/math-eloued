@@ -37,7 +37,26 @@ export function loadWallet(): SavedTeacher[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as SavedTeacher[]) : [];
+    if (!raw) return [];
+    const list = JSON.parse(raw) as SavedTeacher[];
+    if (!Array.isArray(list)) return [];
+
+    const seen = new Set<string>();
+    const unique: SavedTeacher[] = [];
+    for (const item of list) {
+      if (!item) continue;
+      const key = (item.slug || item.code || "").trim().toLowerCase();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      unique.push(item);
+    }
+
+    // تنظيف تلقائي لأي تكرارات مخزنة مسبقاً في متصفح المستخدم
+    if (unique.length !== list.length) {
+      saveWallet(unique);
+    }
+
+    return unique;
   } catch {
     return [];
   }
@@ -61,6 +80,7 @@ export function autoSaveTeacherToWallet(teacher: {
 
   const current = loadWallet();
   const cleanCode = (teacher.code || "").trim().toUpperCase();
+  const cleanSlug = (teacher.slug || "").trim().toLowerCase();
 
   // جلب اسم وأيقونة المادة
   const subjObj = MIDDLE_SCHOOL_SUBJECTS.find((s) => s.id === teacher.subject);
@@ -73,11 +93,11 @@ export function autoSaveTeacherToWallet(teacher: {
       ? teacher.levels.map((l) => `${l}م`).join(" • ")
       : undefined;
 
-  const existingIndex = current.findIndex(
-    (t) =>
-      t.slug === teacher.slug ||
-      (cleanCode && t.code.toUpperCase() === cleanCode)
-  );
+  const existingIndex = current.findIndex((t) => {
+    const s = (t.slug || "").trim().toLowerCase();
+    const c = (t.code || "").trim().toUpperCase();
+    return (cleanSlug && s === cleanSlug) || (cleanCode && c === cleanCode);
+  });
 
   const updatedItem: SavedTeacher = {
     slug: teacher.slug,
@@ -113,10 +133,12 @@ export function autoSaveTeacherToWallet(teacher: {
 }
 
 export function isTeacherInWallet(slugOrCode: string): boolean {
-  const clean = (slugOrCode || "").trim().toUpperCase();
-  return loadWallet().some(
-    (t) => t.slug === slugOrCode || t.code.toUpperCase() === clean
-  );
+  const clean = (slugOrCode || "").trim().toLowerCase();
+  return loadWallet().some((t) => {
+    const s = (t.slug || "").trim().toLowerCase();
+    const c = (t.code || "").trim().toLowerCase();
+    return s === clean || c === clean;
+  });
 }
 
 /* ─── المكوّن الرئيسي: محفظة أساتذة أبنائي ─── */
@@ -141,15 +163,21 @@ export default function TeacherWallet() {
     return () => window.removeEventListener("math_wallet_updated", handleUpdate);
   }, []);
 
-  const removeTeacher = (slug: string) => {
-    const updated = wallet.filter((t) => t.slug !== slug);
+  const removeTeacher = (identifier: string) => {
+    const target = (identifier || "").trim().toLowerCase();
+    const updated = wallet.filter(
+      (t) => (t.slug || "").toLowerCase() !== target && (t.code || "").toLowerCase() !== target
+    );
     saveWallet(updated);
     setWallet(updated);
   };
 
-  const updateChildName = (slug: string, childName: string) => {
+  const updateChildName = (identifier: string, childName: string) => {
+    const target = (identifier || "").trim().toLowerCase();
     const updated = wallet.map((t) =>
-      t.slug === slug ? { ...t, childName } : t
+      (t.slug || "").toLowerCase() === target || (t.code || "").toLowerCase() === target
+        ? { ...t, childName }
+        : t
     );
     saveWallet(updated);
     setWallet(updated);
@@ -269,12 +297,12 @@ export default function TeacherWallet() {
       {/* بطاقات الأساتذة المحفوظين */}
       {wallet.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {wallet.map((teacher) => (
+          {wallet.map((teacher, index) => (
             <TeacherWalletCard
-              key={teacher.slug || teacher.code}
+              key={`${teacher.slug || teacher.code || "teacher"}-${index}`}
               teacher={teacher}
-              onRemove={() => removeTeacher(teacher.slug)}
-              onUpdateChild={(name) => updateChildName(teacher.slug, name)}
+              onRemove={() => removeTeacher(teacher.slug || teacher.code)}
+              onUpdateChild={(name) => updateChildName(teacher.slug || teacher.code, name)}
             />
           ))}
         </div>
