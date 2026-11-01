@@ -580,6 +580,7 @@ export interface ReceptionInfo {
 export interface UserProfile {
   id: string;
   role: UserRole;
+  email?: string;
   full_name?: string;
   fullName?: string;
   district_id?: number;

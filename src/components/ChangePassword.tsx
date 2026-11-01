@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { KeyRound, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { KeyRound, Loader2, Mail, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { validatePasswordStrength } from "@/lib/passwordPolicy";
 
@@ -11,6 +11,15 @@ export function ChangePassword() {
   const [confirm, setConfirm] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const [userEmail, setUserEmail] = useState("");
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (data?.user?.email) {
+        setUserEmail(data.user.email);
+      }
+    });
+  }, []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,10 +45,31 @@ export function ChangePassword() {
   };
 
   return (
-    <form onSubmit={submit} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-2xs space-y-2">
-      <h2 className="text-sm font-extrabold text-slate-800 flex items-center gap-2">
-        <KeyRound className="w-4 h-4 text-slate-500" /> تغيير كلمة المرور
-      </h2>
+    <form onSubmit={submit} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-2xs space-y-3">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <h2 className="text-sm font-extrabold text-slate-800 flex items-center gap-2">
+          <KeyRound className="w-4 h-4 text-emerald-600" /> تغيير كلمة المرور وبيانات الأمان
+        </h2>
+        {userEmail && (
+          <span className="text-[11px] font-mono font-bold bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg border border-slate-200" dir="ltr">
+            {userEmail}
+          </span>
+        )}
+      </div>
+
+      {userEmail && (
+        <div className="p-2.5 bg-emerald-50/70 border border-emerald-200/80 rounded-xl flex items-center justify-between text-xs text-emerald-950 flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <Mail className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span className="text-[11px]">
+              البريد المعتمد لهذا الحساب: <strong className="font-mono text-emerald-900 font-bold" dir="ltr">{userEmail}</strong>
+            </span>
+          </div>
+          <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md border border-emerald-200 shrink-0">
+            حساب معتمد ومؤكد ✓
+          </span>
+        </div>
+      )}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <input
           type="password"

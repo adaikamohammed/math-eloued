@@ -129,9 +129,6 @@ export default function GradebookEvaluationPage() {
   // نافذة تفاصيل تقويم تلميذ محدد (Drawer / Modal)
   const [detailStudentName, setDetailStudentName] = useState<string | null>(null);
 
-  // نافذة ميثاق التقويم
-  const [isCharterModalOpen, setIsCharterModalOpen] = useState(false);
-
   // مرجع للتركيز بالأسهم ولوحة المفاتيح
   const tableRef = useRef<HTMLTableElement | null>(null);
 
@@ -688,15 +685,6 @@ export default function GradebookEvaluationPage() {
               <Smartphone className="w-3.5 h-3.5 text-emerald-100" />
               <span>دفتر التقويم اليومي 📱</span>
             </Link>
-            <button
-              onClick={() => setIsCharterModalOpen(true)}
-              type="button"
-              className="px-3 py-1.5 rounded-xl border border-teal-200 bg-teal-50 hover:bg-teal-100 text-xs font-black text-teal-800 transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
-              title="ميثاق التقويم البيداغوجي المعتمد 20/20"
-            >
-              <Scale className="w-3.5 h-3.5 text-teal-600" />
-              <span>ميثاق التقويم (20/20) 📜</span>
-            </button>
             <button
               onClick={() => setIsRubricModalOpen(true)}
               type="button"
@@ -1616,93 +1604,6 @@ export default function GradebookEvaluationPage() {
                 className="btn-primary text-xs px-5 py-2 cursor-pointer"
               >
                 تطبيق واعتماد
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ─── نافذة ميثاق التقويم البيداغوجي 20/20 ─── */}
-      {isCharterModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-3xl p-6 max-w-xl w-full shadow-2xl border border-gray-200 space-y-4 text-right animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b pb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-teal-100 text-teal-800 flex items-center justify-center font-bold">
-                  <Scale className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-black text-gray-900">ميثاق التقويم البيداغوجي المعتمد 20/20</h3>
-                  <p className="text-[11px] text-gray-400">السلم الوزاري لتقييم الأنشطة الصفية في مرحلة التعليم المتوسط</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsCharterModalOpen(false)}
-                className="p-1 rounded-lg text-gray-400 hover:text-gray-700"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="space-y-3 text-xs text-gray-700 leading-relaxed">
-              <div className="bg-teal-50 border border-teal-200 p-3.5 rounded-2xl">
-                <strong className="text-teal-900 block mb-1">قاعدة حساب المعدل الفصلي للمادة:</strong>
-                <p className="font-mono text-teal-800 font-bold dir-ltr text-center py-1">
-                  المعدل الفصلي = [ (التقويم المستمر + الفرض) ÷ 2 + (الاختبار × 2) ] ÷ 3
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl">
-                  <div className="font-bold text-gray-900 flex justify-between">
-                    <span>1. الانضباط والمواظبة والمشاركة الصفية</span>
-                    <span className="font-mono text-[#107a57]">04 نقاط</span>
-                  </div>
-                  <p className="text-[11px] text-gray-500 mt-0.5">
-                    الحضور المنتظم، إحضار الأدوات الهندسية والكتاب، السلوك المحترم، والمساهمة الفعالة في بناء التعلمات.
-                  </p>
-                </div>
-
-                <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl">
-                  <div className="font-bold text-gray-900 flex justify-between">
-                    <span>2. كراس التلميذ والمحاولات (المقطعان 1 و 2)</span>
-                    <span className="font-mono text-[#107a57]">04 نقاط (2ن + 2ن)</span>
-                  </div>
-                  <p className="text-[11px] text-gray-500 mt-0.5">
-                    نظافة الكراس، اكتمال عناصر الدرس وخلوه من البياض، تدوين التمارين وحلولها، والاعتناء برسم الأشكال.
-                  </p>
-                </div>
-
-                <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl">
-                  <div className="font-bold text-gray-900 flex justify-between">
-                    <span>3. الوظائف والواجبات المنزلية (الوظيفتان 1 و 2)</span>
-                    <span className="font-mono text-[#107a57]">04 نقاط (2ن + 2ن)</span>
-                  </div>
-                  <p className="text-[11px] text-gray-500 mt-0.5">
-                    تسليم الواجبات في آجالها المحددة، الجدية في المحاولات الفردية لكراس المحاولات وتجنب النقل الجاهز.
-                  </p>
-                </div>
-
-                <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl">
-                  <div className="font-bold text-gray-900 flex justify-between">
-                    <span>4. الاستجوابات الكتابية الدورية (الاستجوابان 1 و 2)</span>
-                    <span className="font-mono text-[#107a57]">08 نقاط (4ن + 4ن)</span>
-                  </div>
-                  <p className="text-[11px] text-gray-500 mt-0.5">
-                    الاستجوابات الكتابية السريعة لقياس مدى استيعاب الموارد والمكتسبات القبلية بصورة مستمرة.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="pt-2 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setIsCharterModalOpen(false)}
-                className="btn-primary text-xs px-5 py-2 cursor-pointer"
-              >
-                إغلاق
               </button>
             </div>
           </div>

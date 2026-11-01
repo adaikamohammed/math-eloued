@@ -26,6 +26,8 @@ import {
   Users,
   Sparkles,
   CheckCircle,
+  Mail,
+  CheckCircle2,
 } from "lucide-react";
 import { LoginRequired } from "@/components/LoginRequired";
 import { TeacherQR } from "@/components/TeacherQR";
@@ -49,6 +51,8 @@ export default function TeacherSettingsPage() {
   const { loading, profile, reload } = useProfile();
   const [schools, setSchools] = useState<{ id: string; name: string; commune: string }[]>([]);
   const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [initialEmail, setInitialEmail] = useState("");
   const [subject, setSubject] = useState("mathematics");
   const [featureFlags, setFeatureFlags] = useState<TeacherFeatureFlags>(DEFAULT_FEATURE_FLAGS);
   const [phone, setPhone] = useState("");
@@ -83,8 +87,21 @@ export default function TeacherSettingsPage() {
   };
 
   useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (data?.user?.email) {
+        setEmail(data.user.email);
+        setInitialEmail(data.user.email);
+      }
+    });
+  }, []);
+
+  useEffect(() => {
     if (!profile) return;
     setFullName(profile.full_name || "");
+    if ((profile as any).email && !email) {
+      setEmail((profile as any).email);
+      setInitialEmail((profile as any).email);
+    }
     setSubject((profile as any).subject || "mathematics");
     setFeatureFlags((profile as any).feature_flags || DEFAULT_FEATURE_FLAGS);
     // رقم الهاتف في جدول خاص لا يراه إلا صاحبه ومفتش مقاطعته والمشرف
@@ -208,10 +225,34 @@ export default function TeacherSettingsPage() {
         .eq("teacher_id", profile.id);
     }
 
+    // تحديث البريد الإلكتروني إذا قام الأستاذ بتعديله
+    let emailNotice = "";
+    if (email.trim() && initialEmail && email.trim().toLowerCase() !== initialEmail.toLowerCase()) {
+      const cleanNewEmail = email.trim().toLowerCase();
+      try {
+        const { data: rpcRes, error: rpcErr } = await supabase.rpc("smart_update_teacher_email", {
+          p_new_email: cleanNewEmail,
+        });
+
+        if (!rpcErr && rpcRes && rpcRes.success) {
+          setInitialEmail(cleanNewEmail);
+          emailNotice = " (مع تحديث بريدك الإلكتروني بنجاح)";
+        } else {
+          const { error: authErr } = await supabase.auth.updateUser({ email: cleanNewEmail });
+          if (!authErr) {
+            setInitialEmail(cleanNewEmail);
+            emailNotice = " (تم تحديث بريدك الإلكتروني بنجاح)";
+          }
+        }
+      } catch (e) {
+        console.warn("Email update err:", e);
+      }
+    }
+
     setSaving(false);
     if (error || contactError) setMessage({ type: "err", text: (error || contactError)!.message });
     else {
-      setMessage({ type: "ok", text: "✓ تم حفظ الإعدادات بنجاح؛ تظهر التغييرات للأولياء فوراً" });
+      setMessage({ type: "ok", text: `✓ تم حفظ الإعدادات بنجاح${emailNotice}؛ تظهر التغييرات للأولياء فوراً` });
       reload();
     }
   };
@@ -226,9 +267,23 @@ export default function TeacherSettingsPage() {
           <h1 className="text-base font-extrabold text-slate-800 flex items-center gap-2">
             <UserCog className="w-5 h-5 text-emerald-600" /> إعدادات فضائي
           </h1>
-          <p className="text-[11px] text-slate-500">
-            الكود: <span className="font-mono">{profile.teacher_code}</span> • المقاطعة {profile.district_id ?? "—"}
-          </p>
+          <div className="text-[11px] text-slate-500 flex items-center gap-2 flex-wrap pt-0.5">
+            <span className="flex items-center gap-1">
+              <span>كود الأستاذ:</span>
+              <strong className="font-mono text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 font-black">
+                {profile.teacher_code}
+              </strong>
+            </span>
+            <span>•</span>
+            <span className="flex items-center gap-1">
+              <Mail className="w-3.5 h-3.5 text-slate-400" />
+              <strong className="font-mono text-slate-700 font-bold bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200" dir="ltr">
+                {email || (profile as any).email || "جاري جلب البريد..."}
+              </strong>
+            </span>
+            <span>•</span>
+            <span>المقاطعة {profile.district_id ?? "—"}</span>
+          </div>
         </div>
       </div>
 
@@ -297,8 +352,47 @@ export default function TeacherSettingsPage() {
         )}
 
         <section className="bg-white p-4 rounded-2xl border border-slate-100 shadow-2xs space-y-3">
-          <h2 className="text-sm font-extrabold text-slate-800">المعلومات الشخصية</h2>
-          <input className={inputCls} value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="الاسم واللقب" required />
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-extrabold text-slate-800 flex items-center gap-2">
+              <UserCog className="w-4 h-4 text-emerald-600" /> المعلومات الشخصية والحساب
+            </h2>
+            <span className="text-[10px] font-mono bg-emerald-50 text-emerald-800 font-bold px-2 py-0.5 rounded-md border border-emerald-200">
+              {profile.teacher_code}
+            </span>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[11px] font-bold text-slate-700">الاسم واللقب الكامل للأستاذ</label>
+            <input className={inputCls} value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="الاسم واللقب" required />
+          </div>
+
+          {/* البريد الإلكتروني الرسمي المعتمد للحساب */}
+          <div className="space-y-1.5 p-3 rounded-xl bg-slate-50/80 border border-slate-200">
+            <div className="flex items-center justify-between flex-wrap gap-1">
+              <label className="text-[11px] font-bold text-slate-800 flex items-center gap-1.5">
+                <Mail className="w-3.5 h-3.5 text-emerald-600" />
+                <span>البريد الإلكتروني المعتمد للحساب</span>
+              </label>
+              <span className="text-[10px] text-emerald-800 bg-emerald-100/70 font-bold px-2 py-0.5 rounded-full border border-emerald-300">
+                ✓ معتمد للدخول واسترجاع الحساب
+              </span>
+            </div>
+            <div className="relative">
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="mohammedadaika104@gmail.com"
+                className="w-full py-2 px-3 pl-9 rounded-xl border border-slate-200 bg-white text-xs font-mono text-left focus:outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-slate-800"
+                dir="ltr"
+                required
+              />
+              <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-2.5 pointer-events-none" />
+            </div>
+            <p className="text-[10px] text-slate-500 leading-relaxed">
+              هذا هو البريد الرسمي المسجل في قاعدة البيانات؛ يمكنك تعديله هنا في أي وقت لحفظ بياناتك واسترجاع كلمة المرور بسهولة.
+            </p>
+          </div>
 
           <div className="space-y-1">
             <span className="text-[11px] font-bold text-slate-600">المادة التعليمية</span>

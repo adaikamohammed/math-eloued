@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import Link from "next/link";
+import { LoginRequired } from "@/components/LoginRequired";
 import {
   ArrowRight,
   Save,
@@ -18,87 +19,90 @@ import {
   UserCheck,
   TrendingUp,
   Filter,
+  Plus,
+  Trash2,
+  Edit2,
+  Check,
+  X,
+  AlertTriangle,
+  FileSpreadsheet,
+  Layers,
+  HelpCircle,
+  Award,
 } from "lucide-react";
 import {
   OfficialGradeRecord,
   StudentRosterItem,
   LessonsData,
-  ContinuousCriterion,
-  OFFICIAL_MINISTERIAL_CRITERIA,
   sortClasses,
 } from "@/lib/types";
 
-// المعايير البيداغوجية الرسمية المعتمدة
-const CRITERIA_ITEMS: Array<{
-  key: keyof OfficialGradeRecord;
-  name: string;
-  max: number;
-  icon: string;
-  quickValues: number[];
-  color: string;
-}> = [
+// تعريف بنية العمود المرن في التقويم المستمر
+export interface ContinuousColumn {
+  id: string; // معرف فريد للعمود
+  title: string; // عنوان العمود مثل: وظيفة 1، كراس 1، مشاركة، استجواب
+  maxScore: number; // العلامة القصوى للعمود (مثلاً: 2، 4، 5)
+  category?: "behavior" | "notebook" | "homework" | "quiz" | "custom";
+}
+
+// الأعمدة الافتراضية الرسمية (مجموعها 20 نقطة)
+const DEFAULT_COLUMNS: ContinuousColumn[] = [
+  { id: "col_behavior", title: "مشاركة وانضباط", maxScore: 4, category: "behavior" },
+  { id: "col_nb1", title: "كراس 1", maxScore: 2, category: "notebook" },
+  { id: "col_nb2", title: "كراس 2", maxScore: 2, category: "notebook" },
+  { id: "col_hw1", title: "وظيفة 1", maxScore: 2, category: "homework" },
+  { id: "col_hw2", title: "وظيفة 2", maxScore: 2, category: "homework" },
+  { id: "col_q1", title: "استجواب 1", maxScore: 4, category: "quiz" },
+  { id: "col_q2", title: "استجواب 2", maxScore: 4, category: "quiz" },
+];
+
+// نماذج جاهزة يمكن للأستاذ الاختيار منها بضغطة زر
+const COLUMN_PRESETS = [
   {
-    key: "behaviorScore",
-    name: "المشاركة والسلوك والانضباط",
-    max: 4,
-    icon: "🙋‍♂️",
-    quickValues: [4, 3.5, 3, 2.5, 2, 1, 0],
-    color: "emerald",
+    name: "النموذج الوزاري المعتمد (20ن)",
+    description: "مشاركة (4ن) + كراس (2ن+2ن) + وظائف (2ن+2ن) + استجوابات (4ن+4ن)",
+    columns: DEFAULT_COLUMNS,
   },
   {
-    key: "notebook1Score",
-    name: "كراس التلميذ: المقطع 1",
-    max: 2,
-    icon: "📖",
-    quickValues: [2, 1.5, 1, 0.5, 0],
-    color: "sky",
+    name: "نموذج الأرباع المتساوية (4 × 5ن = 20ن)",
+    description: "مشاركة وسلوك (5ن) + كراس وتطبيقات (5ن) + واجبات منزلية (5ن) + استجوابات (5ن)",
+    columns: [
+      { id: "col_behavior", title: "المشاركة والسلوك", maxScore: 5, category: "behavior" as const },
+      { id: "col_notebook", title: "الكراس والمحاولات", maxScore: 5, category: "notebook" as const },
+      { id: "col_homework", title: "الواجبات المنزلية", maxScore: 5, category: "homework" as const },
+      { id: "col_quiz", title: "الاستجوابات والأنشطة", maxScore: 5, category: "quiz" as const },
+    ],
   },
   {
-    key: "notebook2Score",
-    name: "كراس التلميذ: المقطع 2",
-    max: 2,
-    icon: "📖",
-    quickValues: [2, 1.5, 1, 0.5, 0],
-    color: "indigo",
-  },
-  {
-    key: "homework1Score",
-    name: "الوظيفة المنزلية 1",
-    max: 2,
-    icon: "📝",
-    quickValues: [2, 1.5, 1, 0.5, 0],
-    color: "amber",
-  },
-  {
-    key: "homework2Score",
-    name: "الوظيفة المنزلية 2",
-    max: 2,
-    icon: "📝",
-    quickValues: [2, 1.5, 1, 0.5, 0],
-    color: "orange",
-  },
-  {
-    key: "quiz1Score",
-    name: "الاستجواب الكتابي 1",
-    max: 4,
-    icon: "✍️",
-    quickValues: [4, 3.5, 3, 2.5, 2, 1, 0],
-    color: "purple",
-  },
-  {
-    key: "quiz2Score",
-    name: "الاستجواب الكتابي 2",
-    max: 4,
-    icon: "✍️",
-    quickValues: [4, 3.5, 3, 2.5, 2, 1, 0],
-    color: "rose",
+    name: "نموذج الواجبات والمتابعة السريعة (3 أعمدة)",
+    description: "واجبات وكراريس (8ن) + استجوابات كتابية (8ن) + سلوك ومواظبة (4ن)",
+    columns: [
+      { id: "col_hw_nb", title: "الواجبات والكراريس", maxScore: 8, category: "homework" as const },
+      { id: "col_quizzes", title: "الاستجوابات الدورية", maxScore: 8, category: "quiz" as const },
+      { id: "col_behavior", title: "الانضباط والمشاركة", maxScore: 4, category: "behavior" as const },
+    ],
   },
 ];
 
 export default function ContinuousEvalMobilePage() {
   // حالة المصادقة والتحميل
+  const [authenticated, setAuthenticated] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const [lastEditedStudent, setLastEditedStudent] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/auth")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data && data.authenticated !== undefined) {
+          setAuthenticated(Boolean(data.authenticated));
+        } else {
+          setAuthenticated(true);
+        }
+      })
+      .catch(() => setAuthenticated(true));
+  }, []);
 
   // الفوج والفصل
   const [customClasses, setCustomClasses] = useState<string[]>(["1م1", "1م2", "1م3", "2م3"]);
@@ -110,17 +114,39 @@ export default function ContinuousEvalMobilePage() {
   // سجلات النقاط: مفتاحها `${className}_${studentName}_T${trimester}`
   const [records, setRecords] = useState<Record<string, OfficialGradeRecord>>({});
 
-  // نمط العرض: "single" (معيار واحد سريع للهاتف) أو "grid" (جدول المعايير الكامل)
-  const [viewMode, setViewMode] = useState<"single" | "grid">("single");
+  // الأعمدة الديناميكية للأستاذ
+  const [columns, setColumns] = useState<ContinuousColumn[]>(DEFAULT_COLUMNS);
+  const [isColumnModalOpen, setIsColumnModalOpen] = useState(false);
+  const [editingColumn, setEditingColumn] = useState<ContinuousColumn | null>(null);
+  const [newColTitle, setNewColTitle] = useState("");
+  const [newColMax, setNewColMax] = useState<number>(2);
 
-  // المعيار النشط حالياً في نمط الهاتف الفردي (الافتراضي: المشاركة أو الواجب)
-  const [activeCriterionKey, setActiveCriterionKey] = useState<string>("behaviorScore");
-
-  // بطاقة تفصيل التلميذ المفتوحة (Accordion)
-  const [expandedStudent, setExpandedStudent] = useState<string | null>(null);
-
-  // مؤقت الحفظ التلقائي
+  // مرجع لتأخير الحفظ التلقائي
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // جلب الأعمدة المحفوظة للفوج من التخزين المحلي
+  useEffect(() => {
+    try {
+      const savedCols = localStorage.getItem(`jusoor_eval_cols_${selectedClass}`);
+      if (savedCols) {
+        const parsed = JSON.parse(savedCols);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setColumns(parsed);
+          return;
+        }
+      }
+    } catch {}
+    // استخدام الأعمدة الافتراضية إذا لم توجد تخصيصات
+    setColumns(DEFAULT_COLUMNS);
+  }, [selectedClass]);
+
+  // حفظ الأعمدة عند تعديلها
+  const saveColumnsConfig = useCallback((newCols: ContinuousColumn[]) => {
+    setColumns(newCols);
+    try {
+      localStorage.setItem(`jusoor_eval_cols_${selectedClass}`, JSON.stringify(newCols));
+    } catch {}
+  }, [selectedClass]);
 
   // جلب البيانات الأولية من الكاش ثم السيرفر
   useEffect(() => {
@@ -173,46 +199,87 @@ export default function ContinuousEvalMobilePage() {
       .finally(() => setLoading(false));
   }, []);
 
-  // حساب علامة التقويم الإجمالية من 20
-  const computeStudentTotal = useCallback((rec: Partial<OfficialGradeRecord>): number => {
-    const beh = rec.behaviorScore ?? 4;
-    const nb1 = rec.notebook1Score ?? 2;
-    const nb2 = rec.notebook2Score ?? 2;
-    const hw1 = rec.homework1Score ?? 2;
-    const hw2 = rec.homework2Score ?? 2;
-    const q1 = rec.quiz1Score ?? 4;
-    const q2 = rec.quiz2Score ?? 4;
-    const bonus = rec.bonusPoints || 0;
-    const total = beh + nb1 + nb2 + hw1 + hw2 + q1 + q2 + bonus;
-    return Math.min(20, Math.max(0, Math.round(total * 10) / 10));
-  }, []);
+  // مجموع النقاط القصوى لجميع الأعمدة المحددة حالياً
+  const totalMaxScore = useMemo(() => {
+    return columns.reduce((acc, col) => acc + (col.maxScore || 0), 0);
+  }, [columns]);
 
-  // دالة جلب سجل تلميذ محدد
+  // حساب علامة التقويم المستمر الإجمالية بدقة من 20
+  const computeStudentTotal = useCallback(
+    (customScores: Record<string, number | undefined>, bonusPoints: number = 0): number => {
+      let sum = 0;
+      columns.forEach((col) => {
+        const val = customScores[col.id];
+        if (typeof val === "number" && !isNaN(val)) {
+          sum += val;
+        }
+      });
+      sum += bonusPoints || 0;
+
+      if (totalMaxScore <= 0) return 0;
+
+      // إذا كان مجموع الأعمدة 20 تماماً يكون الحساب مباشراً
+      let finalScore = 0;
+      if (totalMaxScore === 20) {
+        finalScore = sum;
+      } else {
+        // إذا كان المجموع مختلفاً (مثلاً 15 أو 25) يتم تحويله بدقة على 20
+        finalScore = (sum / totalMaxScore) * 20;
+      }
+
+      return Math.min(20, Math.max(0, Math.round(finalScore * 10) / 10));
+    },
+    [columns, totalMaxScore]
+  );
+
+  // دالة جلب سجل تلميذ محدد (الحالة الافتراضية صفر لجميع الخانات)
   const getRecord = useCallback(
     (studentName: string): OfficialGradeRecord => {
       const key = `${selectedClass.replace(/\s+/g, "")}_${studentName.trim()}_T${selectedTrimester}`;
       const existing = records[key];
-      if (existing) return existing;
+      if (existing) {
+        // التأكد من تهيئة customScores إن لم تكن موجودة
+        if (!existing.customScores) {
+          const cScores: Record<string, number> = {};
+          // ربط الحقول القديمة إن كانت متوفرة وإلا فالحالة الافتراضية 0
+          if (existing.behaviorScore !== undefined) cScores.col_behavior = existing.behaviorScore;
+          if (existing.notebook1Score !== undefined) cScores.col_nb1 = existing.notebook1Score;
+          if (existing.notebook2Score !== undefined) cScores.col_nb2 = existing.notebook2Score;
+          if (existing.homework1Score !== undefined) cScores.col_hw1 = existing.homework1Score;
+          if (existing.homework2Score !== undefined) cScores.col_hw2 = existing.homework2Score;
+          if (existing.quiz1Score !== undefined) cScores.col_q1 = existing.quiz1Score;
+          if (existing.quiz2Score !== undefined) cScores.col_q2 = existing.quiz2Score;
+          existing.customScores = cScores;
+        }
+        return existing;
+      }
+
+      // سجل جديد نظيف: الافتراضي 0 في جميع الخانات
+      const initialCustomScores: Record<string, number> = {};
+      columns.forEach((col) => {
+        initialCustomScores[col.id] = 0;
+      });
 
       return {
         studentName,
         className: selectedClass,
         trimester: selectedTrimester,
-        continuousScore: 20,
-        behaviorScore: 4,
-        notebook1Score: 2,
-        notebook2Score: 2,
-        homework1Score: 2,
-        homework2Score: 2,
-        quiz1Score: 4,
-        quiz2Score: 4,
+        continuousScore: 0,
+        behaviorScore: 0,
+        notebook1Score: 0,
+        notebook2Score: 0,
+        homework1Score: 0,
+        homework2Score: 0,
+        quiz1Score: 0,
+        quiz2Score: 0,
         bonusPoints: 0,
+        customScores: initialCustomScores,
       };
     },
-    [records, selectedClass, selectedTrimester]
+    [records, selectedClass, selectedTrimester, columns]
   );
 
-  // حفظ التغييرات إلى السيرفر والكاش
+  // حفظ التغييرات إلى السيرفر والكاش تلقائياً
   const triggerAutoSave = useCallback(
     (newRecords: Record<string, OfficialGradeRecord>) => {
       setSaveStatus("saving");
@@ -254,41 +321,49 @@ export default function ContinuousEvalMobilePage() {
     [customClasses, studentRoster]
   );
 
-  // تحديث حقل لتلميذ
-  const handleScoreChange = useCallback(
-    (studentName: string, field: keyof OfficialGradeRecord, value: number) => {
+  // تحديث علامة عمود معين لتلميذ
+  const handleColumnScoreChange = useCallback(
+    (studentName: string, columnId: string, value: number, isMissing: boolean = false) => {
       setRecords((prev) => {
         const key = `${selectedClass.replace(/\s+/g, "")}_${studentName.trim()}_T${selectedTrimester}`;
-        const current = prev[key] || {
-          studentName,
-          className: selectedClass,
-          trimester: selectedTrimester,
-          continuousScore: 20,
-          behaviorScore: 4,
-          notebook1Score: 2,
-          notebook2Score: 2,
-          homework1Score: 2,
-          homework2Score: 2,
-          quiz1Score: 4,
-          quiz2Score: 4,
-          bonusPoints: 0,
-        };
+        const current = getRecord(studentName);
+        const nextCustomScores = { ...(current.customScores || {}) };
 
+        // تخزين النقطة
+        nextCustomScores[columnId] = value;
+
+        // حالة "لم يحضر" باللون الأحمر
+        if (isMissing) {
+          nextCustomScores[`missing_${columnId}`] = 1;
+        } else {
+          delete nextCustomScores[`missing_${columnId}`];
+        }
+
+        // التوافق مع الحقول القياسية
         const updated: OfficialGradeRecord = {
           ...current,
-          [field]: value,
+          customScores: nextCustomScores,
         };
 
-        // إعادة حساب المجموع الإجمالي
-        updated.continuousScore = computeStudentTotal(updated);
+        if (columnId === "col_behavior") updated.behaviorScore = value;
+        if (columnId === "col_nb1") updated.notebook1Score = value;
+        if (columnId === "col_nb2") updated.notebook2Score = value;
+        if (columnId === "col_hw1") updated.homework1Score = value;
+        if (columnId === "col_hw2") updated.homework2Score = value;
+        if (columnId === "col_q1") updated.quiz1Score = value;
+        if (columnId === "col_q2") updated.quiz2Score = value;
+
+        // إعادة حساب العلامة الإجمالية من 20 بدقة
+        updated.continuousScore = computeStudentTotal(nextCustomScores, updated.bonusPoints || 0);
         updated.updatedAt = new Date().toISOString();
 
         const next = { ...prev, [key]: updated };
+        setLastEditedStudent(studentName);
         triggerAutoSave(next);
         return next;
       });
     },
-    [selectedClass, selectedTrimester, computeStudentTotal, triggerAutoSave]
+    [selectedClass, selectedTrimester, getRecord, computeStudentTotal, triggerAutoSave]
   );
 
   // زيادة أو إنقاص نقاط إضافية صفيّة بلمسة واحدة
@@ -296,66 +371,55 @@ export default function ContinuousEvalMobilePage() {
     (studentName: string, delta: number) => {
       setRecords((prev) => {
         const key = `${selectedClass.replace(/\s+/g, "")}_${studentName.trim()}_T${selectedTrimester}`;
-        const current = prev[key] || {
-          studentName,
-          className: selectedClass,
-          trimester: selectedTrimester,
-          continuousScore: 20,
-          behaviorScore: 4,
-          notebook1Score: 2,
-          notebook2Score: 2,
-          homework1Score: 2,
-          homework2Score: 2,
-          quiz1Score: 4,
-          quiz2Score: 4,
-          bonusPoints: 0,
-        };
-
+        const current = getRecord(studentName);
         const newBonus = Math.round(((current.bonusPoints || 0) + delta) * 10) / 10;
         const updated: OfficialGradeRecord = {
           ...current,
           bonusPoints: newBonus,
         };
-        updated.continuousScore = computeStudentTotal(updated);
+        updated.continuousScore = computeStudentTotal(updated.customScores || {}, newBonus);
         updated.updatedAt = new Date().toISOString();
 
         const next = { ...prev, [key]: updated };
+        setLastEditedStudent(studentName);
         triggerAutoSave(next);
         return next;
       });
     },
-    [selectedClass, selectedTrimester, computeStudentTotal, triggerAutoSave]
+    [selectedClass, selectedTrimester, getRecord, computeStudentTotal, triggerAutoSave]
   );
 
-  // وضع العلامة الكاملة لجميع تلاميذ الفوج في المعيار النشط
-  const handleSetMaxForCriterion = useCallback(
-    (field: keyof OfficialGradeRecord, maxValue: number) => {
+  // عمليات سريعة على العمود بالكامل (مثل: وضع علامة كاملة لمن أحضر الواجب)
+  const handleBatchColumnAction = useCallback(
+    (columnId: string, action: "set_max" | "set_zero" | "mark_all_missing") => {
+      const targetCol = columns.find((c) => c.id === columnId);
+      if (!targetCol) return;
+
       setRecords((prev) => {
         const next = { ...prev };
         studentRoster
           .filter((s) => (s.className || "").replace(/\s+/g, "") === selectedClass.replace(/\s+/g, ""))
           .forEach((st) => {
             const key = `${selectedClass.replace(/\s+/g, "")}_${st.studentName.trim()}_T${selectedTrimester}`;
-            const current = next[key] || {
-              studentName: st.studentName,
-              className: selectedClass,
-              trimester: selectedTrimester,
-              continuousScore: 20,
-              behaviorScore: 4,
-              notebook1Score: 2,
-              notebook2Score: 2,
-              homework1Score: 2,
-              homework2Score: 2,
-              quiz1Score: 4,
-              quiz2Score: 4,
-              bonusPoints: 0,
-            };
+            const current = getRecord(st.studentName);
+            const nextCustomScores = { ...(current.customScores || {}) };
+
+            if (action === "set_max") {
+              nextCustomScores[columnId] = targetCol.maxScore;
+              delete nextCustomScores[`missing_${columnId}`];
+            } else if (action === "set_zero") {
+              nextCustomScores[columnId] = 0;
+              delete nextCustomScores[`missing_${columnId}`];
+            } else if (action === "mark_all_missing") {
+              nextCustomScores[columnId] = 0;
+              nextCustomScores[`missing_${columnId}`] = 1;
+            }
 
             const updated: OfficialGradeRecord = {
               ...current,
-              [field]: maxValue,
+              customScores: nextCustomScores,
             };
-            updated.continuousScore = computeStudentTotal(updated);
+            updated.continuousScore = computeStudentTotal(nextCustomScores, updated.bonusPoints || 0);
             updated.updatedAt = new Date().toISOString();
             next[key] = updated;
           });
@@ -364,8 +428,52 @@ export default function ContinuousEvalMobilePage() {
         return next;
       });
     },
-    [studentRoster, selectedClass, selectedTrimester, computeStudentTotal, triggerAutoSave]
+    [columns, studentRoster, selectedClass, selectedTrimester, getRecord, computeStudentTotal, triggerAutoSave]
   );
+
+  // إضافة عمود جديد
+  const handleAddColumn = () => {
+    if (!newColTitle.trim()) return;
+    const newId = `col_${Date.now()}`;
+    const newCol: ContinuousColumn = {
+      id: newId,
+      title: newColTitle.trim(),
+      maxScore: Number(newColMax) || 2,
+      category: "custom",
+    };
+    const updated = [...columns, newCol];
+    saveColumnsConfig(updated);
+    setNewColTitle("");
+    setNewColMax(2);
+  };
+
+  // حذف عمود
+  const handleDeleteColumn = (colId: string) => {
+    if (columns.length <= 1) {
+      alert("يجب الإبقاء على عمود واحد على الأقل في الجدول.");
+      return;
+    }
+    const updated = columns.filter((c) => c.id !== colId);
+    saveColumnsConfig(updated);
+  };
+
+  // تعديل عمود موجود
+  const handleSaveEditColumn = () => {
+    if (!editingColumn || !editingColumn.title.trim()) return;
+    const updated = columns.map((c) =>
+      c.id === editingColumn.id ? { ...editingColumn, maxScore: Number(editingColumn.maxScore) || 1 } : c
+    );
+    saveColumnsConfig(updated);
+    setEditingColumn(null);
+  };
+
+  // تطبيق نموذج جاهز
+  const handleApplyPreset = (presetColumns: ContinuousColumn[]) => {
+    if (confirm("هل تريد بالتأكيد اعتماد هذا النموذج لتقسيم الأعمدة؟")) {
+      saveColumnsConfig(presetColumns);
+      setIsColumnModalOpen(false);
+    }
+  };
 
   // تلاميذ الفوج المختار مرتبين أبجدياً
   const classStudents = useMemo(() => {
@@ -384,32 +492,44 @@ export default function ContinuousEvalMobilePage() {
 
   // إحصائيات سريعة للفوج
   const classStats = useMemo(() => {
-    if (classStudents.length === 0) return { avg: "0.00", count: 0, above10: 0 };
+    if (classStudents.length === 0) return { avg: "0.00", count: 0, above10: 0, missingTotal: 0 };
     let sum = 0;
     let above10 = 0;
+    let missingTotal = 0;
+
     classStudents.forEach((st) => {
       const rec = getRecord(st.studentName);
-      const score = rec.continuousScore ?? 20;
+      const score = rec.continuousScore ?? 0;
       sum += score;
       if (score >= 10) above10++;
+
+      // عد الخانات باللون الأحمر (لم يحضر)
+      if (rec.customScores) {
+        Object.keys(rec.customScores).forEach((k) => {
+          if (k.startsWith("missing_") && rec.customScores![k] === 1) {
+            missingTotal++;
+          }
+        });
+      }
     });
+
     return {
       avg: (sum / classStudents.length).toFixed(2),
       count: classStudents.length,
       above10,
+      missingTotal,
     };
   }, [classStudents, getRecord]);
 
-  // المعيار النشط الحالي
-  const activeCriterion = useMemo(() => {
-    return CRITERIA_ITEMS.find((c) => c.key === activeCriterionKey) || CRITERIA_ITEMS[0];
-  }, [activeCriterionKey]);
+  if (authenticated === false) {
+    return <LoginRequired next="/eval/continuous" title="دفتر التقويم المستمر الصفي" />;
+  }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 pb-20 font-sans antialiased" dir="rtl">
+    <div className="min-h-screen bg-slate-50 text-slate-800 pb-28 font-sans antialiased" dir="rtl">
       {/* ─── الشريط العلوي الثابت ─── */}
       <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm px-3 py-2.5">
-        <div className="max-w-4xl mx-auto flex items-center justify-between gap-2">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-2">
           {/* زر العودة وعنوان الصفحة */}
           <div className="flex items-center gap-2 min-w-0">
             <Link
@@ -419,75 +539,76 @@ export default function ContinuousEvalMobilePage() {
             >
               <ArrowRight className="w-5 h-5" />
             </Link>
-            <div className="truncate">
-              <div className="flex items-center gap-1.5">
-                <span className="text-base font-black text-slate-900 tracking-tight flex items-center gap-1">
-                  <span>📱</span> دفتر التقويم المستمر
-                </span>
-                <span className="hidden sm:inline-block text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                  تنقيط صفي يومي
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <h1 className="text-sm font-black text-slate-900 flex items-center gap-1.5 truncate">
+                  <Smartphone className="w-4 h-4 text-emerald-600" />
+                  <span>دفتر التقويم المستمر الميداني</span>
+                </h1>
+                <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full border border-emerald-200">
+                  تنقيط صفي مرن
                 </span>
               </div>
-              <p className="text-[11px] text-slate-500 truncate">
-                وضع النقاط فقط • مزامنة تلقائية مع جدول الرصد
+              <p className="text-[10px] text-slate-500 truncate">
+                تعديل وحرية الأعمدة • الافتراضي 0 • رصد الواجبات والكراريس باللون الأحمر
               </p>
             </div>
           </div>
 
-          {/* حالة الحفظ وزر التبديل لجدول الرصد */}
-          <div className="flex items-center gap-1.5 shrink-0">
-            <div className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 font-medium">
-              {saveStatus === "saving" ? (
-                <span className="flex items-center gap-1 text-amber-600">
-                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping inline-block" />
-                  جارِ الحفظ...
-                </span>
-              ) : saveStatus === "saved" ? (
-                <span className="flex items-center gap-1 text-emerald-600 font-bold">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  تم الحفظ
-                </span>
-              ) : (
-                <span className="text-slate-400 text-[11px]">محفوظ تلقائياً</span>
-              )}
-            </div>
+          {/* مؤشر الحفظ والأزرار الإجرائية */}
+          <div className="flex items-center gap-2 shrink-0">
+            {saveStatus === "saving" && (
+              <span className="text-[11px] font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded-lg border border-amber-200 flex items-center gap-1">
+                <span>جارٍ الحفظ...</span>
+              </span>
+            )}
+            {saveStatus === "saved" && (
+              <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 flex items-center gap-1 animate-fade-in">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                <span>محفوظ تلقائياً</span>
+              </span>
+            )}
+
+            {/* زر فتح إدارة وتخصيص الأعمدة */}
+            <button
+              type="button"
+              onClick={() => setIsColumnModalOpen(true)}
+              className="py-1.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-black flex items-center gap-1.5 shadow-sm transition active:scale-95 cursor-pointer"
+              title="إدارة وتعديل أعمدة التقويم المستمر"
+            >
+              <Sliders className="w-3.5 h-3.5 text-amber-300" />
+              <span>تخصيص الأعمدة ({columns.length})</span>
+            </button>
 
             <Link
               href="/eval"
-              className="hidden sm:flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold transition shadow-sm"
+              className="py-1.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black flex items-center gap-1.5 shadow-sm transition active:scale-95"
             >
-              <span>جدول الرصد الفصلي</span>
               <TableIcon className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">جدول الرصد الفصلي</span>
+              <span className="sm:hidden">الرصد</span>
             </Link>
           </div>
         </div>
       </header>
 
       {/* ─── الحاوية الرئيسية ─── */}
-      <main className="max-w-4xl mx-auto px-3 py-3 space-y-3">
-        {/* ─── 1. شريط اختيار الفوج والفصل الدراسي ─── */}
-        <section className="bg-white rounded-2xl p-3 border border-slate-200/80 shadow-xs space-y-2.5">
-          {/* اختيار الفوج كأزرار لمس كبيرة وسريعة */}
-          <div>
-            <div className="flex items-center justify-between text-xs text-slate-500 font-bold mb-1.5 px-0.5">
-              <span>اختر الفوج التربوي:</span>
-              <span className="text-emerald-700 font-black">
-                {classStudents.length} تلميذاً مسجلاً
-              </span>
-            </div>
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+      <main className="max-w-7xl mx-auto px-3 sm:px-6 pt-4 space-y-3.5">
+        {/* شريط اختيار الفوج والفصل والإحصائيات */}
+        <div className="bg-white rounded-2xl p-3 sm:p-4 border border-slate-200 shadow-xs space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            {/* أزرار الأفواج */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-xs font-bold text-slate-500 ml-1">اختر الفوج:</span>
               {customClasses.map((cls) => {
-                const isSelected = selectedClass === cls;
+                const isActive = selectedClass === cls;
                 return (
                   <button
                     key={cls}
-                    onClick={() => {
-                      setSelectedClass(cls);
-                      setExpandedStudent(null);
-                    }}
-                    className={`px-4 py-2 rounded-xl font-black text-sm transition-all shrink-0 active:scale-95 ${
-                      isSelected
-                        ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/20 ring-2 ring-emerald-500/20"
+                    onClick={() => setSelectedClass(cls)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition cursor-pointer ${
+                      isActive
+                        ? "bg-emerald-700 text-white shadow-sm"
                         : "bg-slate-100 text-slate-700 hover:bg-slate-200"
                     }`}
                   >
@@ -496,19 +617,16 @@ export default function ContinuousEvalMobilePage() {
                 );
               })}
             </div>
-          </div>
 
-          {/* اختيار الفصل الدراسي والبحث السريع */}
-          <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
             {/* أزرار الفصول */}
-            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl shrink-0">
-              {([1, 2, 3] as const).map((t) => (
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+              {[1, 2, 3].map((t) => (
                 <button
                   key={t}
-                  onClick={() => setSelectedTrimester(t)}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition ${
+                  onClick={() => setSelectedTrimester(t as 1 | 2 | 3)}
+                  className={`px-3 py-1 rounded-lg text-xs font-black transition cursor-pointer ${
                     selectedTrimester === t
-                      ? "bg-white text-slate-900 shadow-xs"
+                      ? "bg-white text-emerald-900 shadow-xs font-black"
                       : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
@@ -518,632 +636,558 @@ export default function ContinuousEvalMobilePage() {
             </div>
 
             {/* مربع البحث عن تلميذ */}
-            <div className="relative flex-1">
-              <Search className="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2" />
+            <div className="relative flex-1 sm:flex-initial sm:min-w-[200px]">
               <input
                 type="text"
+                placeholder="ابحث عن اسم تلميذ..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="ابحث عن اسم تلميذ..."
-                className="w-full pr-8 pl-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500/30"
+                className="w-full py-1.5 pr-8 pl-3 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20"
               />
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-2.5 pointer-events-none" />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery("")}
-                  className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs"
+                  className="absolute left-2.5 top-2 text-slate-400 hover:text-slate-600"
                 >
-                  ✕
+                  <X className="w-3.5 h-3.5" />
                 </button>
               )}
             </div>
+          </div>
 
-            {/* زر تبديل نمط العرض (فردي / جدول) */}
-            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl shrink-0">
-              <button
-                onClick={() => setViewMode("single")}
-                className={`p-1.5 rounded-lg text-xs font-bold transition ${
-                  viewMode === "single"
-                    ? "bg-white text-emerald-700 shadow-xs"
-                    : "text-slate-600 hover:text-slate-900"
-                }`}
-                title="نمط المعيار الفردي السريع للهاتف"
-              >
-                <LayoutList className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setViewMode("grid")}
-                className={`p-1.5 rounded-lg text-xs font-bold transition ${
-                  viewMode === "grid"
-                    ? "bg-white text-emerald-700 shadow-xs"
-                    : "text-slate-600 hover:text-slate-900"
-                }`}
-                title="نمط جدول المعايير الشامل"
-              >
-                <TableIcon className="w-4 h-4" />
-              </button>
+          {/* شريط الإحصائيات والمعدل الفوجي */}
+          <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between text-xs text-slate-600 gap-2">
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="font-bold">
+                عدد التلاميذ: <strong className="text-slate-900">{classStats.count}</strong>
+              </span>
+              <span>•</span>
+              <span>
+                معدل التقويم الفوجي:{" "}
+                <strong className="text-emerald-700 font-mono font-black text-sm">
+                  {classStats.avg} / 20
+                </strong>
+              </span>
+              <span>•</span>
+              <span>
+                الحاصلون على ≥ 10:{" "}
+                <strong className="text-emerald-800">
+                  {classStats.above10} من {classStats.count}
+                </strong>
+              </span>
+              {classStats.missingTotal > 0 && (
+                <>
+                  <span>•</span>
+                  <span className="text-red-700 font-bold bg-red-50 border border-red-200 px-2 py-0.5 rounded-md flex items-center gap-1">
+                    <span>🔴 لم يحضروا الواجب / الكراس:</span>
+                    <strong>{classStats.missingTotal} حالة</strong>
+                  </span>
+                </>
+              )}
+            </div>
+
+            <div className="text-[11px] text-slate-500 font-medium flex items-center gap-2">
+              <span>مجموع نقاط الأعمدة: <strong className="font-mono text-slate-800">{totalMaxScore}ن</strong></span>
+              {totalMaxScore !== 20 && (
+                <span className="text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded text-[10px] font-bold">
+                  تحويل آلي دقيق لـ 20/20
+                </span>
+              )}
             </div>
           </div>
-        </section>
-
-        {/* ─── 2. في نمط الهاتف الفردي: شريط اختيار المعيار ─── */}
-        {viewMode === "single" && (
-          <section className="bg-white rounded-2xl p-3 border border-slate-200/80 shadow-xs space-y-2">
-            <div className="flex items-center justify-between text-xs font-bold text-slate-500">
-              <span>ماذا تريد تنقيطه الآن؟</span>
-              <button
-                onClick={() =>
-                  handleSetMaxForCriterion(
-                    activeCriterion.key,
-                    activeCriterion.max
-                  )
-                }
-                className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-[11px] flex items-center gap-1 transition active:scale-95"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>وضع {activeCriterion.max}/{activeCriterion.max} للجميع</span>
-              </button>
-            </div>
-
-            {/* أزرار المعايير السبعة كشريط أفقي مريح */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
-              {CRITERIA_ITEMS.map((item) => {
-                const isActive = activeCriterionKey === item.key;
-                return (
-                  <button
-                    key={item.key}
-                    onClick={() => setActiveCriterionKey(item.key)}
-                    className={`px-3 py-2 rounded-xl text-xs font-black transition-all shrink-0 flex items-center gap-1.5 active:scale-95 ${
-                      isActive
-                        ? "bg-emerald-600 text-white shadow-sm"
-                        : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                    }`}
-                  >
-                    <span>{item.icon}</span>
-                    <span>{item.name}</span>
-                    <span
-                      className={`text-[10px] px-1.5 py-0.2 rounded-md ${
-                        isActive
-                          ? "bg-emerald-700 text-emerald-100"
-                          : "bg-slate-200 text-slate-600"
-                      }`}
-                    >
-                      {item.max}ن
-                    </span>
-                  </button>
-                );
-              })}
-
-              {/* زر رصيد النقاط الإضافية */}
-              <button
-                onClick={() => setActiveCriterionKey("bonusPoints")}
-                className={`px-3 py-2 rounded-xl text-xs font-black transition-all shrink-0 flex items-center gap-1.5 active:scale-95 ${
-                  activeCriterionKey === "bonusPoints"
-                    ? "bg-amber-500 text-white shadow-sm"
-                    : "bg-amber-50 text-amber-800 hover:bg-amber-100"
-                }`}
-              >
-                <span>⚡</span>
-                <span>نقاط إضافية (+/-)</span>
-              </button>
-            </div>
-          </section>
-        )}
-
-        {/* ─── 3. شريط إحصائي مصغر ─── */}
-        <div className="flex items-center justify-between px-2 text-xs text-slate-500">
-          <div className="flex items-center gap-3">
-            <span>
-              معدل التقويم الفوجي:{" "}
-              <strong className="text-emerald-700 font-black">
-                {classStats.avg} / 20
-              </strong>
-            </span>
-            <span>
-              الحاصلون على ≥ 10:{" "}
-              <strong className="text-slate-800 font-bold">
-                {classStats.above10} من {classStats.count}
-              </strong>
-            </span>
-          </div>
-          <span className="text-[11px] text-slate-400">
-            {classStudents.length} تلميذ
-          </span>
         </div>
 
-        {/* ─── 4. قائمة التلاميذ ─── */}
-        {classStudents.length === 0 ? (
-          <div className="bg-white rounded-2xl p-8 text-center border border-slate-200 text-slate-500 space-y-2">
-            <p className="font-bold text-sm">لا توجد أسماء تلاميذ مسجلة في الفوج {selectedClass}</p>
-            <p className="text-xs text-slate-400">
-              يمكنك استيراد أو إضافة التلاميذ من صفحة إدارة التلاميذ.
-            </p>
-            <Link
-              href="/admin/students"
-              className="inline-block px-4 py-2 rounded-xl bg-emerald-600 text-white font-bold text-xs"
-            >
-              إدارة قوائم التلاميذ
-            </Link>
-          </div>
-        ) : viewMode === "single" ? (
-          /* ══════════════════════════════════════════════════════════════
-             النمط الفردي السريع للهاتف (Cards View)
-             ══════════════════════════════════════════════════════════════ */
-          <div className="space-y-2">
-            {filteredStudents.map((st, index) => {
-              const rec = getRecord(st.studentName);
-              const currentScore =
-                activeCriterionKey === "bonusPoints"
-                  ? rec.bonusPoints || 0
-                  : (rec[activeCriterion.key] as number) ?? activeCriterion.max;
+        {/* ══════════════════════════════════════════════════════════════
+           الجدول الأساسي المرن للتقويم والتنقيط الميداني
+           ══════════════════════════════════════════════════════════════ */}
+        <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-right text-xs border-collapse">
+              <thead>
+                <tr className="bg-slate-100/90 text-slate-800 font-black border-b border-slate-200 text-center">
+                  <th className="py-3 px-2 w-9 border-l border-slate-200/80">#</th>
+                  <th className="py-3 px-3 min-w-[150px] text-right sticky right-0 bg-slate-100 z-20 border-l border-slate-200/80 shadow-xs">
+                    اسم التلميذ
+                  </th>
 
-              const isExpanded = expandedStudent === st.studentName;
+                  {/* أعمدة التقويم المرنة */}
+                  {columns.map((col, cIdx) => (
+                    <th
+                      key={col.id}
+                      className="py-2.5 px-2 min-w-[110px] border-l border-slate-200/80 bg-slate-50/70"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="font-black text-slate-900 text-xs truncate">
+                            {col.title}
+                          </span>
+                          <span className="font-mono text-[10px] bg-slate-200/80 text-slate-700 px-1.5 py-0.2 rounded font-bold">
+                            ({col.maxScore}ن)
+                          </span>
+                        </div>
 
-              return (
-                <div
-                  key={st.id || st.studentName}
-                  className="bg-white rounded-2xl p-3 border border-slate-200/90 shadow-xs hover:border-emerald-300 transition-all space-y-2.5"
-                >
-                  {/* رأس بطاقة التلميذ: الاسم ورقم الترتيب والمجموع الكلي */}
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="w-6 h-6 rounded-full bg-slate-100 text-slate-600 font-bold text-xs flex items-center justify-center shrink-0">
-                        {index + 1}
-                      </span>
-                      <span className="font-black text-sm text-slate-900 truncate">
-                        {st.studentName}
-                      </span>
-                      {rec.bonusPoints ? (
-                        <span
-                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                            rec.bonusPoints > 0
-                              ? "bg-emerald-100 text-emerald-800"
-                              : "bg-rose-100 text-rose-800"
-                          }`}
-                        >
-                          {rec.bonusPoints > 0 ? `+${rec.bonusPoints}` : rec.bonusPoints}
-                        </span>
-                      ) : null}
-                    </div>
-
-                    {/* المجموع الإجمالي المحسوب */}
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <div className="text-right">
-                        <span className="text-[10px] text-slate-400 block leading-tight">
-                          المجموع الكلي
-                        </span>
-                        <span
-                          className={`text-sm font-black ${
-                            rec.continuousScore >= 10
-                              ? "text-emerald-700"
-                              : "text-rose-600"
-                          }`}
-                        >
-                          {rec.continuousScore?.toFixed(1) || "20.0"}{" "}
-                          <span className="text-[10px] text-slate-400">/20</span>
-                        </span>
-                      </div>
-
-                      {/* زر فتح بقية المعايير لهذا التلميذ */}
-                      <button
-                        onClick={() =>
-                          setExpandedStudent(isExpanded ? null : st.studentName)
-                        }
-                        className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition"
-                        title="عرض كامل علامات التلميذ"
-                      >
-                        {isExpanded ? (
-                          <ChevronUp className="w-4 h-4" />
-                        ) : (
-                          <ChevronDown className="w-4 h-4" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* أزرار التنقيط السريع للمعيار النشط (لمسة واحدة بالأصبع) */}
-                  {activeCriterionKey === "bonusPoints" ? (
-                    // تنقيط الرصيد الإضافي (+ / -)
-                    <div className="flex items-center justify-between gap-1.5 pt-1 border-t border-slate-100">
-                      <span className="text-xs font-bold text-slate-500">
-                        الرصيد الصفي:{" "}
-                        <strong className="text-amber-700">
-                          {rec.bonusPoints || 0} ن
-                        </strong>
-                      </span>
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => handleBonusChange(st.studentName, +1)}
-                          className="px-2.5 py-1 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-xs font-black transition active:scale-95"
-                        >
-                          +1
-                        </button>
-                        <button
-                          onClick={() => handleBonusChange(st.studentName, +0.5)}
-                          className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-black transition active:scale-95"
-                        >
-                          +0.5
-                        </button>
-                        <button
-                          onClick={() => handleBonusChange(st.studentName, -0.5)}
-                          className="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-black transition active:scale-95"
-                        >
-                          -0.5
-                        </button>
-                        <button
-                          onClick={() => handleBonusChange(st.studentName, -1)}
-                          className="px-2.5 py-1 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-800 text-xs font-black transition active:scale-95"
-                        >
-                          -1
-                        </button>
-                        {rec.bonusPoints !== 0 && (
+                        {/* أزرار سريعة للعمود بالكامل */}
+                        <div className="flex items-center justify-center gap-1 pt-1 border-t border-slate-200/60">
                           <button
-                            onClick={() =>
-                              handleScoreChange(st.studentName, "bonusPoints", 0)
-                            }
-                            className="p-1 rounded-lg text-slate-400 hover:text-slate-600"
-                            title="تصفير الرصيد الإضافي"
+                            type="button"
+                            onClick={() => handleBatchColumnAction(col.id, "set_max")}
+                            className="text-[9px] bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold px-1.5 py-0.5 rounded transition"
+                            title={`وضع العلامة الكاملة (${col.maxScore}) لكل من أحضر`}
                           >
-                            <RotateCcw className="w-3.5 h-3.5" />
+                            ✓ الكل أحضر
                           </button>
-                        )}
+                          <button
+                            type="button"
+                            onClick={() => handleBatchColumnAction(col.id, "mark_all_missing")}
+                            className="text-[9px] bg-red-100 hover:bg-red-200 text-red-800 font-bold px-1.5 py-0.5 rounded transition"
+                            title="تحديد الكل كـ (لم يحضر) باللون الأحمر"
+                          >
+                            🔴 لم يحضر
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleBatchColumnAction(col.id, "set_zero")}
+                            className="text-[9px] bg-slate-200 hover:bg-slate-300 text-slate-700 px-1 py-0.5 rounded transition"
+                            title="تصفير هذا العمود (0)"
+                          >
+                            0
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ) : (
-                    // تنقيط المعيار العادي (أزرار سريعة ومربع رقمي)
-                    <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100">
-                      <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
-                        {activeCriterion.quickValues.map((val) => {
-                          const isSelected = currentScore === val;
-                          return (
-                            <button
-                              key={val}
-                              onClick={() =>
-                                handleScoreChange(
-                                  st.studentName,
-                                  activeCriterion.key,
-                                  val
-                                )
-                              }
-                              className={`px-3 py-1.5 rounded-xl font-black text-xs transition active:scale-95 shrink-0 ${
-                                isSelected
-                                  ? "bg-emerald-600 text-white shadow-xs"
-                                  : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                              }`}
-                            >
-                              {val}
-                            </button>
-                          );
-                        })}
-                      </div>
+                    </th>
+                  ))}
 
-                      {/* إدخال رقمي مباشر إن أراد الأستاذ قيمة كسرية دقيقة */}
-                      <div className="flex items-center gap-1 shrink-0">
-                        <input
-                          type="number"
-                          inputMode="decimal"
-                          step="0.25"
-                          min="0"
-                          max={activeCriterion.max}
-                          value={currentScore}
-                          onChange={(e) => {
-                            const v = parseFloat(e.target.value);
-                            handleScoreChange(
-                              st.studentName,
-                              activeCriterion.key,
-                              isNaN(v) ? 0 : Math.min(activeCriterion.max, Math.max(0, v))
-                            );
-                          }}
-                          className="w-14 text-center py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-black text-slate-800 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500/30"
-                        />
-                        <span className="text-[10px] text-slate-400">
-                          /{activeCriterion.max}
-                        </span>
-                      </div>
-                    </div>
-                  )}
+                  {/* عمود الرصيد الإضافي */}
+                  <th className="py-2.5 px-2 text-center min-w-[80px] border-l border-slate-200/80 bg-amber-50/60 text-amber-950 font-black">
+                    <div>إضافي (+/-)</div>
+                    <span className="text-[10px] text-amber-700 font-normal">حصص</span>
+                  </th>
 
-                  {/* تفصيل جميع المعايير للتلميذ عند النقر على السهم */}
-                  {isExpanded && (
-                    <div className="pt-2 border-t border-slate-200/80 mt-2 bg-slate-50/70 -mx-3 -mb-3 p-3 rounded-b-2xl space-y-2">
-                      <div className="text-[11px] font-black text-slate-600 mb-1">
-                        جميع جزئيات تقويم {st.studentName}:
-                      </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                        {CRITERIA_ITEMS.map((item) => {
-                          const val = (rec[item.key] as number) ?? item.max;
-                          return (
-                            <div
-                              key={item.key}
-                              className="bg-white p-2 rounded-xl border border-slate-200/80 flex items-center justify-between"
-                            >
-                              <div className="truncate min-w-0 pr-1">
-                                <span className="text-[11px] font-bold text-slate-700 block truncate">
-                                  {item.icon} {item.name}
-                                </span>
-                                <span className="text-[10px] text-slate-400">
-                                  من {item.max}ن
-                                </span>
-                              </div>
-                              <input
-                                type="number"
-                                inputMode="decimal"
-                                step="0.5"
-                                min="0"
-                                max={item.max}
-                                value={val}
-                                onChange={(e) => {
-                                  const v = parseFloat(e.target.value);
-                                  handleScoreChange(
-                                    st.studentName,
-                                    item.key,
-                                    isNaN(v) ? 0 : Math.min(item.max, Math.max(0, v))
-                                  );
-                                }}
-                                className="w-12 text-center py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-black text-slate-800 focus:bg-white focus:outline-hidden"
-                              />
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          /* ══════════════════════════════════════════════════════════════
-             نمط الجدول الشامل (Full Criteria Matrix Grid)
-             ══════════════════════════════════════════════════════════════ */
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-right text-xs">
-                <thead>
-                  <tr className="bg-slate-100/90 text-slate-700 font-black border-b border-slate-200">
-                    <th className="py-2.5 px-2 text-center w-8">#</th>
-                    <th className="py-2.5 px-3 min-w-[130px] sticky right-0 bg-slate-100 z-10">
-                      اسم التلميذ
-                    </th>
-                    <th className="py-2.5 px-2 text-center min-w-[65px]">
-                      مشاركة (4)
-                    </th>
-                    <th className="py-2.5 px-2 text-center min-w-[65px]">
-                      كراس 1 (2)
-                    </th>
-                    <th className="py-2.5 px-2 text-center min-w-[65px]">
-                      كراس 2 (2)
-                    </th>
-                    <th className="py-2.5 px-2 text-center min-w-[65px]">
-                      وظيفة 1 (2)
-                    </th>
-                    <th className="py-2.5 px-2 text-center min-w-[65px]">
-                      وظيفة 2 (2)
-                    </th>
-                    <th className="py-2.5 px-2 text-center min-w-[65px]">
-                      استجواب 1 (4)
-                    </th>
-                    <th className="py-2.5 px-2 text-center min-w-[65px]">
-                      استجواب 2 (4)
-                    </th>
-                    <th className="py-2.5 px-2 text-center min-w-[55px]">
-                      إضافي (+/-)
-                    </th>
-                    <th className="py-2.5 px-3 text-center min-w-[75px] bg-emerald-50 text-emerald-900">
-                      المجموع (20)
-                    </th>
+                  {/* عمود المجموع النهائي من 20 */}
+                  <th className="py-2.5 px-3 text-center min-w-[95px] bg-emerald-50 text-emerald-950 font-black">
+                    <div>المجموع</div>
+                    <span className="text-[10px] text-emerald-700 font-bold">(من 20.0)</span>
+                  </th>
+                </tr>
+              </thead>
+
+              <tbody className="divide-y divide-slate-100">
+                {filteredStudents.length === 0 ? (
+                  <tr>
+                    <td colSpan={columns.length + 3} className="py-12 text-center text-slate-400">
+                      {searchQuery ? "لا يوجد تلميذ مطابق لنتائج البحث" : "لا يوجد تلاميذ مسجلين في هذا الفوج"}
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filteredStudents.map((st, idx) => {
+                ) : (
+                  filteredStudents.map((st, idx) => {
                     const rec = getRecord(st.studentName);
+                    const isLastEdited = lastEditedStudent === st.studentName;
+                    const finalScore = rec.continuousScore ?? 0;
+
                     return (
                       <tr
                         key={st.id || st.studentName}
-                        className="hover:bg-slate-50/80 transition"
+                        className={`transition hover:bg-slate-50/90 ${
+                          isLastEdited ? "bg-emerald-50/40" : ""
+                        }`}
                       >
-                        <td className="py-2 px-2 text-center text-slate-400 font-bold">
+                        {/* الرقم الترتيبي */}
+                        <td className="py-2 px-2 text-center text-slate-400 font-bold border-l border-slate-100">
                           {idx + 1}
                         </td>
-                        <td className="py-2 px-3 font-black text-slate-900 sticky right-0 bg-white z-10 shadow-xs">
-                          {st.studentName}
+
+                        {/* اسم التلميذ مثبت على اليمين */}
+                        <td className="py-2 px-3 font-black text-slate-900 sticky right-0 bg-white z-10 border-l border-slate-200/80 shadow-2xs">
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="truncate">{st.studentName}</span>
+                            {st.groupName && (
+                              <span className="text-[10px] text-slate-400 font-normal shrink-0">
+                                ({st.groupName})
+                              </span>
+                            )}
+                          </div>
                         </td>
 
-                        {/* مشاركة */}
-                        <td className="py-2 px-1 text-center">
-                          <input
-                            type="number"
-                            inputMode="decimal"
-                            step="0.5"
-                            min="0"
-                            max="4"
-                            value={rec.behaviorScore ?? 4}
-                            onChange={(e) =>
-                              handleScoreChange(
-                                st.studentName,
-                                "behaviorScore",
-                                parseFloat(e.target.value) || 0
-                              )
-                            }
-                            className="w-12 text-center py-1 bg-slate-50 border border-slate-200 rounded text-xs font-bold"
-                          />
+                        {/* خلايا الأعمدة الديناميكية */}
+                        {columns.map((col) => {
+                          const customScores = rec.customScores || {};
+                          const currentScore = customScores[col.id] ?? 0;
+                          const isMissing = customScores[`missing_${col.id}`] === 1;
+
+                          return (
+                            <td
+                              key={col.id}
+                              className={`py-1.5 px-1.5 text-center border-l border-slate-100 transition ${
+                                isMissing
+                                  ? "bg-red-50/90 border-red-300"
+                                  : currentScore > 0
+                                  ? "bg-emerald-50/20"
+                                  : ""
+                              }`}
+                            >
+                              <div className="flex items-center justify-center gap-1">
+                                {/* حقل إدخال النقطة */}
+                                <input
+                                  type="number"
+                                  inputMode="decimal"
+                                  step="0.25"
+                                  min="0"
+                                  max={col.maxScore}
+                                  value={currentScore}
+                                  onChange={(e) => {
+                                    const val = parseFloat(e.target.value);
+                                    handleColumnScoreChange(
+                                      st.studentName,
+                                      col.id,
+                                      isNaN(val) ? 0 : Math.min(col.maxScore, Math.max(0, val)),
+                                      false
+                                    );
+                                  }}
+                                  className={`w-11 text-center py-1 rounded-lg text-xs font-black transition ${
+                                    isMissing
+                                      ? "bg-red-100 text-red-900 border border-red-300 focus:bg-white focus:ring-red-400"
+                                      : currentScore > 0
+                                      ? "bg-emerald-50 text-emerald-900 border border-emerald-300 focus:bg-white"
+                                      : "bg-slate-50 text-slate-700 border border-slate-200 focus:bg-white focus:border-emerald-500"
+                                  } focus:outline-hidden focus:ring-2`}
+                                />
+
+                                {/* زر الذكاء: تبديل حالة الإحضار (أخضر أحضر / أحمر لم يحضر) */}
+                                <div className="flex flex-col gap-0.5">
+                                  {/* زر أحضر الواجب (العلامة الكاملة بنقرة واحدة) */}
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleColumnScoreChange(
+                                        st.studentName,
+                                        col.id,
+                                        col.maxScore,
+                                        false
+                                      )
+                                    }
+                                    className={`w-5 h-5 rounded flex items-center justify-center text-[10px] transition cursor-pointer ${
+                                      currentScore === col.maxScore && !isMissing
+                                        ? "bg-emerald-600 text-white font-bold"
+                                        : "bg-slate-100 hover:bg-emerald-100 text-slate-600 hover:text-emerald-800"
+                                    }`}
+                                    title={`أحضر وأنجز المطلوب (${col.maxScore}ن)`}
+                                  >
+                                    ✓
+                                  </button>
+
+                                  {/* زر لم يُحضر (اللون الأحمر التنبيهي لمطالبته به) */}
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleColumnScoreChange(
+                                        st.studentName,
+                                        col.id,
+                                        0,
+                                        !isMissing
+                                      )
+                                    }
+                                    className={`w-5 h-5 rounded flex items-center justify-center text-[9px] transition cursor-pointer ${
+                                      isMissing
+                                        ? "bg-red-600 text-white font-black animate-pulse"
+                                        : "bg-slate-100 hover:bg-red-100 text-slate-400 hover:text-red-700"
+                                    }`}
+                                    title="تحديد كـ (لم يحضر) باللون الأحمر لمطالبته بإحضاره"
+                                  >
+                                    🔴
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* وسم حالة لم يحضر */}
+                              {isMissing && (
+                                <span className="block text-[9px] font-black text-red-700 mt-0.5 leading-none">
+                                  لم يُحضر ⚠️
+                                </span>
+                              )}
+                            </td>
+                          );
+                        })}
+
+                        {/* عمود الرصيد الإضافي (+ / -) */}
+                        <td className="py-1.5 px-1 text-center border-l border-slate-100 bg-amber-50/20">
+                          <div className="flex items-center justify-center gap-1">
+                            <span
+                              className={`font-mono text-xs font-black min-w-[24px] ${
+                                (rec.bonusPoints || 0) > 0
+                                  ? "text-emerald-700 font-extrabold"
+                                  : (rec.bonusPoints || 0) < 0
+                                  ? "text-rose-700 font-extrabold"
+                                  : "text-slate-400"
+                              }`}
+                            >
+                              {(rec.bonusPoints || 0) > 0 ? `+${rec.bonusPoints}` : rec.bonusPoints || 0}
+                            </span>
+                            <div className="flex flex-col gap-0.5">
+                              <button
+                                type="button"
+                                onClick={() => handleBonusChange(st.studentName, 0.5)}
+                                className="w-4 h-3.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded text-[9px] font-bold flex items-center justify-center"
+                                title="إضافة +0.5"
+                              >
+                                +
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleBonusChange(st.studentName, -0.5)}
+                                className="w-4 h-3.5 bg-rose-100 hover:bg-rose-200 text-rose-800 rounded text-[9px] font-bold flex items-center justify-center"
+                                title="خصم -0.5"
+                              >
+                                -
+                              </button>
+                            </div>
+                          </div>
                         </td>
 
-                        {/* كراس 1 */}
-                        <td className="py-2 px-1 text-center">
-                          <input
-                            type="number"
-                            inputMode="decimal"
-                            step="0.5"
-                            min="0"
-                            max="2"
-                            value={rec.notebook1Score ?? 2}
-                            onChange={(e) =>
-                              handleScoreChange(
-                                st.studentName,
-                                "notebook1Score",
-                                parseFloat(e.target.value) || 0
-                              )
-                            }
-                            className="w-12 text-center py-1 bg-slate-50 border border-slate-200 rounded text-xs font-bold"
-                          />
-                        </td>
-
-                        {/* كراس 2 */}
-                        <td className="py-2 px-1 text-center">
-                          <input
-                            type="number"
-                            inputMode="decimal"
-                            step="0.5"
-                            min="0"
-                            max="2"
-                            value={rec.notebook2Score ?? 2}
-                            onChange={(e) =>
-                              handleScoreChange(
-                                st.studentName,
-                                "notebook2Score",
-                                parseFloat(e.target.value) || 0
-                              )
-                            }
-                            className="w-12 text-center py-1 bg-slate-50 border border-slate-200 rounded text-xs font-bold"
-                          />
-                        </td>
-
-                        {/* وظيفة 1 */}
-                        <td className="py-2 px-1 text-center">
-                          <input
-                            type="number"
-                            inputMode="decimal"
-                            step="0.5"
-                            min="0"
-                            max="2"
-                            value={rec.homework1Score ?? 2}
-                            onChange={(e) =>
-                              handleScoreChange(
-                                st.studentName,
-                                "homework1Score",
-                                parseFloat(e.target.value) || 0
-                              )
-                            }
-                            className="w-12 text-center py-1 bg-slate-50 border border-slate-200 rounded text-xs font-bold"
-                          />
-                        </td>
-
-                        {/* وظيفة 2 */}
-                        <td className="py-2 px-1 text-center">
-                          <input
-                            type="number"
-                            inputMode="decimal"
-                            step="0.5"
-                            min="0"
-                            max="2"
-                            value={rec.homework2Score ?? 2}
-                            onChange={(e) =>
-                              handleScoreChange(
-                                st.studentName,
-                                "homework2Score",
-                                parseFloat(e.target.value) || 0
-                              )
-                            }
-                            className="w-12 text-center py-1 bg-slate-50 border border-slate-200 rounded text-xs font-bold"
-                          />
-                        </td>
-
-                        {/* استجواب 1 */}
-                        <td className="py-2 px-1 text-center">
-                          <input
-                            type="number"
-                            inputMode="decimal"
-                            step="0.5"
-                            min="0"
-                            max="4"
-                            value={rec.quiz1Score ?? 4}
-                            onChange={(e) =>
-                              handleScoreChange(
-                                st.studentName,
-                                "quiz1Score",
-                                parseFloat(e.target.value) || 0
-                              )
-                            }
-                            className="w-12 text-center py-1 bg-slate-50 border border-slate-200 rounded text-xs font-bold"
-                          />
-                        </td>
-
-                        {/* استجواب 2 */}
-                        <td className="py-2 px-1 text-center">
-                          <input
-                            type="number"
-                            inputMode="decimal"
-                            step="0.5"
-                            min="0"
-                            max="4"
-                            value={rec.quiz2Score ?? 4}
-                            onChange={(e) =>
-                              handleScoreChange(
-                                st.studentName,
-                                "quiz2Score",
-                                parseFloat(e.target.value) || 0
-                              )
-                            }
-                            className="w-12 text-center py-1 bg-slate-50 border border-slate-200 rounded text-xs font-bold"
-                          />
-                        </td>
-
-                        {/* إضافي */}
-                        <td className="py-2 px-1 text-center">
-                          <input
-                            type="number"
-                            inputMode="decimal"
-                            step="0.5"
-                            value={rec.bonusPoints || 0}
-                            onChange={(e) =>
-                              handleScoreChange(
-                                st.studentName,
-                                "bonusPoints",
-                                parseFloat(e.target.value) || 0
-                              )
-                            }
-                            className="w-12 text-center py-1 bg-amber-50/70 border border-amber-200 rounded text-xs font-bold text-amber-900"
-                          />
-                        </td>
-
-                        {/* المجموع */}
-                        <td className="py-2 px-3 text-center bg-emerald-50/50 font-black text-sm">
+                        {/* عمود المجموع النهائي المحسوب بدقة من 20 */}
+                        <td className="py-2 px-2 text-center bg-emerald-50/60 font-mono font-black text-xs">
                           <span
-                            className={
-                              rec.continuousScore >= 10
-                                ? "text-emerald-700"
-                                : "text-rose-600"
-                            }
+                            className={`inline-block px-2.5 py-1 rounded-lg text-xs font-black shadow-2xs ${
+                              finalScore >= 15
+                                ? "bg-emerald-600 text-white"
+                                : finalScore >= 10
+                                ? "bg-teal-600 text-white"
+                                : finalScore >= 8
+                                ? "bg-amber-500 text-white"
+                                : "bg-rose-600 text-white"
+                            }`}
                           >
-                            {rec.continuousScore?.toFixed(1) || "20.0"}
+                            {finalScore.toFixed(1)}
                           </span>
                         </td>
                       </tr>
                     );
-                  })}
-                </tbody>
-              </table>
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* ─── بطاقة التوجيه السريع للاستخدام ─── */}
+        <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-2xs space-y-2 text-xs text-slate-600">
+          <div className="flex items-center gap-2 font-bold text-slate-900">
+            <HelpCircle className="w-4 h-4 text-emerald-600" />
+            <span>إرشادات التنقيط السريع والميداني في القسم:</span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2 pt-1 text-[11px]">
+            <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
+              <strong className="text-emerald-800 block mb-0.5">✓ التنقيط بنقرة واحدة:</strong>
+              اضغط على رمز (✓) لمن أحضر الواجب أو الكراس لأخذ العلامة كاملة مباشرة، أو اكتب علامة مخصصة في المربع.
+            </div>
+            <div className="p-2.5 rounded-xl bg-red-50/60 border border-red-200">
+              <strong className="text-red-800 block mb-0.5">🔴 متابعة من لم يُحضر:</strong>
+              اضغط على رمز (🔴) لمن لم يحضر الواجب؛ ستتحول الخانة إلى لون أحمر تنبيهي لتطالبه بإحضاره في الحصة المقبلة.
+            </div>
+            <div className="p-2.5 rounded-xl bg-indigo-50/60 border border-indigo-200">
+              <strong className="text-indigo-800 block mb-0.5">⚙️ حرية الأعمدة والحساب:</strong>
+              يمكنك زيادة أو إنقاص أو تعديل مسميات الأعمدة كما تشاء، والمنظومة تتكفل بحساب علامة 20/20 الدقيقة ومزامنتها تلقائياً.
             </div>
           </div>
-        )}
-
-        {/* ─── 5. تذييل تنبيهي خفيف ─── */}
-        <div className="p-3 bg-emerald-50/80 rounded-2xl border border-emerald-200/70 flex items-center justify-between text-xs text-emerald-800">
-          <div className="flex items-center gap-2">
-            <span>💡</span>
-            <span>
-              جميع النقاط المسجلة هنا تُحسب آلياً وتنتقل فوراً إلى خانة{" "}
-              <strong>«التقويم المستمر من 20»</strong> في جدول رصد النقاط الرسمي.
-            </span>
-          </div>
-          <Link
-            href="/eval"
-            className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold shrink-0 shadow-xs"
-          >
-            معاينة جدول الرصد
-          </Link>
         </div>
       </main>
+
+      {/* ══════════════════════════════════════════════════════════════
+         نافذة تخصيص وإدارة الأعمدة (إضافة / تعديل / حذف / نماذج)
+         ══════════════════════════════════════════════════════════════ */}
+      {isColumnModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl p-5 sm:p-6 max-w-lg w-full shadow-2xl border border-slate-200 space-y-4 text-right max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold">
+                  <Sliders className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900">
+                    إدارة وتخصيص أعمدة التقويم المستمر
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    فوج: <strong>{selectedClass}</strong> • مجموع النقاط الحالي: <strong>{totalMaxScore}ن</strong>
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsColumnModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* قسم النماذج الجاهزة */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 block">نماذج معيارية جاهزة:</label>
+              <div className="space-y-1.5">
+                {COLUMN_PRESETS.map((p, pIdx) => (
+                  <button
+                    key={pIdx}
+                    type="button"
+                    onClick={() => handleApplyPreset(p.columns)}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-emerald-50 hover:border-emerald-300 text-right transition cursor-pointer flex items-center justify-between gap-2"
+                  >
+                    <div>
+                      <span className="text-xs font-black text-slate-800 block">{p.name}</span>
+                      <span className="text-[10px] text-slate-500">{p.description}</span>
+                    </div>
+                    <span className="text-[10px] bg-white border border-slate-200 text-emerald-700 font-bold px-2 py-1 rounded-lg shrink-0">
+                      تطبيق
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* قائمة الأعمدة الحالية مع إمكانية الحذف والتعديل */}
+            <div className="space-y-2 pt-2 border-t border-slate-100">
+              <label className="text-xs font-bold text-slate-700 block">
+                الأعمدة المعتمدة حالياً ({columns.length}):
+              </label>
+
+              <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                {columns.map((col, idx) => (
+                  <div
+                    key={col.id}
+                    className="p-2.5 rounded-xl border border-slate-200 bg-white flex items-center justify-between gap-2"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold flex items-center justify-center">
+                        {idx + 1}
+                      </span>
+                      <div>
+                        <span className="text-xs font-black text-slate-800">{col.title}</span>
+                        <span className="text-[10px] font-mono text-emerald-700 font-bold mr-1.5">
+                          (العلامة القصوى: {col.maxScore}ن)
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setEditingColumn({ ...col })}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-700 hover:bg-slate-100 transition"
+                        title="تعديل هذا العمود"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteColumn(col.id)}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-red-700 hover:bg-red-50 transition"
+                        title="حذف هذا العمود"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* نموذج تعديل عمود محدد إن كان مفتوحاً */}
+            {editingColumn && (
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-2 animate-fade-in">
+                <span className="text-xs font-black text-amber-900 block">
+                  تعديل العمود: {editingColumn.title}
+                </span>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    value={editingColumn.title}
+                    onChange={(e) => setEditingColumn({ ...editingColumn, title: e.target.value })}
+                    placeholder="عنوان العمود"
+                    className="p-2 rounded-lg border border-amber-300 text-xs bg-white"
+                  />
+                  <input
+                    type="number"
+                    min="1"
+                    max="20"
+                    step="0.5"
+                    value={editingColumn.maxScore}
+                    onChange={(e) =>
+                      setEditingColumn({
+                        ...editingColumn,
+                        maxScore: parseFloat(e.target.value) || 1,
+                      })
+                    }
+                    placeholder="النقاط القصوى"
+                    className="p-2 rounded-lg border border-amber-300 text-xs bg-white font-mono text-center"
+                  />
+                </div>
+                <div className="flex justify-end gap-1.5 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setEditingColumn(null)}
+                    className="px-3 py-1 rounded-lg border border-slate-300 text-slate-600 text-xs"
+                  >
+                    إلغاء
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveEditColumn}
+                    className="px-3 py-1 rounded-lg bg-emerald-600 text-white text-xs font-bold"
+                  >
+                    حفظ التعديل
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* قسم إضافة عمود جديد */}
+            <div className="pt-2 border-t border-slate-100 space-y-2">
+              <label className="text-xs font-bold text-slate-700 block">إضافة عمود جديد:</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  placeholder="اسم العمود (مثال: واجب 3 أو مشروع)..."
+                  value={newColTitle}
+                  onChange={(e) => setNewColTitle(e.target.value)}
+                  className="flex-1 py-2 px-3 rounded-xl border border-slate-200 text-xs bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20"
+                />
+                <div className="flex items-center gap-1 shrink-0">
+                  <span className="text-xs text-slate-500 font-bold">من:</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max="20"
+                    step="0.5"
+                    value={newColMax}
+                    onChange={(e) => setNewColMax(parseFloat(e.target.value) || 1)}
+                    className="w-14 py-2 text-center rounded-xl border border-slate-200 text-xs font-mono font-bold bg-slate-50"
+                  />
+                  <span className="text-xs text-slate-500 font-bold">ن</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddColumn}
+                  disabled={!newColTitle.trim()}
+                  className="py-2 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-black text-xs shrink-0 flex items-center gap-1 transition"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>إضافة</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="pt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsColumnModalOpen(false)}
+                className="py-2 px-5 rounded-xl bg-slate-800 text-white text-xs font-black cursor-pointer"
+              >
+                تم والعودة للجدول
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

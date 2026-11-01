@@ -43,7 +43,7 @@ export async function getSessionProfile() {
     .select("id, role, full_name, district_id, slug, teacher_code, school_custom_name, middle_school_id, levels_taught, is_verified")
     .eq("id", user.id)
     .single();
-  return { supabase, user, profile };
+  return { supabase, user, profile: profile ? { ...profile, email: user.email } : null };
 }
 
 // الأستاذ المسجل دخوله (يحل محل كلمة المرور المشتركة القديمة)

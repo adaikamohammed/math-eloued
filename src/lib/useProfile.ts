@@ -41,7 +41,7 @@ export function useProfile() {
           .maybeSingle();
 
         if (data) {
-          setProfile(data as UserProfile);
+          setProfile({ ...data, email: session.user.email } as UserProfile);
           setLoading(false);
           return;
         }
