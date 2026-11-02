@@ -114,15 +114,27 @@ export default function TeachersStaffRoomPackPage() {
               </button>
             </div>
 
-            {/* زر الطباعة الفورية */}
-            <button
-              type="button"
-              onClick={handlePrint}
-              className="py-2.5 px-5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white text-xs font-black shadow-md transition flex items-center gap-2 cursor-pointer active:scale-95"
-            >
-              <Printer className="w-4 h-4" />
-              <span>طباعة المستندات الآن A4 🖨️</span>
-            </button>
+            {/* أزرار تحميل PDF المباشرة والطباعة */}
+            <div className="flex items-center gap-1.5">
+              <a
+                href="/documents/الحزمة_الشاملة_إعلان_ودليل_متوسطة_باهي_علي.pdf"
+                download="الحزمة_الشاملة_قاعة_الأساتذة_متوسطة_باهي_علي.pdf"
+                className="py-2 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold transition flex items-center gap-1.5"
+                title="تحميل الحزمة الشاملة PDF كاملة (3 أوراق)"
+              >
+                <Download className="w-3.5 h-3.5 text-emerald-600" />
+                <span>تحميل PDF الشامل 📥</span>
+              </a>
+
+              <button
+                type="button"
+                onClick={handlePrint}
+                className="py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white text-xs font-black shadow-md transition flex items-center gap-2 cursor-pointer active:scale-95"
+              >
+                <Printer className="w-4 h-4" />
+                <span>طباعة A4 🖨️</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -367,14 +379,14 @@ export default function TeachersStaffRoomPackPage() {
               </div>
 
               {/* ─── الخطوة 01: إنشاء الحساب ─── */}
-              <div className="border border-slate-200 rounded-2xl p-4 bg-slate-50/70 space-y-2.5">
+              <div className="border border-slate-200 rounded-2xl p-3.5 bg-slate-50/70 space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="w-6 h-6 rounded-lg bg-emerald-800 text-white text-xs font-black flex items-center justify-center">
                       01
                     </span>
                     <h3 className="text-sm font-black text-slate-900">
-                      إنشاء حساب الأستاذ الجديد وتحديد المادة
+                      إنشاء حساب الأستاذ الجديد وتحديد المادة والمؤسسة
                     </h3>
                   </div>
                   <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-md">
@@ -382,43 +394,40 @@ export default function TeachersStaffRoomPackPage() {
                   </span>
                 </div>
 
-                <p className="text-xs text-slate-600 leading-relaxed font-medium">
-                  افتح الموقع، اضغط على <strong>«إنشاء حساب أستاذ جديد»</strong>، ثم اكتب اسمك الكامل، مادتك التعليمية (رياضيات، لغة عربية، علوم، فيزياء...)، واختر المستويات التي تدرسها في المتوسطة (1م، 2م، 3م، 4م).
-                </p>
-
-                {/* سكرين شوت ومحاكاة بصرية لواجهة إنشاء الحساب */}
-                <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-2xs space-y-2">
-                  <div className="flex items-center justify-between text-[10px] font-mono font-bold text-slate-400 border-b pb-1">
-                    <span>نافذة التسجيل: jusoor-dz.vercel.app/register</span>
-                    <span>خطوة 1 من 2</span>
+                <div className="grid grid-cols-1 sm:grid-cols-[210px_1fr] gap-3 items-center">
+                  <div className="rounded-xl overflow-hidden border border-slate-300 shadow-xs h-36 bg-slate-100 flex items-center justify-center shrink-0">
+                    <img
+                      src="/screenshots/step1_register.png"
+                      alt="إنشاء حساب جديد للأستاذ"
+                      className="w-full h-full object-cover object-top"
+                    />
                   </div>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="p-2 rounded-lg bg-slate-50 border border-slate-200 font-bold text-slate-700">
-                      👤 الاسم الكامل: <span className="text-emerald-800 font-black">أستاذ المادة</span>
+                  <div className="space-y-1.5 text-xs text-slate-700 font-medium">
+                    <div className="flex items-start gap-1.5">
+                      <span className="w-4 h-4 rounded-full bg-emerald-700 text-white text-[10px] font-black flex items-center justify-center shrink-0 mt-0.5">1</span>
+                      <p>انقر على تبويب <strong>«إنشاء حساب جديد»</strong> واكتب اسمك ولقبك الكامل كما هو معتمد في الإدارة.</p>
                     </div>
-                    <div className="p-2 rounded-lg bg-slate-50 border border-slate-200 font-bold text-slate-700">
-                      📖 المادة: <span className="text-emerald-800 font-black">الرياضيات (أو مادتك)</span>
+                    <div className="flex items-start gap-1.5">
+                      <span className="w-4 h-4 rounded-full bg-emerald-700 text-white text-[10px] font-black flex items-center justify-center shrink-0 mt-0.5">2</span>
+                      <p>اختر <strong>مادة التدريس</strong>، وحدد الولاية (الوادي) واسم المؤسسة: <strong>{schoolName}</strong>.</p>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2 text-[11px] font-bold text-slate-600 bg-emerald-50/60 p-2 rounded-lg border border-emerald-100">
-                    <span>المستويات المسندة:</span>
-                    <span className="px-2 py-0.5 bg-emerald-700 text-white rounded font-mono text-[10px]">1م</span>
-                    <span className="px-2 py-0.5 bg-emerald-700 text-white rounded font-mono text-[10px]">2م</span>
-                    <span className="px-2 py-0.5 bg-slate-200 text-slate-700 rounded font-mono text-[10px]">3م</span>
-                    <span className="px-2 py-0.5 bg-emerald-700 text-white rounded font-mono text-[10px]">4م</span>
+                    <div className="flex items-start gap-1.5">
+                      <span className="w-4 h-4 rounded-full bg-emerald-700 text-white text-[10px] font-black flex items-center justify-center shrink-0 mt-0.5">3</span>
+                      <p>أدخل بريدك الإلكتروني وكلمة المرور الخاصة بك واضغط على زر <strong>«إنشاء الحساب ومتابعة»</strong>.</p>
+                    </div>
                   </div>
                 </div>
               </div>
 
               {/* ─── الخطوة 02: لوحة الأستاذ والحصول على الكود ─── */}
-              <div className="border border-slate-200 rounded-2xl p-4 bg-slate-50/70 space-y-2.5">
+              <div className="border border-slate-200 rounded-2xl p-3.5 bg-slate-50/70 space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="w-6 h-6 rounded-lg bg-teal-800 text-white text-xs font-black flex items-center justify-center">
                       02
                     </span>
                     <h3 className="text-sm font-black text-slate-900">
-                      لوحة الأستاذ والحصول على كود مادتك المخصص
+                      فضاء الأستاذ، كود المادة، ورابط فضاء التلاميذ والأولياء
                     </h3>
                   </div>
                   <span className="text-[10px] font-bold text-teal-700 bg-teal-100/80 px-2 py-0.5 rounded-md">
@@ -426,36 +435,40 @@ export default function TeachersStaffRoomPackPage() {
                   </span>
                 </div>
 
-                <p className="text-xs text-slate-600 leading-relaxed font-medium">
-                  بمجرد الدخول، يُنشئ لك النظام تلقائياً <strong>رمزاً سريعاً خاصاً بك (مثال: MTH-101)</strong> ورابطاً مباشراً مع رمز QR. انسخه وشاركه مع التلاميذ في القسم أو في كراس المحاولات ليدخل أولياؤهم مباشرة.
-                </p>
-
-                {/* سكرين شوت ومحاكاة بصرية لكود الأستاذ */}
-                <div className="bg-gradient-to-r from-slate-900 to-emerald-950 text-white rounded-xl p-3 shadow-2xs flex items-center justify-between gap-3">
-                  <div className="space-y-1">
-                    <span className="text-[10px] text-emerald-300 font-bold block">كود المادة المعطى للتلاميذ:</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg font-mono font-black text-white bg-white/20 px-3 py-0.5 rounded-lg border border-white/20 tracking-wider">
-                        MTH-896
-                      </span>
-                      <span className="text-[11px] text-emerald-200 font-bold">يكتبه الولي في خانة البحث فيفتح فضاءك فوراً</span>
-                    </div>
+                <div className="grid grid-cols-1 sm:grid-cols-[210px_1fr] gap-3 items-center">
+                  <div className="rounded-xl overflow-hidden border border-slate-300 shadow-xs h-36 bg-slate-100 flex items-center justify-center shrink-0">
+                    <img
+                      src="/screenshots/step2_teacher_space.png"
+                      alt="فضاء الأستاذ وكود المادة"
+                      className="w-full h-full object-cover object-top"
+                    />
                   </div>
-                  <div className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-black shrink-0">
-                    نسخ الرابط 📋
+                  <div className="space-y-1.5 text-xs text-slate-700 font-medium">
+                    <div className="flex items-start gap-1.5">
+                      <span className="w-4 h-4 rounded-full bg-teal-700 text-white text-[10px] font-black flex items-center justify-center shrink-0 mt-0.5">1</span>
+                      <p>يظهر في فضائك كود الأستاذ الخاص (مثل: <strong>MTH-784</strong>) وهو الرمز الذي يربط الولي بمادتك في هاتفه.</p>
+                    </div>
+                    <div className="flex items-start gap-1.5">
+                      <span className="w-4 h-4 rounded-full bg-teal-700 text-white text-[10px] font-black flex items-center justify-center shrink-0 mt-0.5">2</span>
+                      <p>يتاح لك رابط فضاء التلاميذ لنشره في مجموعات التواصل أو كتابته في كراس التلميذ.</p>
+                    </div>
+                    <div className="flex items-start gap-1.5">
+                      <span className="w-4 h-4 rounded-full bg-teal-700 text-white text-[10px] font-black flex items-center justify-center shrink-0 mt-0.5">3</span>
+                      <p>يستعرض الولي كراس السبورة والواجبات المنزلية ومواعيد الاستقبال الرسمية للأستاذ بالمؤسسة.</p>
+                    </div>
                   </div>
                 </div>
               </div>
 
               {/* ─── الخطوة 03: إدارة الأفواج والتلاميذ ─── */}
-              <div className="border border-slate-200 rounded-2xl p-4 bg-slate-50/70 space-y-2.5">
+              <div className="border border-slate-200 rounded-2xl p-3.5 bg-slate-50/70 space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="w-6 h-6 rounded-lg bg-blue-800 text-white text-xs font-black flex items-center justify-center">
                       03
                     </span>
                     <h3 className="text-sm font-black text-slate-900">
-                      إدارة الأفواج وتدوين قوائم التلاميذ
+                      إدارة الأفواج وقوائم التلاميذ وتقسيم التفويج
                     </h3>
                   </div>
                   <span className="text-[10px] font-bold text-blue-700 bg-blue-100/80 px-2 py-0.5 rounded-md">
@@ -463,20 +476,27 @@ export default function TeachersStaffRoomPackPage() {
                   </span>
                 </div>
 
-                <p className="text-xs text-slate-600 leading-relaxed font-medium">
-                  من القائمة الجانبية اختر <strong>«إدارة الأفواج والتلاميذ»</strong>، أضف أفواجك التربوية ثم دوّن أسماء التلاميذ أو الصق القائمة دفعة واحدة لتجهيز دفتر التقويم الصفي الفوري.
-                </p>
-
-                {/* محاكاة بصرية لإدارة الأفواج */}
-                <div className="bg-white rounded-xl border border-slate-200 p-2.5 text-xs space-y-1.5">
-                  <div className="flex items-center justify-between font-bold text-slate-700 border-b pb-1">
-                    <span>قائمة الفوج: <strong className="text-emerald-800">1 متوسط 2 (1م2)</strong></span>
-                    <span className="text-[10px] text-slate-400">عدد التلاميذ: 34 تلميذاً</span>
+                <div className="grid grid-cols-1 sm:grid-cols-[210px_1fr] gap-3 items-center">
+                  <div className="rounded-xl overflow-hidden border border-slate-300 shadow-xs h-36 bg-slate-100 flex items-center justify-center shrink-0">
+                    <img
+                      src="/screenshots/step3_classes_roster.png"
+                      alt="إدارة الأفواج والتلاميذ"
+                      className="w-full h-full object-cover object-top"
+                    />
                   </div>
-                  <div className="grid grid-cols-3 gap-1.5 text-[11px] font-medium text-slate-600">
-                    <span className="p-1 rounded bg-slate-50 border">1. بلقاسم محمد الأمين</span>
-                    <span className="p-1 rounded bg-slate-50 border">2. عدايكة أسامة</span>
-                    <span className="p-1 rounded bg-slate-50 border">3. تجاني يحيى</span>
+                  <div className="space-y-1.5 text-xs text-slate-700 font-medium">
+                    <div className="flex items-start gap-1.5">
+                      <span className="w-4 h-4 rounded-full bg-blue-700 text-white text-[10px] font-black flex items-center justify-center shrink-0 mt-0.5">1</span>
+                      <p>من القائمة الجانبية اختر <strong>«إدارة الأفواج والتلاميذ»</strong> وأضف أقسامك (1م1، 1م2، 2م3...).</p>
+                    </div>
+                    <div className="flex items-start gap-1.5">
+                      <span className="w-4 h-4 rounded-full bg-blue-700 text-white text-[10px] font-black flex items-center justify-center shrink-0 mt-0.5">2</span>
+                      <p>استورد قوائم التلاميذ بنقرة واحدة مع تحديد وتوزيع <strong>التفويج (فوج 1 / فوج 2)</strong> للحصص التطبيقية.</p>
+                    </div>
+                    <div className="flex items-start gap-1.5">
+                      <span className="w-4 h-4 rounded-full bg-blue-700 text-white text-[10px] font-black flex items-center justify-center shrink-0 mt-0.5">3</span>
+                      <p>تجهيز فوري لدفتر التقويم الصفي اليومي وسجل المتابعة الميدانية لكل فوج على حدة.</p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -509,14 +529,14 @@ export default function TeachersStaffRoomPackPage() {
               </div>
 
               {/* ─── الخطوة 04: توثيق صور السبورة والواجبات ─── */}
-              <div className="border border-slate-200 rounded-2xl p-4 bg-slate-50/70 space-y-2.5">
+              <div className="border border-slate-200 rounded-2xl p-3.5 bg-slate-50/70 space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="w-6 h-6 rounded-lg bg-emerald-800 text-white text-xs font-black flex items-center justify-center">
                       04
                     </span>
                     <h3 className="text-sm font-black text-slate-900">
-                      توثيق صور السبورة اليومية وإسناد الواجبات
+                      توثيق سبورة الحصة ونشر الواجبات والحلول النموذجية
                     </h3>
                   </div>
                   <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-md">
@@ -524,90 +544,109 @@ export default function TeachersStaffRoomPackPage() {
                   </span>
                 </div>
 
-                <p className="text-xs text-slate-600 leading-relaxed font-medium">
-                  من صفحة <strong>«كراس الدروس والسبورة»</strong>، اختر المستوى (مثلاً 1م)، اضغط <strong>«إضافة درس جديد»</strong>، التقط صورة السبورة بكاميرا هاتفك أو ارفعها، واكتب رقم التمرين أو الواجب المنزلي.
-                </p>
-
-                {/* محاكاة بصرية لبطاقة الدرس والسبورة */}
-                <div className="bg-white rounded-xl border border-slate-200 p-3 space-y-2 text-xs shadow-2xs">
-                  <div className="flex items-center justify-between">
-                    <span className="font-black text-emerald-900">الدرس 04: العمليات على الأعداد الطبيعية والعشرية</span>
-                    <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded">منشور للولي ✓</span>
+                <div className="grid grid-cols-1 sm:grid-cols-[210px_1fr] gap-3 items-center">
+                  <div className="rounded-xl overflow-hidden border border-slate-300 shadow-xs h-36 bg-slate-100 flex items-center justify-center shrink-0">
+                    <img
+                      src="/screenshots/step4_board_journal.png"
+                      alt="كراس الدروس والسبورة"
+                      className="w-full h-full object-cover object-top"
+                    />
                   </div>
-                  <div className="flex items-center gap-2 text-[11px] text-slate-600">
-                    <span className="flex items-center gap-1 font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
-                      📸 صورة السبورة مرفوعة
-                    </span>
-                    <span className="flex items-center gap-1 font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                      📝 واجب منزلي: تمرين 14 ص 18
-                    </span>
+                  <div className="space-y-1.5 text-xs text-slate-700 font-medium">
+                    <div className="flex items-start gap-1.5">
+                      <span className="w-4 h-4 rounded-full bg-emerald-700 text-white text-[10px] font-black flex items-center justify-center shrink-0 mt-0.5">1</span>
+                      <p>في نهاية الحصة التقط صورة بكاميرا هاتفك للسبورة واضغط <strong>«رفع السبورة الرقمية»</strong>.</p>
+                    </div>
+                    <div className="flex items-start gap-1.5">
+                      <span className="w-4 h-4 rounded-full bg-emerald-700 text-white text-[10px] font-black flex items-center justify-center shrink-0 mt-0.5">2</span>
+                      <p><strong>خدمة التلميذ الغائب:</strong> يستطيع التلميذ الغائب أو المريض نقل الدرس وحل التمارين فوراً دون عناء استعارة الكراس.</p>
+                    </div>
+                    <div className="flex items-start gap-1.5">
+                      <span className="w-4 h-4 rounded-full bg-emerald-700 text-white text-[10px] font-black flex items-center justify-center shrink-0 mt-0.5">3</span>
+                      <p>نشر التمارين والواجبات وحلولها النموذجية بعد التصحيح لتعزيز مراجعة الأولياء في البيت.</p>
+                    </div>
                   </div>
                 </div>
               </div>
 
               {/* ─── الخطوة 05: دفتر التقويم المستمر الصفي بالهاتف ─── */}
-              <div className="border border-slate-200 rounded-2xl p-4 bg-slate-50/70 space-y-2.5">
+              <div className="border border-slate-200 rounded-2xl p-3.5 bg-slate-50/70 space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="w-6 h-6 rounded-lg bg-teal-800 text-white text-xs font-black flex items-center justify-center">
                       05
                     </span>
                     <h3 className="text-sm font-black text-slate-900">
-                      دفتر التقويم الصفي السريع بالهاتف (Quick Tap)
+                      التقويم المستمر بالهاتف في القسم والاحتساب الآلي للمعدلات
                     </h3>
                   </div>
                   <span className="text-[10px] font-bold text-teal-700 bg-teal-100/80 px-2 py-0.5 rounded-md">
-                    تنقيط القسم كاملاً في 30 ثانية ⚡
+                    تنقيط القسم كاملاً بلمسات سريعة ⚡
                   </span>
                 </div>
 
-                <p className="text-xs text-slate-600 leading-relaxed font-medium">
-                  ادخل إلى <strong>«دفتر التقويم المستمر الصفي»</strong> من هاتفك داخل القسم، اختر المعيار (مثلاً: الوظيفة 1 من 2ن)، والمس علامة التلميذ مباشرة بأصبعك، مع زر ذهبي <strong>«🌟 وضع 2/2 للجميع»</strong>. تُحسب المعدلات الفصلية آلياً وفق المنشور الوزاري!
-                </p>
-
-                {/* محاكاة بصرية لأزرار التنقيط بالأصبع في الهاتف */}
-                <div className="bg-white rounded-xl border border-teal-200 p-2.5 space-y-2 text-xs">
-                  <div className="flex items-center justify-between text-[11px] font-bold text-slate-700 border-b pb-1">
-                    <span>التلميذ: <strong>بلقاسم محمد الأمين (1م2)</strong></span>
-                    <span className="text-emerald-800 font-mono font-black text-sm">العلامة: 2 / 2</span>
+                <div className="grid grid-cols-1 sm:grid-cols-[210px_1fr] gap-3 items-center">
+                  <div className="rounded-xl overflow-hidden border border-slate-300 shadow-xs h-36 bg-slate-100 flex items-center justify-center shrink-0">
+                    <img
+                      src="/screenshots/step5_continuous_grading.png"
+                      alt="دفتر التقويم المستمر"
+                      className="w-full h-full object-cover object-top"
+                    />
                   </div>
-                  <div className="flex items-center gap-1.5 justify-end" dir="ltr">
-                    <span className="px-3 py-1 bg-emerald-700 text-white font-black rounded-lg text-xs shadow-xs">[ 2 ]</span>
-                    <span className="px-3 py-1 bg-slate-100 text-slate-700 font-bold rounded-lg text-xs">[ 1.5 ]</span>
-                    <span className="px-3 py-1 bg-slate-100 text-slate-700 font-bold rounded-lg text-xs">[ 1 ]</span>
-                    <span className="px-3 py-1 bg-slate-100 text-slate-700 font-bold rounded-lg text-xs">[ 0.5 ]</span>
+                  <div className="space-y-1.5 text-xs text-slate-700 font-medium">
+                    <div className="flex items-start gap-1.5">
+                      <span className="w-4 h-4 rounded-full bg-teal-700 text-white text-[10px] font-black flex items-center justify-center shrink-0 mt-0.5">1</span>
+                      <p>افتح <strong>«دفتر التقويم المستمر»</strong> من هاتفك داخل الحجرة واضغط على علامة كل تلميذ مباشرة.</p>
+                    </div>
+                    <div className="flex items-start gap-1.5">
+                      <span className="w-4 h-4 rounded-full bg-teal-700 text-white text-[10px] font-black flex items-center justify-center shrink-0 mt-0.5">2</span>
+                      <p>معايير منضبطة: مشاركة وانضباط (4ن)، كراس (2ن)، وظائف منزلية (2ن)، استجوابات (4ن).</p>
+                    </div>
+                    <div className="flex items-start gap-1.5">
+                      <span className="w-4 h-4 rounded-full bg-teal-700 text-white text-[10px] font-black flex items-center justify-center shrink-0 mt-0.5">3</span>
+                      <p><strong>حساب آلي فوري:</strong> تحتسب المنصة المجموع من 20 تلقائياً وجاهز للتصدير لكشف النقاط الوزاري.</p>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* ─── الخطوة 06: الدفتر اليومي، دفتر النصوص، وتكريم النوابغ ─── */}
-              <div className="border border-slate-200 rounded-2xl p-4 bg-slate-50/70 space-y-2.5">
+              {/* ─── الخطوة 06: الدفتر اليومي، كراس النصوص، وتكرار الدروس ─── */}
+              <div className="border border-slate-200 rounded-2xl p-3.5 bg-slate-50/70 space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="w-6 h-6 rounded-lg bg-indigo-800 text-white text-xs font-black flex items-center justify-center">
                       06
                     </span>
                     <h3 className="text-sm font-black text-slate-900">
-                      الدفاتر البيداغوجية، تكرار الحصص، وتكريم النوابغ
+                      الدفتر اليومي، كراس النصوص، وتكرار الحصص للأفواج المتوازية
                     </h3>
                   </div>
                   <span className="text-[10px] font-bold text-indigo-700 bg-indigo-100/80 px-2 py-0.5 rounded-md">
-                    المسودة ودفتر النصوص ولوحة الشرف
+                    المذكرات وسيرورة الحصة 📝
                   </span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="p-2.5 rounded-xl bg-white border border-slate-200 space-y-1">
-                    <span className="font-black text-slate-900 block">⚡ تكرار الدرس للأقسام:</span>
-                    <p className="text-[11px] text-slate-600 font-medium leading-relaxed">
-                      إذا كنت تدرس نفس الدرس لـ (1م1، 1م2، 1م3)، اضغط <strong>«حفظ وتكرار الدرس»</strong> ليتوثق لبقية الأفواج بلمسة واحدة.
-                    </p>
+                <div className="grid grid-cols-1 sm:grid-cols-[210px_1fr] gap-3 items-center">
+                  <div className="rounded-xl overflow-hidden border border-slate-300 shadow-xs h-36 bg-slate-100 flex items-center justify-center shrink-0">
+                    <img
+                      src="/screenshots/step6_daily_diary.png"
+                      alt="الدفتر اليومي ودفتر النصوص"
+                      className="w-full h-full object-cover object-top"
+                    />
                   </div>
-                  <div className="p-2.5 rounded-xl bg-white border border-slate-200 space-y-1">
-                    <span className="font-black text-slate-900 block">🏆 لوحة الشرف الرسمية:</span>
-                    <p className="text-[11px] text-slate-600 font-medium leading-relaxed">
-                      سجّل المتفوقين في لوحة الشرف واطبع شهادات التقدير الرسمية للمؤسسة بضغطة زر واحدة.
-                    </p>
+                  <div className="space-y-1.5 text-xs text-slate-700 font-medium">
+                    <div className="flex items-start gap-1.5">
+                      <span className="w-4 h-4 rounded-full bg-indigo-700 text-white text-[10px] font-black flex items-center justify-center shrink-0 mt-0.5">1</span>
+                      <p>تدوين دقيق للحصة: الميدان، المقطع التعلمي، المورد المعرفي، وسيرورة النشاط (تمهيدي، وسيطي، نهائي).</p>
+                    </div>
+                    <div className="flex items-start gap-1.5">
+                      <span className="w-4 h-4 rounded-full bg-indigo-700 text-white text-[10px] font-black flex items-center justify-center shrink-0 mt-0.5">2</span>
+                      <p><strong>تكرار الدرس بنقرة واحدة:</strong> وفّر وقتك وانسخ بيانات الحصة للأقسام المتوازية دون إعادة كتابتها.</p>
+                    </div>
+                    <div className="flex items-start gap-1.5">
+                      <span className="w-4 h-4 rounded-full bg-indigo-700 text-white text-[10px] font-black flex items-center justify-center shrink-0 mt-0.5">3</span>
+                      <p>دفتر نصوص ميداني رسمي جاهز للتفتيش الإداري والبيداغوجي والطباعة المباشرة بضغطة واحدة.</p>
+                    </div>
                   </div>
                 </div>
               </div>

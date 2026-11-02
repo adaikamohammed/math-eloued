@@ -5,8 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
-    "test": "tsx --test src/lib/*.test.ts"
+    "test": "tsx --test src/lib/*.test.ts",
+    "generate:pdf": "tsx scripts/generate-school-announcement-pdfs.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.7.0",
