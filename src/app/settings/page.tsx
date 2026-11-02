@@ -18,6 +18,7 @@ import {
   CalendarClock,
   Sparkles,
   Crown,
+  Printer,
 } from "lucide-react";
 import { LoginRequired } from "@/components/LoginRequired";
 import { TeacherQR } from "@/components/TeacherQR";
@@ -306,7 +307,25 @@ export default function TeacherSettingsPage() {
       </div>
 
       {/* ─── بطاقات الوصول السريع ─── */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+        <Link
+          href="/admin/announcement"
+          className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white border border-emerald-600 transition shadow-2xs flex items-center justify-between group"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-9 h-9 rounded-xl bg-white/20 text-white border border-white/20 flex items-center justify-center shrink-0 shadow-2xs">
+              <Printer className="w-4 h-4" />
+            </div>
+            <div className="text-right min-w-0">
+              <span className="block text-xs font-black truncate">
+                ملصق ودليل قاعة الأساتذة
+              </span>
+              <span className="text-[10px] text-emerald-100 font-medium">طباعة A4 للمتوسطة 🖨️</span>
+            </div>
+          </div>
+          <ArrowRight className="w-3.5 h-3.5 text-white/80 group-hover:text-white rotate-180 transition shrink-0" />
+        </Link>
+
         <Link
           href="/settings/features"
           className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200/90 hover:border-emerald-300 transition shadow-2xs flex items-center justify-between group"

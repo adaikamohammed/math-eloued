@@ -89,36 +89,42 @@ function AppShellContent({ children }: { children: React.ReactNode }) {
 
   return (
     <div
-      className="flex h-screen bg-[#fafaf7] text-[#1a1a2e] overflow-hidden"
+      className="flex h-screen bg-[#fafaf7] text-[#1a1a2e] overflow-hidden print:h-auto print:overflow-visible print:bg-white"
       dir="rtl"
       suppressHydrationWarning
     >
-      {/* ── الشريط الجانبي (على اليمين، بكامل الارتفاع h-screen) ── */}
-      <DesktopSidebar />
+      {/* ── الشريط الجانبي (يختفي أثناء الطباعة) ── */}
+      <div className="print:hidden shrink-0">
+        <DesktopSidebar />
+      </div>
 
-      {/* ── العمود الرئيسي لمحتوى لوحة التحكم (على اليسار) ── */}
-      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
-        {/* الهيدر بارتفاع h-16 مطابق لرأس الشريط الجانبي تماماً دون أي انقطاع */}
-        <GlobalNavbar />
+      {/* ── العمود الرئيسي لمحتوى لوحة التحكم ── */}
+      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden print:h-auto print:overflow-visible print:block">
+        {/* الهيدر (يختفي أثناء الطباعة) */}
+        <div className="print:hidden">
+          <GlobalNavbar />
+        </div>
 
-        {/* مساحة المحتوى القابلة للتمرير مع الحفاظ على الهيدر والشريط ثابتين */}
-        <main className="flex-1 overflow-y-auto p-3 sm:p-6 pb-24 lg:pb-8 app-main-content">
+        {/* مساحة المحتوى القابلة للتمرير */}
+        <main className="flex-1 overflow-y-auto p-3 sm:p-6 pb-24 lg:pb-8 app-main-content print:p-0 print:m-0 print:overflow-visible">
           <div
             className={`w-full mx-auto transition-all ${
               mode === "full" ? "max-w-7xl" : mode === "wide" ? "max-w-6xl" : "max-w-5xl"
-            }`}
+            } print:max-w-none print:w-full`}
           >
             {children}
           </div>
 
-          <footer className="mt-12 text-center text-xs text-gray-400 py-4 border-t border-[#e8e8e0] hidden md:block">
+          <footer className="mt-12 text-center text-xs text-gray-400 py-4 border-t border-[#e8e8e0] hidden md:block print:hidden">
             منصة جسور التعليمية — حيث يلتقي الأستاذ، الولي، والتلميذ
           </footer>
         </main>
       </div>
 
-      {/* شريط التنقل السفلي للهاتف داخل لوحة التحكم */}
-      <MobileBottomNav />
+      {/* شريط التنقل السفلي للهاتف (يختفي أثناء الطباعة) */}
+      <div className="print:hidden">
+        <MobileBottomNav />
+      </div>
     </div>
   );
 }

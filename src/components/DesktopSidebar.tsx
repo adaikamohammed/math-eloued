@@ -29,6 +29,7 @@ import {
   BookMarked,
   Smartphone,
   Crown,
+  Printer,
 } from "lucide-react";
 import { useLayout } from "@/context/LayoutContext";
 import { supabase } from "@/lib/supabase";
@@ -140,6 +141,12 @@ export function DesktopSidebar() {
               label: "المنشور الولائي والمراسلات",
               href: "/super-admin?tab=circular",
               icon: Megaphone,
+            },
+            {
+              label: "أوراق وملصق قاعة الأساتذة",
+              href: "/admin/announcement",
+              icon: Printer,
+              badge: "A4 جاهز",
             },
           ],
         },
@@ -298,6 +305,13 @@ export function DesktopSidebar() {
             href: "/super-admin",
             icon: Crown,
             badge: "إدارة",
+          },
+          {
+            label: "أوراق وملصق قاعة الأساتذة",
+            href: "/admin/announcement",
+            icon: Printer,
+            badge: "طباعة A4",
+            badgeColor: "bg-emerald-600 text-white",
           },
           {
             label: "تخصيص الواجهة والصفحات",
