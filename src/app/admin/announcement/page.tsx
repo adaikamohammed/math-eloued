@@ -667,6 +667,12 @@ export default function TeachersStaffRoomPackPage() {
 
       {/* ─── تنسيقات الطباعة الدقيقة A4 CSS Print Styles ─── */}
       <style jsx global>{`
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@500;600;700;800;900&display=swap');
+
+        body, .a4-sheet {
+          font-family: 'Cairo', 'Tajawal', Tahoma, sans-serif !important;
+        }
+
         @media print {
           @page {
             size: A4 portrait;
