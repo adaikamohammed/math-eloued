@@ -320,6 +320,40 @@ export type AnonymousMessage = {
   read?: boolean; // هل تمت قراءتها من الأستاذ
 };
 
+// أصناف استفسارات وتواصل الأولياء مع الأساتذة
+export type InquiryCategory =
+  | "grade"       // استفسار عن علامة / تقويم مستمر
+  | "lesson"      // سؤال حول درس / تمرين / واجب منزلي
+  | "behavior"    // سلوك وانضباط ومواظبة
+  | "absence"     // تبرير غياب أو استفسار عنه
+  | "appointment" // طلب موعد في الاستقبال الأسبوعي
+  | "general";    // استفسار عام
+
+// نموذج استفسار الولي المنظم
+export type ParentInquiry = {
+  id: string;              // معرّف فريد: inq_1730000000_abcd
+  trackingCode: string;    // كود تتبع قصير أنيق للولي: مثلاً JSR-MTH-942
+  secretToken: string;     // رمز حماية سري لضمان خصوصية الاستفسار ورد الأستاذ
+  teacherId: string;       // معرّف الأستاذ المستهدف (UUID)
+  teacherCode?: string;    // كود الأستاذ (مثل MTH-784)
+  teacherName?: string;    // اسم الأستاذ
+  subject?: string;        // مادة التدريس (رياضيات، لغة عربية...)
+  parentName: string;      // اسم الولي (الأب / الأم / الولي)
+  studentName: string;     // اسم التلميذ (الابن)
+  studentGroup: string;    // الفوج / القسم (1م1، 1م2، 2م3...)
+  parentPhone?: string;    // رقم هاتف الولي للتواصل أو إرسال الرد عبر واتساب (اختياري)
+  category: InquiryCategory;
+  content: string;         // نص السؤال أو الملاحظة
+  createdAt: string;
+  status: "pending" | "answered" | "closed";
+  readByTeacher: boolean;
+  reply?: {
+    content: string;       // نص رد الأستاذ البيداغوجي
+    repliedAt: string;
+    teacherName?: string;
+  };
+};
+
 export type TeacherFeatureFlags = {
   boardLessons?: boolean;          // كراس القسم وصور السبورة
   homework?: boolean;              // الواجبات والأنشطة المنزلية
@@ -516,6 +550,8 @@ export type LessonsData = {
   studentRoster?: StudentRosterItem[];
   announcements?: Announcement[];
   anonymousMessages?: AnonymousMessage[];
+  parentInquiries?: ParentInquiry[]; // استفسارات ومراسلات الأولياء المنظمة
+  publicInquiries?: ParentInquiry[]; // الردود العامة الموجهة للأولياء للاطلاع بالكود السري
   featureFlags?: TeacherFeatureFlags;
   subject?: SubjectId | string;
   customClasses?: string[];

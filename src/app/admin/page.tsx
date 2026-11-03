@@ -65,6 +65,8 @@ import {
   EyeOff,
   Copy,
   Mail,
+  Send,
+  MessageCircle,
 } from "lucide-react";
 import {
   LEVELS,
@@ -84,7 +86,9 @@ import {
   type MessageCategory,
   type StudentRosterItem,
   type ReceptionInfo,
+  type ParentInquiry,
 } from "@/lib/types";
+import { INQUIRY_CATEGORIES, buildWhatsAppReplyUrl } from "@/lib/inquiries";
 
 export type TeacherSession = {
   id: string;
@@ -267,6 +271,16 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
   const [messageReadFilter, setMessageReadFilter] = useState<"all" | "unread" | "read">("all");
   const [deletingMessage, setDeletingMessage] = useState<AnonymousMessage | null>(null);
 
+  // حالات استفسارات ومراسلات الأولياء المباشرة
+  const [inquiriesList, setInquiriesList] = useState<ParentInquiry[]>([]);
+  const [inquiriesLoading, setInquiriesLoading] = useState(false);
+  const [inquiryStatusFilter, setInquiryStatusFilter] = useState<"all" | "pending" | "answered">("all");
+  const [inquiryCategoryFilter, setInquiryCategoryFilter] = useState<string>("all");
+  const [messagesSubTab, setMessagesSubTab] = useState<"inquiries" | "anonymous">("inquiries");
+  const [replyingInquiryId, setReplyingInquiryId] = useState<string | null>(null);
+  const [replyContent, setReplyContent] = useState("");
+  const [isSubmittingReply, setIsSubmittingReply] = useState(false);
+
   const allAdminClasses = useMemo(() => {
     if (teacherClasses.length > 0) return teacherClasses;
     const set = new Set<string>();
@@ -421,6 +435,22 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
     }
   }, []);
 
+  const loadInquiries = useCallback(async () => {
+    try {
+      setInquiriesLoading(true);
+      const res = await fetch(`/api/inquiries?_t=${Date.now()}`, {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
+      });
+      const data = await res.json();
+      setInquiriesList(data.inquiries || []);
+    } catch {
+      setInquiriesList([]);
+    } finally {
+      setInquiriesLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadLessons();
     loadSummons();
@@ -429,11 +459,81 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
     loadEvaluations();
     loadAnnouncements();
     loadMessages();
-  }, [loadLessons, loadSummons, loadHonors, loadPenalties, loadEvaluations, loadAnnouncements, loadMessages]);
+    loadInquiries();
+  }, [loadLessons, loadSummons, loadHonors, loadPenalties, loadEvaluations, loadAnnouncements, loadMessages, loadInquiries]);
 
   const unreadMessagesCount = useMemo(() => {
     return messagesList.filter((m) => !m.read).length;
   }, [messagesList]);
+
+  const unreadInquiriesCount = useMemo(() => {
+    return inquiriesList.filter((i) => !i.readByTeacher || i.status === "pending").length;
+  }, [inquiriesList]);
+
+  // إرسال رد الأستاذ على استفسار الولي
+  const handleSendInquiryReply = async (inquiry: ParentInquiry) => {
+    if (!replyContent.trim()) {
+      showToast("error", "يرجى كتابة نص الرد للولي");
+      return;
+    }
+    setIsSubmittingReply(true);
+    try {
+      const res = await fetch("/api/inquiries/reply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          inquiryId: inquiry.id,
+          replyContent: replyContent.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "فشل إرسال الرد");
+      showToast("success", "✓ تم اعتماد الرد البيداغوجي بنجاح ويمكن للولي الاطلاع عليه فوراً!");
+      setReplyingInquiryId(null);
+      setReplyContent("");
+      loadInquiries();
+    } catch (err: any) {
+      showToast("error", err.message || "تعذر إرسال الرد حالياً");
+    } finally {
+      setIsSubmittingReply(false);
+    }
+  };
+
+  // تبديل حالة قراءة استفسار الولي
+  const handleToggleInquiryRead = async (inquiry: ParentInquiry) => {
+    try {
+      const newRead = !inquiry.readByTeacher;
+      const res = await fetch("/api/inquiries", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: inquiry.id,
+          read: newRead,
+        }),
+      });
+      if (!res.ok) throw new Error("فشل التحديث");
+      setInquiriesList((prev) =>
+        prev.map((i) => (i.id === inquiry.id ? { ...i, readByTeacher: newRead } : i))
+      );
+    } catch {
+      showToast("error", "تعذر تحديث حالة القراءة");
+    }
+  };
+
+  // حذف استفسار
+  const handleDeleteInquiry = async (inquiryId: string) => {
+    if (!confirm("هل أنت متأكد من حذف هذا الاستفسار نهائياً؟")) return;
+    try {
+      const res = await fetch(`/api/inquiries?id=${encodeURIComponent(inquiryId)}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("فشل الحذف");
+      setInquiriesList((prev) => prev.filter((i) => i.id !== inquiryId));
+      showToast("success", "تم حذف الاستفسار بنجاح");
+    } catch {
+      showToast("error", "تعذر حذف الاستفسار");
+    }
+  };
 
   // حفظ أو تعديل إعلان
   const handleSaveAnnouncement = async (e: React.FormEvent) => {
@@ -1519,12 +1619,14 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
           }`}
         >
           <MessageSquare className="w-4 h-4" />
-          <span>صندوق الرسائل</span>
-          {unreadMessagesCount > 0 ? (
-            <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse ring-2 ring-white" />
-          ) : messagesList.length > 0 ? (
+          <span>الرسائل والاستفسارات</span>
+          {(unreadMessagesCount + unreadInquiriesCount) > 0 ? (
+            <span className="bg-rose-500 text-white text-[10px] font-mono px-1.5 py-0.2 rounded-full font-black animate-pulse">
+              {unreadMessagesCount + unreadInquiriesCount}
+            </span>
+          ) : (messagesList.length + inquiriesList.length) > 0 ? (
             <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${mainTab === "messages" ? "bg-white/20 text-white" : "bg-purple-100 text-purple-800"}`}>
-              {messagesList.length}
+              {messagesList.length + inquiriesList.length}
             </span>
           ) : null}
         </button>
@@ -4090,215 +4192,671 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
         </div>
       )}
 
-      {/* ==================== 7. تبويب صندوق الرسائل والملاحظات المجهولة ==================== */}
+      {/* ==================== 7. تبويب الرسائل والاستفسارات ==================== */}
       {mainTab === "messages" && (
         <div className="space-y-4">
-          {/* لافتة تعريفية */}
-          <div className="bg-gradient-to-r from-purple-800 via-indigo-800 to-purple-900 text-white rounded-2xl p-4 shadow-sm flex items-start gap-3">
-            <span className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center text-lg shrink-0 mt-0.5">
-              📬
-            </span>
-            <div className="space-y-1 text-xs">
-              <div className="flex items-center gap-2">
-                <h3 className="font-black text-sm">صندوق الصراحة والشفافية (رسائل مجهولة)</h3>
-                {unreadMessagesCount > 0 && (
-                  <span className="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full animate-pulse">
-                    {unreadMessagesCount} جديدة
-                  </span>
-                )}
-              </div>
-              <p className="text-purple-200 text-[11px] leading-relaxed">
-                🔒 جميع هذه الرسائل مجهولة الهوية بنسبة 100% ولا تظهر أي معلومة عن هوية المرسل لضمان الشفافية وحرية التعبير للطلاب والأولياء.
-              </p>
-            </div>
+          {/* شريط التبديل بين استفسارات الأولياء والرسائل المجهولة */}
+          <div className="flex bg-slate-100 p-1.5 rounded-2xl gap-1 border border-slate-200">
+            <button
+              type="button"
+              onClick={() => setMessagesSubTab("inquiries")}
+              className={`flex-1 py-2.5 px-4 rounded-xl text-xs sm:text-sm font-black transition flex items-center justify-center gap-2 cursor-pointer ${
+                messagesSubTab === "inquiries"
+                  ? "bg-emerald-700 text-white shadow-xs"
+                  : "text-slate-600 hover:bg-white/60"
+              }`}
+            >
+              <MessageCircle className="w-4 h-4 text-emerald-200" />
+              <span>استفسارات وملاحظات الأولياء 💬</span>
+              {unreadInquiriesCount > 0 ? (
+                <span className="bg-rose-500 text-white text-[10px] font-mono px-2 py-0.5 rounded-full font-black animate-pulse">
+                  {unreadInquiriesCount} بانتظار الرد
+                </span>
+              ) : inquiriesList.length > 0 ? (
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${messagesSubTab === "inquiries" ? "bg-white/20 text-white" : "bg-emerald-100 text-emerald-800"}`}>
+                  {inquiriesList.length}
+                </span>
+              ) : null}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setMessagesSubTab("anonymous")}
+              className={`flex-1 py-2.5 px-4 rounded-xl text-xs sm:text-sm font-black transition flex items-center justify-center gap-2 cursor-pointer ${
+                messagesSubTab === "anonymous"
+                  ? "bg-purple-800 text-white shadow-xs"
+                  : "text-slate-600 hover:bg-white/60"
+              }`}
+            >
+              <Mail className="w-4 h-4 text-purple-200" />
+              <span>صندوق الصراحة المجهول 🔒</span>
+              {unreadMessagesCount > 0 ? (
+                <span className="bg-rose-500 text-white text-[10px] font-mono px-2 py-0.5 rounded-full font-black animate-pulse">
+                  {unreadMessagesCount} جديدة
+                </span>
+              ) : messagesList.length > 0 ? (
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${messagesSubTab === "anonymous" ? "bg-white/20 text-white" : "bg-purple-100 text-purple-800"}`}>
+                  {messagesList.length}
+                </span>
+              ) : null}
+            </button>
           </div>
 
-          {/* فلاتر الرسائل */}
-          <div className="bg-white rounded-2xl p-3 border border-slate-200 shadow-2xs space-y-2.5">
-            <div className="flex items-center justify-between text-xs font-bold text-slate-700">
-              <span>تصفية الرسائل:</span>
-              <button
-                onClick={loadMessages}
-                className="text-[11px] text-purple-700 hover:underline flex items-center gap-1 font-bold"
-              >
-                <RefreshCw className="w-3 h-3" /> تحديث القائمة
-              </button>
-            </div>
-
-            <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
-              {[
-                { id: "all", label: `الكل (${messagesList.length})` },
-                { id: "unread", label: `غير مقروءة (${unreadMessagesCount})` },
-                { id: "read", label: `مقروءة (${messagesList.length - unreadMessagesCount})` },
-              ].map((f) => (
-                <button
-                  key={f.id}
-                  onClick={() => setMessageReadFilter(f.id as any)}
-                  className={`py-1.5 px-3 rounded-xl font-bold whitespace-nowrap transition ${
-                    messageReadFilter === f.id
-                      ? "bg-purple-700 text-white shadow-xs"
-                      : "bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100"
-                  }`}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
-
-            <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs border-t border-slate-100 pt-2">
-              {[
-                { id: "all", label: "جميع الموضوعات" },
-                { id: "question", label: "❓ أسئلة الدروس" },
-                { id: "suggestion", label: "💡 مقترحات" },
-                { id: "criticism", label: "⚖️ نقد وملاحظات" },
-                { id: "other", label: "💬 عام" },
-              ].map((c) => (
-                <button
-                  key={c.id}
-                  onClick={() => setMessageCategoryFilter(c.id)}
-                  className={`py-1 px-2.5 rounded-lg text-[11px] font-bold whitespace-nowrap transition ${
-                    messageCategoryFilter === c.id
-                      ? "bg-slate-800 text-white"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  }`}
-                >
-                  {c.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* قائمة الرسائل */}
-          {(() => {
-            const filtered = messagesList.filter((m) => {
-              if (messageReadFilter === "unread" && m.read) return false;
-              if (messageReadFilter === "read" && !m.read) return false;
-              if (messageCategoryFilter !== "all" && m.category !== messageCategoryFilter) return false;
-              return true;
-            });
-
-            if (filtered.length === 0) {
-              return (
-                <div className="bg-white rounded-2xl p-8 border border-slate-200 text-center space-y-2">
-                  <div className="w-12 h-12 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center mx-auto text-xl">
-                    📬
+          {/* ───────────────── القسم الأول: استفسارات الأولياء المباشرة ───────────────── */}
+          {messagesSubTab === "inquiries" && (
+            <div className="space-y-4">
+              {/* لافتة تعريفية */}
+              <div className="bg-gradient-to-r from-emerald-800 via-teal-800 to-emerald-900 text-white rounded-2xl p-4 shadow-sm flex items-start gap-3">
+                <span className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center text-lg shrink-0 mt-0.5">
+                  💬
+                </span>
+                <div className="space-y-1 text-xs">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-black text-sm">استفسارات وملاحظات الأولياء البيداغوجية</h3>
+                    {unreadInquiriesCount > 0 && (
+                      <span className="bg-amber-400 text-emerald-950 text-[10px] font-black px-2 py-0.5 rounded-full">
+                        {unreadInquiriesCount} استفسار بحاجة لردك
+                      </span>
+                    )}
                   </div>
-                  <h4 className="text-xs font-black text-slate-800">
-                    لا توجد رسائل مطابقة للفلتر
-                  </h4>
-                  <p className="text-[11px] text-slate-400">
-                    عندما يرسل تلميذ أو ولي أمر رسالة من صفحة "صندوق الصراحة"، ستظهر هنا فوراً.
+                  <p className="text-emerald-100 text-[11px] leading-relaxed">
+                    🎯 رسائل موجهة إليك حصراً من أولياء تلاميذ أفواجك. يمكنك الرد بيداغوجياً ليظهر الرد للولي فوراً برقم التتبع الخاص به، أو إرسال الرد له مباشرة عبر تطبيق واتساب بنقرة واحدة.
                   </p>
                 </div>
-              );
-            }
+              </div>
 
-            return (
-              <div className="space-y-3">
-                {filtered.map((msg) => (
-                  <div
-                    key={msg.id}
-                    className={`rounded-2xl p-4 border transition ${
-                      !msg.read
-                        ? "bg-white border-purple-300 shadow-xs ring-1 ring-purple-100"
-                        : "bg-slate-50/80 border-slate-200 shadow-2xs"
+              {/* أدوات التصفية والتحديث */}
+              <div className="bg-white rounded-2xl p-3 border border-slate-200 shadow-2xs space-y-2.5">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-700">
+                  <span>تصفية الاستفسارات:</span>
+                  <button
+                    onClick={loadInquiries}
+                    disabled={inquiriesLoading}
+                    className="text-[11px] text-emerald-700 hover:underline flex items-center gap-1 font-bold cursor-pointer disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${inquiriesLoading ? "animate-spin" : ""}`} />
+                    <span>تحديث القائمة</span>
+                  </button>
+                </div>
+
+                <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
+                  {[
+                    { id: "all", label: `الكل (${inquiriesList.length})` },
+                    {
+                      id: "pending",
+                      label: `⏳ بانتظار الرد (${inquiriesList.filter((i) => i.status === "pending").length})`,
+                    },
+                    {
+                      id: "answered",
+                      label: `🟢 تم الرد (${inquiriesList.filter((i) => i.status === "answered").length})`,
+                    },
+                  ].map((f) => (
+                    <button
+                      key={f.id}
+                      onClick={() => setInquiryStatusFilter(f.id as any)}
+                      className={`py-1.5 px-3 rounded-xl font-bold whitespace-nowrap transition cursor-pointer ${
+                        inquiryStatusFilter === f.id
+                          ? "bg-emerald-700 text-white shadow-xs"
+                          : "bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100"
+                      }`}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs border-t border-slate-100 pt-2">
+                  <button
+                    onClick={() => setInquiryCategoryFilter("all")}
+                    className={`py-1 px-2.5 rounded-lg text-[11px] font-bold whitespace-nowrap transition cursor-pointer ${
+                      inquiryCategoryFilter === "all"
+                        ? "bg-slate-800 text-white"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                     }`}
                   >
-                    <div className="flex items-start justify-between gap-2 flex-wrap pb-2 border-b border-slate-100">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span
-                          className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
-                            msg.category === "question"
-                              ? "bg-blue-50 text-blue-700 border-blue-200"
-                              : msg.category === "suggestion"
-                              ? "bg-amber-50 text-amber-800 border-amber-200"
-                              : msg.category === "criticism"
-                              ? "bg-purple-50 text-purple-700 border-purple-200"
-                              : "bg-slate-100 text-slate-700 border-slate-200"
-                          }`}
-                        >
-                          {msg.category === "question"
-                            ? "❓ سؤال حول درس"
-                            : msg.category === "suggestion"
-                            ? "💡 اقتراح تطويري"
-                            : msg.category === "criticism"
-                            ? "⚖️ نقد بنّاء"
-                            : "💬 استفسار عام"}
-                        </span>
-
-                        {msg.targetLevel && (
-                          <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md border border-slate-200">
-                            الصف: {msg.targetLevel}
-                          </span>
-                        )}
-
-                        <span className="text-[10px] text-slate-400 font-medium">
-                          {new Date(msg.createdAt).toLocaleDateString("ar-DZ", {
-                            weekday: "short",
-                            year: "numeric",
-                            month: "short",
-                            day: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </span>
-
-                        {!msg.read ? (
-                          <span className="text-[9px] font-black bg-red-100 text-red-700 px-1.5 py-0.2 rounded-full border border-red-200">
-                            جديدة 🆕
-                          </span>
-                        ) : (
-                          <span className="text-[9px] font-bold bg-emerald-100 text-emerald-700 px-1.5 py-0.2 rounded-full">
-                            مقروءة ✓
-                          </span>
-                        )}
-                      </div>
-
-                      {/* أزرار الإجراءات */}
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => handleToggleMessageRead(msg)}
-                          title={msg.read ? "تحديد كغير مقروءة" : "تحديد كمقروءة"}
-                          className={`py-1 px-2 rounded-lg text-[10px] font-bold transition flex items-center gap-1 ${
-                            msg.read
-                              ? "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                              : "bg-purple-100 text-purple-800 hover:bg-purple-200"
-                          }`}
-                        >
-                          <Check className="w-3 h-3" />
-                          <span>{msg.read ? "غير مقروءة" : "تمت القراءة"}</span>
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            navigator.clipboard.writeText(msg.content);
-                            showToast("success", "تم نسخ نص الرسالة إلى الحافظة 📋");
-                          }}
-                          title="نسخ نص الرسالة"
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
-                        >
-                          <Copy className="w-3.5 h-3.5" />
-                        </button>
-
-                        <button
-                          onClick={() => setDeletingMessage(msg)}
-                          title="حذف الرسالة"
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* نص الرسالة */}
-                    <div className="mt-3 text-xs text-slate-800 leading-relaxed font-medium whitespace-pre-line select-text bg-white p-3 rounded-xl border border-slate-100">
-                      {msg.content}
-                    </div>
-                  </div>
-                ))}
+                    جميع الموضوعات
+                  </button>
+                  {INQUIRY_CATEGORIES.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => setInquiryCategoryFilter(c.id)}
+                      className={`py-1 px-2.5 rounded-lg text-[11px] font-bold whitespace-nowrap transition cursor-pointer ${
+                        inquiryCategoryFilter === c.id
+                          ? "bg-emerald-800 text-white"
+                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      }`}
+                    >
+                      {c.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-            );
-          })()}
+
+              {/* قائمة استفسارات الأولياء */}
+              {(() => {
+                const filtered = inquiriesList.filter((inq) => {
+                  if (inquiryStatusFilter === "pending" && inq.status !== "pending") return false;
+                  if (inquiryStatusFilter === "answered" && inq.status !== "answered") return false;
+                  if (inquiryCategoryFilter !== "all" && inq.category !== inquiryCategoryFilter) return false;
+                  return true;
+                });
+
+                if (filtered.length === 0) {
+                  return (
+                    <div className="bg-white rounded-2xl p-8 border border-slate-200 text-center space-y-2">
+                      <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center mx-auto text-xl">
+                        💬
+                      </div>
+                      <h4 className="text-xs font-black text-slate-800">
+                        لا توجد استفسارات مطابقة للفلتر
+                      </h4>
+                      <p className="text-[11px] text-slate-400">
+                        عندما يرسل ولي أمر استفساراً من صفحتك العامة أو من محفظته، سيظهر هنا فوراً باسم التلميذ والرد المباشر.
+                      </p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-4">
+                    {filtered.map((inq) => {
+                      const catInfo =
+                        INQUIRY_CATEGORIES.find((c) => c.id === inq.category) || INQUIRY_CATEGORIES[0];
+                      const isReplying = replyingInquiryId === inq.id;
+                      const hasReply = Boolean(inq.reply?.content);
+
+                      return (
+                        <div
+                          key={inq.id}
+                          className={`rounded-2xl p-4 sm:p-5 border transition-all space-y-3 ${
+                            inq.status === "pending"
+                              ? "bg-white border-amber-300 shadow-xs ring-2 ring-amber-100"
+                              : "bg-slate-50/90 border-slate-200 shadow-2xs"
+                          }`}
+                        >
+                          {/* رأس بطاقة الاستفسار: التلميذ، الفوج، الولي، التصنيف، الحالة */}
+                          <div className="flex items-start justify-between gap-3 flex-wrap border-b border-slate-100 pb-3">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="inline-flex items-center gap-1 text-xs font-black text-slate-900 bg-slate-100 px-2.5 py-0.5 rounded-lg border border-slate-200">
+                                  👦 التلميذ: <span className="text-emerald-800">{inq.studentName}</span>
+                                </span>
+
+                                <span className="inline-flex items-center gap-1 text-xs font-black text-slate-700 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200">
+                                  🏷️ الفوج: <span className="font-mono text-emerald-800">{inq.studentGroup}</span>
+                                </span>
+
+                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-600 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200">
+                                  👤 الولي: {inq.parentName}
+                                </span>
+
+                                {inq.parentPhone && (
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-mono font-bold text-teal-800 bg-teal-50 px-2 py-0.5 rounded-lg border border-teal-200" dir="ltr">
+                                    📞 {inq.parentPhone}
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="flex items-center gap-2 pt-1 flex-wrap">
+                                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${catInfo.badgeBg} ${catInfo.badgeText} ${catInfo.badgeBorder}`}>
+                                  {catInfo.label}
+                                </span>
+
+                                <span className="text-[10px] text-slate-400 font-medium">
+                                  {new Date(inq.createdAt).toLocaleDateString("ar-DZ", {
+                                    weekday: "short",
+                                    year: "numeric",
+                                    month: "short",
+                                    day: "numeric",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })}
+                                </span>
+
+                                <span className="font-mono text-[9px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200" title="رمز التتبع للولي">
+                                  {inq.trackingCode}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* شارة الحالة والإجراءات العلوية */}
+                            <div className="flex items-center gap-1.5">
+                              {inq.status === "answered" ? (
+                                <span className="inline-flex items-center gap-1 text-[11px] font-black bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full border border-emerald-300">
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                  <span>تم الرد للولي</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-[11px] font-black bg-amber-100 text-amber-900 px-2.5 py-1 rounded-full border border-amber-300 animate-pulse">
+                                  <Clock className="w-3.5 h-3.5 text-amber-700" />
+                                  <span>بانتظار ردك</span>
+                                </span>
+                              )}
+
+                              <button
+                                onClick={() => handleToggleInquiryRead(inq)}
+                                title={inq.readByTeacher ? "تحديد كغير مقروء" : "تحديد كمقروء"}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                              </button>
+
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(
+                                    `استفسار ولي التلميذ: ${inq.studentName} (${inq.studentGroup})\nالولي: ${inq.parentName}\nالموضوع: ${catInfo.label}\nالنص:\n${inq.content}`
+                                  );
+                                  showToast("success", "تم نسخ نص الاستفسار 📋");
+                                }}
+                                title="نسخ الاستفسار"
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
+                              >
+                                <Copy className="w-3.5 h-3.5" />
+                              </button>
+
+                              <button
+                                onClick={() => handleDeleteInquiry(inq.id)}
+                                title="حذف الاستفسار"
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* نص رسالة / استفسار الولي */}
+                          <div className="text-xs text-slate-800 leading-relaxed font-medium whitespace-pre-line select-text bg-white p-3.5 rounded-xl border border-slate-200">
+                            {inq.content}
+                          </div>
+
+                          {/* الرد القائم إن وجد */}
+                          {hasReply && !isReplying && (
+                            <div className="bg-emerald-50/80 rounded-xl p-3.5 border border-emerald-200 space-y-2">
+                              <div className="flex items-center justify-between gap-2 flex-wrap">
+                                <div className="flex items-center gap-1.5 text-xs font-black text-emerald-900">
+                                  <MessageCircle className="w-4 h-4 text-emerald-700" />
+                                  <span>ردك المعتمد للولي:</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {inq.reply?.repliedAt && (
+                                    <span className="text-[10px] text-emerald-700 font-medium">
+                                      {new Date(inq.reply.repliedAt).toLocaleDateString("ar-DZ", {
+                                        year: "numeric",
+                                        month: "short",
+                                        day: "numeric",
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                      })}
+                                    </span>
+                                  )}
+
+                                  <button
+                                    onClick={() => {
+                                      setReplyingInquiryId(inq.id);
+                                      setReplyContent(inq.reply?.content || "");
+                                    }}
+                                    className="text-[10px] text-emerald-800 hover:underline font-bold flex items-center gap-0.5 cursor-pointer"
+                                  >
+                                    <Pencil className="w-3 h-3" />
+                                    <span>تعديل الرد</span>
+                                  </button>
+                                </div>
+                              </div>
+
+                              <p className="text-xs text-emerald-950 leading-relaxed whitespace-pre-line font-medium pr-1">
+                                {inq.reply?.content}
+                              </p>
+
+                              {/* زر واتساب السريع إن كان هاتف الولي متوفراً */}
+                              {inq.parentPhone && (
+                                <div className="pt-1.5 border-t border-emerald-200/60 flex items-center justify-between gap-2">
+                                  <span className="text-[11px] text-emerald-700 font-medium">
+                                    💡 إرسال نسخة من الرد مباشرة لهاتف الولي:
+                                  </span>
+                                  <a
+                                    href={buildWhatsAppReplyUrl(
+                                      inq.parentPhone,
+                                      inq.studentName,
+                                      profile?.full_name || "أستاذ المادة",
+                                      inq.reply?.content || ""
+                                    )}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 px-3 py-1 rounded-lg bg-green-600 hover:bg-green-700 text-white text-[11px] font-black transition shadow-2xs"
+                                  >
+                                    <span>📲 إرسال عبر واتساب</span>
+                                    <ExternalLink className="w-3 h-3" />
+                                  </a>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* محرر الرد (عند النقر على رد أو تعديل الرد) */}
+                          {isReplying && (
+                            <div className="bg-slate-100 rounded-2xl p-4 border border-emerald-300 shadow-xs space-y-3 animate-in fade-in duration-200">
+                              <div className="flex items-center justify-between text-xs font-black text-slate-800">
+                                <span className="flex items-center gap-1.5 text-emerald-800">
+                                  <Pencil className="w-3.5 h-3.5" />
+                                  <span>كتابة رد بيداغوجي لولي التلميذ {inq.studentName}:</span>
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setReplyingInquiryId(null);
+                                    setReplyContent("");
+                                  }}
+                                  className="text-[11px] text-slate-400 hover:text-slate-700 font-bold"
+                                >
+                                  إلغاء ✕
+                                </button>
+                              </div>
+
+                              {/* اقتراحات ردود سريعة جاهزة */}
+                              <div className="space-y-1">
+                                <span className="text-[10px] font-bold text-slate-500">
+                                  قوالب ردود بيداغوجية سريعة (انقر للإدراج):
+                                </span>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {[
+                                    "وعليكم السلام ورحمة الله، تم الاطلاع وتوجيه التلميذ في القسم، شاكراً حرصكم واهتمامكم البيداغوجي.",
+                                    "مرحباً بكم، مستوى التلميذ مطمئن ومستمر في التحسن، وسنركز على هذه النقطة في الحصة القادمة إن شاء الله.",
+                                    "يشرفنا استقبالكم في موعد الاستقبال الأسبوعي المعتمد بالمؤسسة لتدارس الموضوع بشكل مفصل.",
+                                  ].map((tpl, i) => (
+                                    <button
+                                      key={i}
+                                      type="button"
+                                      onClick={() => setReplyContent(tpl)}
+                                      className="text-[10px] bg-white hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 border border-slate-200 hover:border-emerald-300 px-2 py-1 rounded-lg transition text-right font-medium"
+                                    >
+                                      « {tpl.slice(0, 35)}... »
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+
+                              <textarea
+                                value={replyContent}
+                                onChange={(e) => setReplyContent(e.target.value)}
+                                placeholder="اكتب ردك وتوجيهك التربوي للولي هنا..."
+                                rows={3}
+                                className="w-full p-3 rounded-xl bg-white border border-slate-300 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+                              />
+
+                              <div className="flex items-center justify-end gap-2 pt-1">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setReplyingInquiryId(null);
+                                    setReplyContent("");
+                                  }}
+                                  className="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-200 transition"
+                                >
+                                  إلغاء
+                                </button>
+
+                                <button
+                                  type="button"
+                                  disabled={isSubmittingReply || !replyContent.trim()}
+                                  onClick={() => handleSendInquiryReply(inq)}
+                                  className="btn-primary text-xs py-1.5 px-4 font-black flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+                                >
+                                  {isSubmittingReply ? (
+                                    <>
+                                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                      <span>جارٍ الحفظ...</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Send className="w-3.5 h-3.5" />
+                                      <span>اعتماد وإرسال الرد للولي ✓</span>
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* زر كتابة الرد إن لم يكن قد رد بعد */}
+                          {!hasReply && !isReplying && (
+                            <div className="flex items-center justify-between pt-1">
+                              <span className="text-[11px] text-amber-800 font-bold">
+                                ⏳ لم يتم الرد على هذا الولي بعد
+                              </span>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setReplyingInquiryId(inq.id);
+                                  setReplyContent("");
+                                }}
+                                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-black transition shadow-2xs active:scale-95 cursor-pointer"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                                <span>✍️ كتابة الرد للولي</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
+          {/* ───────────────── القسم الثاني: صندوق الصراحة والشفافية (رسائل مجهولة) ───────────────── */}
+          {messagesSubTab === "anonymous" && (
+            <div className="space-y-4">
+              {/* لافتة تعريفية */}
+              <div className="bg-gradient-to-r from-purple-800 via-indigo-800 to-purple-900 text-white rounded-2xl p-4 shadow-sm flex items-start gap-3">
+                <span className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center text-lg shrink-0 mt-0.5">
+                  📬
+                </span>
+                <div className="space-y-1 text-xs">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-black text-sm">صندوق الصراحة والشفافية (رسائل مجهولة)</h3>
+                    {unreadMessagesCount > 0 && (
+                      <span className="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full animate-pulse">
+                        {unreadMessagesCount} جديدة
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-purple-200 text-[11px] leading-relaxed">
+                    🔒 جميع هذه الرسائل مجهولة الهوية بنسبة 100% ولا تظهر أي معلومة عن هوية المرسل لضمان الشفافية وحرية التعبير للطلاب والأولياء.
+                  </p>
+                </div>
+              </div>
+
+              {/* فلاتر الرسائل المجهولة */}
+              <div className="bg-white rounded-2xl p-3 border border-slate-200 shadow-2xs space-y-2.5">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-700">
+                  <span>تصفية الرسائل:</span>
+                  <button
+                    onClick={loadMessages}
+                    className="text-[11px] text-purple-700 hover:underline flex items-center gap-1 font-bold cursor-pointer"
+                  >
+                    <RefreshCw className="w-3 h-3" /> تحديث القائمة
+                  </button>
+                </div>
+
+                <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
+                  {[
+                    { id: "all", label: `الكل (${messagesList.length})` },
+                    { id: "unread", label: `غير مقروءة (${unreadMessagesCount})` },
+                    { id: "read", label: `مقروءة (${messagesList.length - unreadMessagesCount})` },
+                  ].map((f) => (
+                    <button
+                      key={f.id}
+                      onClick={() => setMessageReadFilter(f.id as any)}
+                      className={`py-1.5 px-3 rounded-xl font-bold whitespace-nowrap transition cursor-pointer ${
+                        messageReadFilter === f.id
+                          ? "bg-purple-700 text-white shadow-xs"
+                          : "bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100"
+                      }`}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs border-t border-slate-100 pt-2">
+                  {[
+                    { id: "all", label: "جميع الموضوعات" },
+                    { id: "question", label: "❓ أسئلة الدروس" },
+                    { id: "suggestion", label: "💡 مقترحات" },
+                    { id: "criticism", label: "⚖️ نقد وملاحظات" },
+                    { id: "other", label: "💬 عام" },
+                  ].map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => setMessageCategoryFilter(c.id)}
+                      className={`py-1 px-2.5 rounded-lg text-[11px] font-bold whitespace-nowrap transition cursor-pointer ${
+                        messageCategoryFilter === c.id
+                          ? "bg-slate-800 text-white"
+                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      }`}
+                    >
+                      {c.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* قائمة الرسائل المجهولة */}
+              {(() => {
+                const filtered = messagesList.filter((m) => {
+                  if (messageReadFilter === "unread" && m.read) return false;
+                  if (messageReadFilter === "read" && !m.read) return false;
+                  if (messageCategoryFilter !== "all" && m.category !== messageCategoryFilter) return false;
+                  return true;
+                });
+
+                if (filtered.length === 0) {
+                  return (
+                    <div className="bg-white rounded-2xl p-8 border border-slate-200 text-center space-y-2">
+                      <div className="w-12 h-12 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center mx-auto text-xl">
+                        📬
+                      </div>
+                      <h4 className="text-xs font-black text-slate-800">
+                        لا توجد رسائل مطابقة للفلتر
+                      </h4>
+                      <p className="text-[11px] text-slate-400">
+                        عندما يرسل تلميذ أو ولي أمر رسالة من صفحة "صندوق الصراحة"، ستظهر هنا فوراً.
+                      </p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-3">
+                    {filtered.map((msg) => (
+                      <div
+                        key={msg.id}
+                        className={`rounded-2xl p-4 border transition ${
+                          !msg.read
+                            ? "bg-white border-purple-300 shadow-xs ring-1 ring-purple-100"
+                            : "bg-slate-50/80 border-slate-200 shadow-2xs"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2 flex-wrap pb-2 border-b border-slate-100">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span
+                              className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
+                                msg.category === "question"
+                                  ? "bg-blue-50 text-blue-700 border-blue-200"
+                                  : msg.category === "suggestion"
+                                  ? "bg-amber-50 text-amber-800 border-amber-200"
+                                  : msg.category === "criticism"
+                                  ? "bg-purple-50 text-purple-700 border-purple-200"
+                                  : "bg-slate-100 text-slate-700 border-slate-200"
+                              }`}
+                            >
+                              {msg.category === "question"
+                                ? "❓ سؤال حول درس"
+                                : msg.category === "suggestion"
+                                ? "💡 اقتراح تطويري"
+                                : msg.category === "criticism"
+                                ? "⚖️ نقد بنّاء"
+                                : "💬 استفسار عام"}
+                            </span>
+
+                            {msg.targetLevel && (
+                              <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md border border-slate-200">
+                                الصف: {msg.targetLevel}
+                              </span>
+                            )}
+
+                            <span className="text-[10px] text-slate-400 font-medium">
+                              {new Date(msg.createdAt).toLocaleDateString("ar-DZ", {
+                                weekday: "short",
+                                year: "numeric",
+                                month: "short",
+                                day: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </span>
+
+                            {!msg.read ? (
+                              <span className="text-[9px] font-black bg-red-100 text-red-700 px-1.5 py-0.2 rounded-full border border-red-200">
+                                جديدة 🆕
+                              </span>
+                            ) : (
+                              <span className="text-[9px] font-bold bg-emerald-100 text-emerald-700 px-1.5 py-0.2 rounded-full">
+                                مقروءة ✓
+                              </span>
+                            )}
+                          </div>
+
+                          {/* أزرار الإجراءات */}
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => handleToggleMessageRead(msg)}
+                              title={msg.read ? "تحديد كغير مقروءة" : "تحديد كمقروءة"}
+                              className={`py-1 px-2 rounded-lg text-[10px] font-bold transition flex items-center gap-1 cursor-pointer ${
+                                msg.read
+                                  ? "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                                  : "bg-purple-100 text-purple-800 hover:bg-purple-200"
+                              }`}
+                            >
+                              <Check className="w-3 h-3" />
+                              <span>{msg.read ? "غير مقروءة" : "تمت القراءة"}</span>
+                            </button>
+
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(msg.content);
+                                showToast("success", "تم نسخ نص الرسالة إلى الحافظة 📋");
+                              }}
+                              title="نسخ نص الرسالة"
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+                            >
+                              <Copy className="w-3.5 h-3.5" />
+                            </button>
+
+                            <button
+                              onClick={() => setDeletingMessage(msg)}
+                              title="حذف الرسالة"
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* نص الرسالة */}
+                        <div className="mt-3 text-xs text-slate-800 leading-relaxed font-medium whitespace-pre-line select-text bg-white p-3 rounded-xl border border-slate-100">
+                          {msg.content}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
         </div>
       )}
 

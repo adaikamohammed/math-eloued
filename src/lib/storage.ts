@@ -77,9 +77,9 @@ export function synchronizeStudents(data: LessonsData): LessonsData {
 // ==========================================================
 
 // ما يراه الأولياء والتلاميذ
-const PUBLIC_KEYS = ["lessons", "honors", "announcements", "summons", "featureFlags", "subject", "customClasses", "timetable", "customNotebooks", "boardNomenclature"] as const;
+const PUBLIC_KEYS = ["lessons", "honors", "announcements", "summons", "featureFlags", "subject", "customClasses", "timetable", "customNotebooks", "boardNomenclature", "publicInquiries"] as const;
 // ما يبقى خاصاً بالأستاذ وحده
-const PRIVATE_KEYS = ["evaluations", "gradebookRecords", "continuousEvalConfig", "penalties", "inspectionSessions", "studentRoster", "anonymousMessages", "diaryEntries", "cahierTextesEntries", "specialDays", "diaryDayTitles"] as const;
+const PRIVATE_KEYS = ["evaluations", "gradebookRecords", "continuousEvalConfig", "penalties", "inspectionSessions", "studentRoster", "anonymousMessages", "parentInquiries", "diaryEntries", "cahierTextesEntries", "specialDays", "diaryDayTitles"] as const;
 
 export function normalizeData(json: any): LessonsData {
   return {
@@ -94,6 +94,8 @@ export function normalizeData(json: any): LessonsData {
     studentRoster: Array.isArray(json?.studentRoster) ? json.studentRoster : [],
     announcements: Array.isArray(json?.announcements) ? json.announcements : [],
     anonymousMessages: Array.isArray(json?.anonymousMessages) ? json.anonymousMessages : [],
+    parentInquiries: Array.isArray(json?.parentInquiries) ? json.parentInquiries : [],
+    publicInquiries: Array.isArray(json?.publicInquiries) ? json.publicInquiries : [],
     featureFlags: json?.featureFlags || json?.feature_flags || undefined,
     subject: json?.subject || undefined,
     customClasses: Array.isArray(json?.customClasses) ? json.customClasses : undefined,

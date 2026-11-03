@@ -29,6 +29,7 @@ import { normalizeData, readPublicTeacherData } from "@/lib/storage";
 import { findPublicTeacher } from "@/lib/teachers";
 import { TeacherQR } from "@/components/TeacherQR";
 import { SafeHarborDisclaimer } from "@/components/SafeHarborDisclaimer";
+import { TeacherInquiryActions } from "@/components/TeacherInquiryActions";
 
 interface TeacherPageProps {
   params: Promise<{
@@ -130,6 +131,15 @@ export default async function TeacherPublicSpace({ params, searchParams }: Teach
                 name={profile.full_name || ""}
                 code={isValidLevel ? `${profile.teacher_code || ""}-${requestedLevel}` : profile.teacher_code || ""}
                 school={profile.school_custom_name || ""}
+              />
+              <TeacherInquiryActions
+                teacherId={profile.id}
+                teacherCode={profile.teacher_code || "MTH"}
+                teacherName={profile.full_name || "الأستاذ"}
+                subject={subjectName}
+                availableLevels={activeLevels}
+                defaultLevel={isValidLevel ? requestedLevel : undefined}
+                compact={true}
               />
             </div>
           </div>
@@ -360,21 +370,33 @@ export default async function TeacherPublicSpace({ params, searchParams }: Teach
                 </div>
               )}
 
-              {/* توضيح الرسالة السرية */}
+              {/* توضيح استفسار الولي المباشر */}
               <div className="text-xs text-slate-600 leading-relaxed font-medium bg-slate-50 p-3.5 rounded-2xl border border-slate-100">
-                <strong className="block text-slate-800 font-bold mb-0.5">مراسلة سرية ومباشرة للأستاذ:</strong>
-                <span>يمكن للولي إرسال استفسار بيداغوجي أو تنبيه حول استيعاب ابنه بكل سرية ومباشرة للأستاذ دون أي حرج.</span>
+                <strong className="block text-slate-800 font-bold mb-0.5">تواصل واستفسار خاص مع الأستاذ:</strong>
+                <span>يمكن للولي توجيه سؤال أو ملاحظة خاصة للأستاذ حول استيعاب ابنه وفوزه التربوي، وتصل للأستاذ حصراً دون سواه للرد عليها بيداغوجياً.</span>
               </div>
             </div>
 
             {showMessages && (
-              <Link
-                href={`/messages/send?teacher=${profile.id}${isValidLevel ? `&lvl=${requestedLevel}` : ""}`}
-                className="w-full py-2.5 px-4 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-black flex items-center justify-center gap-2 transition shadow-2xs hover:shadow-md"
-              >
-                <MessageCircle className="w-4 h-4" />
-                <span>إرسال رسالة خاصة للأستاذ 🔒</span>
-              </Link>
+              <div className="space-y-2">
+                <TeacherInquiryActions
+                  teacherId={profile.id}
+                  teacherCode={profile.teacher_code || "MTH"}
+                  teacherName={profile.full_name || "الأستاذ"}
+                  subject={subjectName}
+                  availableLevels={activeLevels}
+                  defaultLevel={isValidLevel ? requestedLevel : undefined}
+                />
+
+                <div className="text-center pt-1">
+                  <Link
+                    href={`/messages/send?teacher=${profile.id}${isValidLevel ? `&lvl=${requestedLevel}` : ""}`}
+                    className="text-[11px] text-slate-400 hover:text-slate-600 transition underline"
+                  >
+                    أو إرسال ملاحظة في صندوق الصراحة المجهول 🔒
+                  </Link>
+                </div>
+              </div>
             )}
           </div>
 

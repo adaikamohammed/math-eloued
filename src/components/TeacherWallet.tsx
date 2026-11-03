@@ -13,12 +13,17 @@ import {
   Building2,
   Sparkles,
   Share2,
+  MessageCircle,
+  Mail,
 } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { MIDDLE_SCHOOL_SUBJECTS } from "@/lib/types";
 import { FamilyWalletShareModal } from "./FamilyWalletShareModal";
 import { decodeFamilyWallet } from "@/lib/familyWallet";
+import { ParentInquiryModal } from "./ParentInquiryModal";
+import { ParentInquiriesListModal } from "./ParentInquiriesListModal";
+import { getLocalInquiries } from "@/lib/parentInquiriesStore";
 
 export interface SavedTeacher {
   slug: string;
@@ -154,9 +159,22 @@ export default function TeacherWallet() {
   const [addingLoading, setAddingLoading] = useState(false);
   const [addMsg, setAddMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [inquiriesListOpen, setInquiriesListOpen] = useState(false);
+  const [inquiryTargetTeacher, setInquiryTargetTeacher] = useState<SavedTeacher | null>(null);
+  const [inquiriesCount, setInquiriesCount] = useState(0);
+
+  const refreshInquiriesCount = () => {
+    try {
+      const list = getLocalInquiries();
+      setInquiriesCount(list.length);
+    } catch {
+      setInquiriesCount(0);
+    }
+  };
 
   useEffect(() => {
     setMounted(true);
+    refreshInquiriesCount();
 
     // التحقق من وجود رابط استيراد محفظة عائلية قادم من هاتف آخر (مثل الأم)
     try {
@@ -188,10 +206,15 @@ export default function TeacherWallet() {
 
     const handleUpdate = () => {
       setWallet(loadWallet());
+      refreshInquiriesCount();
     };
 
     window.addEventListener("math_wallet_updated", handleUpdate);
-    return () => window.removeEventListener("math_wallet_updated", handleUpdate);
+    window.addEventListener("math_parent_inquiries_updated", handleUpdate);
+    return () => {
+      window.removeEventListener("math_wallet_updated", handleUpdate);
+      window.removeEventListener("math_parent_inquiries_updated", handleUpdate);
+    };
   }, []);
 
   const removeTeacher = (identifier: string) => {
@@ -304,17 +327,34 @@ export default function TeacherWallet() {
           </div>
         </div>
 
-        {wallet.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto shrink-0">
           <button
             type="button"
-            onClick={() => setShareModalOpen(true)}
-            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 hover:from-emerald-100 hover:to-teal-100 text-[#107a57] border border-emerald-200 text-xs font-black transition shadow-2xs cursor-pointer self-start sm:self-auto shrink-0 active:scale-95"
-            title="مشاركة ونقل كافة أساتذة المحفظة دفعة واحدة لتجدهم في جهازك الآخر بنقرة واحدة"
+            onClick={() => setInquiriesListOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 text-xs font-black transition shadow-2xs cursor-pointer active:scale-95"
+            title="متابعة استفساراتك وردود الأساتذة عليها"
           >
-            <Share2 className="w-4 h-4 text-[#107a57]" />
-            <span>مشاركة كافة الأساتذة مع جهاز آخر 📲</span>
+            <Mail className="w-3.5 h-3.5 text-purple-700" />
+            <span>استفساراتي وردود الأساتذة 📨</span>
+            {inquiriesCount > 0 && (
+              <span className="font-mono text-[10px] bg-purple-700 text-white px-1.5 py-0.2 rounded-full font-bold">
+                {inquiriesCount}
+              </span>
+            )}
           </button>
-        )}
+
+          {wallet.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShareModalOpen(true)}
+              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 hover:from-emerald-100 hover:to-teal-100 text-[#107a57] border border-emerald-200 text-xs font-black transition shadow-2xs cursor-pointer active:scale-95"
+              title="مشاركة ونقل كافة أساتذة المحفظة دفعة واحدة لتجدهم في جهازك الآخر بنقرة واحدة"
+            >
+              <Share2 className="w-4 h-4 text-[#107a57]" />
+              <span>مشاركة مع جهاز آخر 📲</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* رسالة التنبيه إن وجدت */}
@@ -344,6 +384,7 @@ export default function TeacherWallet() {
               teacher={teacher}
               onRemove={() => removeTeacher(teacher.slug || teacher.code)}
               onUpdateChild={(name) => updateChildName(teacher.slug || teacher.code, name)}
+              onOpenInquiry={(t) => setInquiryTargetTeacher(t)}
             />
           ))}
         </div>
@@ -406,6 +447,39 @@ export default function TeacherWallet() {
         onClose={() => setShareModalOpen(false)}
         wallet={wallet}
       />
+
+      {/* نافذة إرسال استفسار للأستاذ المحدد */}
+      {inquiryTargetTeacher && (
+        <ParentInquiryModal
+          isOpen={Boolean(inquiryTargetTeacher)}
+          onClose={() => {
+            setInquiryTargetTeacher(null);
+            refreshInquiriesCount();
+          }}
+          teacher={{
+            id: inquiryTargetTeacher.slug || inquiryTargetTeacher.code,
+            code: inquiryTargetTeacher.code,
+            name: inquiryTargetTeacher.name,
+            subject: inquiryTargetTeacher.subjectName || inquiryTargetTeacher.subject || "المادة التعليمية",
+            school: inquiryTargetTeacher.school,
+          }}
+          initialStudentName={inquiryTargetTeacher.childName}
+          initialStudentGroup={
+            inquiryTargetTeacher.code?.match(/-([1-4])$/)?.[1]
+              ? `${inquiryTargetTeacher.code.match(/-([1-4])$/)![1]}م`
+              : undefined
+          }
+        />
+      )}
+
+      {/* نافذة قائمة استفسارات الولي وتتبع الردود */}
+      <ParentInquiriesListModal
+        isOpen={inquiriesListOpen}
+        onClose={() => {
+          setInquiriesListOpen(false);
+          refreshInquiriesCount();
+        }}
+      />
     </div>
   );
 }
@@ -415,10 +489,12 @@ function TeacherWalletCard({
   teacher,
   onRemove,
   onUpdateChild,
+  onOpenInquiry,
 }: {
   teacher: SavedTeacher;
   onRemove: () => void;
   onUpdateChild: (name: string) => void;
+  onOpenInquiry: (teacher: SavedTeacher) => void;
 }) {
   const [editingChild, setEditingChild] = useState(false);
   const [childInput, setChildInput] = useState(teacher.childName || "");
@@ -470,7 +546,7 @@ function TeacherWalletCard({
         )}
       </div>
 
-      {/* الجزء السفلي: اسم الابن وزر الدخول الفوري */}
+      {/* الجزء السفلي: اسم الابن وزر المراسلة وزر الدخول الفوري */}
       <div className="flex items-center justify-between gap-2 pt-1 border-t border-[#e8e8e0]/60">
         <div className="min-w-0 flex-1">
           {editingChild ? (
@@ -510,19 +586,31 @@ function TeacherWalletCard({
           )}
         </div>
 
-        {(() => {
-          const lvlParam = (teacher.code || "").match(/-([1-4])$/)?.[1];
-          const targetUrl = `/t/${teacher.slug}${lvlParam ? `?lvl=${lvlParam}` : ""}`;
-          return (
-            <Link
-              href={targetUrl}
-              className="btn-primary text-xs py-1.5 px-3 font-black shrink-0"
-            >
-              <span>{lvlParam ? `دخول (${lvlParam}م)` : "دخول فوري"}</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </Link>
-          );
-        })()}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            type="button"
+            onClick={() => onOpenInquiry(teacher)}
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-black transition cursor-pointer active:scale-95"
+            title="إرسال سؤال أو ملاحظة خاصة للأستاذ حول ابنك"
+          >
+            <MessageCircle className="w-3.5 h-3.5 text-emerald-700" />
+            <span>مراسلة 💬</span>
+          </button>
+
+          {(() => {
+            const lvlParam = (teacher.code || "").match(/-([1-4])$/)?.[1];
+            const targetUrl = `/t/${teacher.slug}${lvlParam ? `?lvl=${lvlParam}` : ""}`;
+            return (
+              <Link
+                href={targetUrl}
+                className="btn-primary text-xs py-1.5 px-3 font-black shrink-0"
+              >
+                <span>{lvlParam ? `دخول (${lvlParam}م)` : "دخول فوري"}</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </Link>
+            );
+          })()}
+        </div>
       </div>
     </div>
   );
