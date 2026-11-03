@@ -108,6 +108,28 @@ function AuthForm() {
     else if (tab === "recover") setActiveTab("recover");
   }, [searchParams]);
 
+  useEffect(() => {
+    // تنظيف أي كاش قديم أو Service Worker معلق في المتصفح لضمان اتصال مباشر وسلس
+    if (typeof window !== "undefined") {
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker
+          .getRegistrations()
+          .then((regs) => {
+            for (const r of regs) r.unregister().catch(() => {});
+          })
+          .catch(() => {});
+      }
+      if ("caches" in window) {
+        caches
+          .keys()
+          .then((keys) => {
+            for (const k of keys) caches.delete(k).catch(() => {});
+          })
+          .catch(() => {});
+      }
+    }
+  }, []);
+
   // حقول تسجيل الدخول
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");

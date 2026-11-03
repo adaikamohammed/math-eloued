@@ -12,24 +12,34 @@ export default function OfflinePage() {
   useEffect(() => {
     setIsOnline(navigator.onLine);
 
-    // إذا كان الجهاز متصلاً بالإنترنت، نتحقق مباشرة من الخادم ونوجه المستخدم إلى لوحة الأستاذ
-    const checkServerAndRedirect = async () => {
-      if (typeof window === "undefined" || !navigator.onLine) return;
-      try {
-        const res = await fetch(`/api/health?_t=${Date.now()}`, { cache: "no-store" });
-        if (res.ok) {
-          window.location.href = "/admin";
-        }
-      } catch {
-        // الخادم غير متاح حالياً
+    // إلغاء أي Service Worker وحذف كافة ملفات الكاش القديمة
+    if (typeof window !== "undefined") {
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker
+          .getRegistrations()
+          .then((regs) => {
+            for (const r of regs) r.unregister().catch(() => {});
+          })
+          .catch(() => {});
       }
-    };
+      if ("caches" in window) {
+        caches
+          .keys()
+          .then((keys) => {
+            for (const k of keys) caches.delete(k).catch(() => {});
+          })
+          .catch(() => {});
+      }
 
-    checkServerAndRedirect();
+      // إذا كان الجهاز متصلاً بالإنترنت، نتوجه فوراً إلى صفحة تسجيل الدخول
+      if (navigator.onLine) {
+        window.location.replace("/login");
+      }
+    }
 
     const handleOnline = () => {
       setIsOnline(true);
-      checkServerAndRedirect();
+      window.location.replace("/login");
     };
 
     const handleOffline = () => {
@@ -45,18 +55,21 @@ export default function OfflinePage() {
     };
   }, []);
 
-  const handleRetry = async () => {
+  const handleForceRefresh = async () => {
     setChecking(true);
     try {
-      const res = await fetch(`/api/health?_t=${Date.now()}`, { cache: "no-store" });
-      if (res.ok) {
-        window.location.href = "/admin";
-        return;
+      if (typeof window !== "undefined") {
+        if ("caches" in window) {
+          const keys = await caches.keys();
+          await Promise.all(keys.map((k) => caches.delete(k)));
+        }
+        if ("serviceWorker" in navigator) {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(regs.map((r) => r.unregister()));
+        }
       }
-    } catch {
-      // لا يزال دون اتصال
-    }
-    setChecking(false);
+    } catch {}
+    window.location.replace("/login");
   };
 
   return (
@@ -146,28 +159,28 @@ export default function OfflinePage() {
         {/* أزرار الإجراءات والتنقل السريع */}
         <div className="space-y-2 pt-2">
           <button
-            onClick={() => { window.location.href = "/admin"; }}
-            className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-black text-sm shadow-lg shadow-emerald-700/20 active:scale-[0.98] transition cursor-pointer"
+            onClick={handleForceRefresh}
+            disabled={checking}
+            className="w-full inline-flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-black text-sm shadow-lg shadow-emerald-700/25 active:scale-[0.98] transition cursor-pointer disabled:opacity-60"
           >
-            <ShieldCheck className="w-4 h-4" />
-            <span>الدخول إلى لوحة الأستاذ والإدارة</span>
+            <RotateCcw className={`w-4 h-4 ${checking ? "animate-spin" : ""}`} />
+            <span>{checking ? "جاري تنظيف الذاكرة والدخول..." : "🚀 الدخول المباشر إلى المنصة وتحديث الذاكرة"}</span>
           </button>
 
           <div className="grid grid-cols-2 gap-2">
             <button
-              onClick={handleRetry}
-              disabled={checking}
-              className="inline-flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs transition cursor-pointer disabled:opacity-60"
+              onClick={() => { window.location.href = "/admin"; }}
+              className="inline-flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs transition cursor-pointer"
             >
-              <RotateCcw className={`w-3.5 h-3.5 ${checking ? "animate-spin" : ""}`} />
-              <span>{checking ? "جاري الفحص..." : "إعادة المحاولة"}</span>
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+              <span>لوحة الأستاذ</span>
             </button>
 
             <button
               onClick={() => { window.location.href = "/login"; }}
               className="inline-flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs transition cursor-pointer"
             >
-              <LogIn className="w-3.5 h-3.5" />
+              <LogIn className="w-3.5 h-3.5 text-emerald-600" />
               <span>تسجيل الدخول</span>
             </button>
           </div>

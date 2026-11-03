@@ -22,47 +22,7 @@ export function OfflineIndicator() {
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
 
-    // 2. تحميل وحفظ الخط والصفحات تلقائياً في الخلفية بدون أي أزرار وبدون إزعاج المستخدم
-    let timer: NodeJS.Timeout | null = null;
-    if ("caches" in window && navigator.onLine) {
-      timer = setTimeout(async () => {
-        try {
-          const cache = await caches.open("jusoor-offline-v1");
-          const urlsToCache = [
-            "/",
-            "/offline",
-            "/eval",
-            "/t/search",
-            "/assessment",
-            "/manifest.json",
-            "/icon.svg",
-            "/icons/icon-192.png",
-            "/icons/icon-512.png",
-            "/fonts/alexandria-arabic.woff2",
-            "/fonts/alexandria-latin.woff2",
-          ];
-
-          for (const url of urlsToCache) {
-            try {
-              const matched = await cache.match(url);
-              if (!matched) {
-                const response = await fetch(url);
-                if (response.ok) {
-                  await cache.put(url, response);
-                }
-              }
-            } catch {
-              // تجاهل بصمت للحفاظ على تجربة المستخدم
-            }
-          }
-        } catch {
-          // تجاهل أي خطأ في بيئة المتصفح
-        }
-      }, 2000);
-    }
-
     return () => {
-      if (timer) clearTimeout(timer);
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
     };
