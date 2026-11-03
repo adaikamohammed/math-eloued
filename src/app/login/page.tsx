@@ -327,9 +327,8 @@ function AuthForm() {
       setRegisteredCode(randomCode);
 
       setTimeout(() => {
-        router.push("/admin?welcome=1");
-        router.refresh();
-      }, 1500);
+        window.location.href = "/admin?welcome=1";
+      }, 1200);
     } catch (err: any) {
       console.error("Register error:", err);
       const raw = String(err?.message || "");
@@ -471,14 +470,14 @@ function AuthForm() {
         }
       }
 
-      if (profile.role === "admin") {
-        router.push("/super-admin");
-      } else if (profile.role === "inspector") {
-        router.push("/inspector");
-      } else {
-        router.push(safeNext || "/admin");
-      }
-      router.refresh();
+      const targetDestination =
+        profile.role === "admin"
+          ? "/super-admin"
+          : profile.role === "inspector"
+            ? "/inspector"
+            : (safeNext || "/admin");
+
+      window.location.href = targetDestination;
     } catch (err: any) {
       const rawMsg = String(err?.message || "");
       if (rawMsg.includes("Invalid login")) {

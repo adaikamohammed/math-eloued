@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { WifiOff, RotateCcw, Home, ClipboardCheck, Search, BookOpen, CheckCircle2 } from "lucide-react";
+import { WifiOff, RotateCcw, Home, ClipboardCheck, Search, BookOpen, CheckCircle2, ShieldCheck, LogIn } from "lucide-react";
 
 export default function OfflinePage() {
   const [isOnline, setIsOnline] = useState(false);
@@ -12,9 +12,24 @@ export default function OfflinePage() {
   useEffect(() => {
     setIsOnline(navigator.onLine);
 
+    // إذا كان الجهاز متصلاً بالإنترنت، نتحقق مباشرة من الخادم ونوجه المستخدم إلى لوحة الأستاذ
+    const checkServerAndRedirect = async () => {
+      if (typeof window === "undefined" || !navigator.onLine) return;
+      try {
+        const res = await fetch(`/api/health?_t=${Date.now()}`, { cache: "no-store" });
+        if (res.ok) {
+          window.location.href = "/admin";
+        }
+      } catch {
+        // الخادم غير متاح حالياً
+      }
+    };
+
+    checkServerAndRedirect();
+
     const handleOnline = () => {
       setIsOnline(true);
-      window.location.reload();
+      checkServerAndRedirect();
     };
 
     const handleOffline = () => {
@@ -30,15 +45,18 @@ export default function OfflinePage() {
     };
   }, []);
 
-  const handleRetry = () => {
+  const handleRetry = async () => {
     setChecking(true);
-    setTimeout(() => {
-      if (navigator.onLine) {
-        window.location.reload();
-      } else {
-        setChecking(false);
+    try {
+      const res = await fetch(`/api/health?_t=${Date.now()}`, { cache: "no-store" });
+      if (res.ok) {
+        window.location.href = "/admin";
+        return;
       }
-    }, 600);
+    } catch {
+      // لا يزال دون اتصال
+    }
+    setChecking(false);
   };
 
   return (
@@ -125,16 +143,34 @@ export default function OfflinePage() {
           </div>
         </div>
 
-        {/* زر إعادة المحاولة */}
-        <div className="pt-2">
+        {/* أزرار الإجراءات والتنقل السريع */}
+        <div className="space-y-2 pt-2">
           <button
-            onClick={handleRetry}
-            disabled={checking}
-            className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-black text-sm shadow-lg shadow-emerald-700/20 active:scale-[0.98] transition cursor-pointer disabled:opacity-60"
+            onClick={() => { window.location.href = "/admin"; }}
+            className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-black text-sm shadow-lg shadow-emerald-700/20 active:scale-[0.98] transition cursor-pointer"
           >
-            <RotateCcw className={`w-4 h-4 ${checking ? "animate-spin" : ""}`} />
-            <span>{checking ? "جاري التحقق من الشبكة..." : "إعادة محاولة الاتصال"}</span>
+            <ShieldCheck className="w-4 h-4" />
+            <span>الدخول إلى لوحة الأستاذ والإدارة</span>
           </button>
+
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={handleRetry}
+              disabled={checking}
+              className="inline-flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs transition cursor-pointer disabled:opacity-60"
+            >
+              <RotateCcw className={`w-3.5 h-3.5 ${checking ? "animate-spin" : ""}`} />
+              <span>{checking ? "جاري الفحص..." : "إعادة المحاولة"}</span>
+            </button>
+
+            <button
+              onClick={() => { window.location.href = "/login"; }}
+              className="inline-flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs transition cursor-pointer"
+            >
+              <LogIn className="w-3.5 h-3.5" />
+              <span>تسجيل الدخول</span>
+            </button>
+          </div>
         </div>
 
         <p className="text-[11px] text-slate-400">

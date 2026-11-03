@@ -1,11 +1,10 @@
 // Service Worker - منصة جسور التعليمية (Jusoor Offline Engine)
-const CACHE_NAME = "jusoor-offline-v1";
+const CACHE_NAME = "jusoor-offline-v2";
 
 // الملفات والصفحات المحورية المطلوب حفظها مسبقاً في ذاكرة الهاتف أو الحاسوب
 const PRECACHE_ASSETS = [
   "/",
   "/offline",
-  "/login",
   "/eval",
   "/t/search",
   "/assessment",
@@ -61,6 +60,21 @@ self.addEventListener("fetch", (event) => {
 
   // تجاهل أي طلب غير GET أو غير http/https
   if (req.method !== "GET" || !url.protocol.startsWith("http")) return;
+
+  // استثناء كافة مسارات لوحة التحكم وتسجيل الدخول والحسابات من الـ Service Worker
+  // هذه الصفحات تتطلب اتصالاً مباشراً بالخادم السحابي ويجب ألا تسقط أبداً في شاشة الأوفلاين
+  const isAuthOrAdmin =
+    url.pathname.startsWith("/admin") ||
+    url.pathname.startsWith("/super-admin") ||
+    url.pathname.startsWith("/login") ||
+    url.pathname.startsWith("/inspector") ||
+    url.pathname.startsWith("/settings") ||
+    url.pathname.startsWith("/auth") ||
+    url.pathname.startsWith("/api/auth");
+
+  if (isAuthOrAdmin) {
+    return; // تمرير مباشر للمتصفح والشبكة دون أي اعتراض
+  }
 
   // أ. ملفات الخط العربي المحلية: Cache-First فائق السرعة
   if (url.pathname.startsWith("/fonts/") || url.pathname.endsWith(".woff2")) {
@@ -124,7 +138,12 @@ self.addEventListener("fetch", (event) => {
           }
           return response;
         })
-        .catch(async () => {
+        .catch(async (err) => {
+          // إذا كان الإلغاء ناتج عن تنقل العميل (AbortError)، لا نرجع صفحة الأوفلاين
+          if (err && (err.name === "AbortError" || String(err).includes("aborted"))) {
+            return Response.error();
+          }
+
           const cached = await caches.match(req);
           if (cached) return cached;
 
