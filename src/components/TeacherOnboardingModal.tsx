@@ -25,6 +25,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { TeacherSession } from "@/app/admin/page";
 import { ReceptionInfo, SCHOOL_DAYS } from "@/lib/types";
+import { getTeacherLevelCode } from "@/lib/teacherCodes";
 
 interface Props {
   isOpen: boolean;
@@ -695,8 +696,8 @@ export function TeacherOnboardingModal({
                 </span>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {selectedLevels.map((lvl) => {
-                    const code = `${profile.teacher_code || "MTH"}-${lvl}`;
-                    const url = `${typeof window !== "undefined" ? window.location.origin : ""}/t/${profile.slug || profile.teacher_code}?lvl=${lvl}`;
+                    const code = getTeacherLevelCode(profile.teacher_code || "MTH", lvl);
+                    const url = `${typeof window !== "undefined" ? window.location.origin : ""}/t/${profile.slug || profile.teacher_code}?code=${code}`;
                     const isCopied = copiedCode === code;
 
                     return (

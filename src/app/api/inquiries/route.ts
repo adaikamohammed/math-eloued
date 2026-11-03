@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getLessonsData, saveLessonsData } from "@/lib/storage";
 import { requireTeacher, createSupabaseServerClient } from "@/lib/auth";
 import { clientIp, rateLimit } from "@/lib/rateLimit";
@@ -9,6 +9,7 @@ import {
   generateTrackingCode,
   validateInquiryPayload,
 } from "@/lib/inquiries";
+import { findPublicTeacher } from "@/lib/teachers";
 import { randomBytes } from "crypto";
 
 export const dynamic = "force-dynamic";
@@ -48,30 +49,14 @@ export async function POST(req: NextRequest) {
 
     const supabase = await createSupabaseServerClient();
 
-    // 3. تحديد الأستاذ المستهدف والتحقق من حسابه
-    let resolvedTeacherId = teacherId;
-    let teacherProfile: any = null;
+    // 3. تحديد الأستاذ المستهدف والتحقق من حسابه بشكل قطعي ومرن
+    const targetKey = (teacherId || teacherCode || body.teacherSlug || "").toString().trim();
+    const teacherProfile = await findPublicTeacher(targetKey);
 
-    if (resolvedTeacherId) {
-      const { data: prof } = await supabase
-        .from("profiles")
-        .select("id, full_name, teacher_code, subject, school_custom_name")
-        .eq("id", resolvedTeacherId)
-        .maybeSingle();
-      teacherProfile = prof;
-    } else if (teacherCode) {
-      const { data: prof } = await supabase
-        .from("profiles")
-        .select("id, full_name, teacher_code, subject, school_custom_name")
-        .eq("teacher_code", teacherCode.trim().toUpperCase())
-        .maybeSingle();
-      teacherProfile = prof;
-      if (prof) resolvedTeacherId = prof.id;
-    }
-
-    if (!resolvedTeacherId || !teacherProfile) {
+    if (!teacherProfile || !teacherProfile.id) {
       return NextResponse.json({ error: "الأستاذ المستهدف غير موجود أو لم يتم تحديده" }, { status: 404 });
     }
+    const resolvedTeacherId = teacherProfile.id;
 
     // 4. إنشاء نموذج الاستفسار المنظم
     const inquiryId = `inq_${Date.now()}_${randomBytes(3).toString("hex")}`;
@@ -85,7 +70,7 @@ export async function POST(req: NextRequest) {
       teacherId: resolvedTeacherId,
       teacherCode: teacherProfile.teacher_code || undefined,
       teacherName: teacherProfile.full_name || "الأستاذ",
-      subject: teacherProfile.subject || undefined,
+      subject: (teacherProfile as any).subject || undefined,
       parentName: validation.cleanData.parentName,
       studentName: validation.cleanData.studentName,
       studentGroup: validation.cleanData.studentGroup,

@@ -24,6 +24,7 @@ import { decodeFamilyWallet } from "@/lib/familyWallet";
 import { ParentInquiryModal } from "./ParentInquiryModal";
 import { ParentInquiriesListModal } from "./ParentInquiriesListModal";
 import { getLocalInquiries } from "@/lib/parentInquiriesStore";
+import { parseTeacherInputCode, getTeacherLevelCode } from "@/lib/teacherCodes";
 
 export interface SavedTeacher {
   slug: string;
@@ -243,13 +244,9 @@ export default function TeacherWallet() {
     const rawClean = newCode.trim().toUpperCase();
     if (!rawClean) return;
 
-    let baseCode = rawClean;
-    let targetLevel: number | null = null;
-    const match = rawClean.match(/^([A-Za-z]{2,5}[-_]?\d{2,5})[-_/\s]?([1-4])(?:[mMم])?$/i);
-    if (match) {
-      baseCode = match[1];
-      targetLevel = parseInt(match[2], 10);
-    }
+    const parsed = parseTeacherInputCode(rawClean);
+    const baseCode = parsed.baseCode;
+    const targetLevel = parsed.isLockedToLevel ? parsed.level : null;
 
     setAddingLoading(true);
 
@@ -273,11 +270,15 @@ export default function TeacherWallet() {
         return;
       }
 
+      const secureCode = targetLevel
+        ? getTeacherLevelCode(data.teacher_code || baseCode, targetLevel)
+        : data.teacher_code || baseCode;
+
       // حفظ الأستاذ فوراً
       autoSaveTeacherToWallet({
         slug: data.slug || data.teacher_code || data.id,
         name: data.full_name || "الأستاذ",
-        code: targetLevel ? `${data.teacher_code || baseCode}-${targetLevel}` : data.teacher_code || baseCode,
+        code: secureCode,
         subject: data.subject,
         school: data.school_custom_name,
         levels: targetLevel ? [targetLevel] : data.levels_taught,
@@ -464,11 +465,10 @@ export default function TeacherWallet() {
             school: inquiryTargetTeacher.school,
           }}
           initialStudentName={inquiryTargetTeacher.childName}
-          initialStudentGroup={
-            inquiryTargetTeacher.code?.match(/-([1-4])$/)?.[1]
-              ? `${inquiryTargetTeacher.code.match(/-([1-4])$/)![1]}م`
-              : undefined
-          }
+          initialStudentGroup={(() => {
+            const p = parseTeacherInputCode(inquiryTargetTeacher.code || "");
+            return p.isLockedToLevel && p.level ? `${p.level}م` : undefined;
+          })()}
         />
       )}
 
@@ -598,14 +598,17 @@ function TeacherWalletCard({
           </button>
 
           {(() => {
-            const lvlParam = (teacher.code || "").match(/-([1-4])$/)?.[1];
-            const targetUrl = `/t/${teacher.slug}${lvlParam ? `?lvl=${lvlParam}` : ""}`;
+            const parsed = parseTeacherInputCode(teacher.code || "");
+            const hasLockedLevel = parsed.isLockedToLevel && parsed.level;
+            const targetUrl = hasLockedLevel
+              ? `/t/${teacher.slug}?code=${encodeURIComponent(teacher.code)}`
+              : `/t/${teacher.slug}`;
             return (
               <Link
                 href={targetUrl}
                 className="btn-primary text-xs py-1.5 px-3 font-black shrink-0"
               >
-                <span>{lvlParam ? `دخول (${lvlParam}م)` : "دخول فوري"}</span>
+                <span>{hasLockedLevel ? `دخول (${parsed.level}م)` : "دخول فوري"}</span>
                 <ExternalLink className="w-3.5 h-3.5" />
               </Link>
             );

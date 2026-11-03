@@ -17,6 +17,7 @@ import {
   Key,
   Layers,
 } from "lucide-react";
+import { getTeacherLevelCode } from "@/lib/teacherCodes";
 
 interface ParentShareModalProps {
   isOpen: boolean;
@@ -123,7 +124,7 @@ ${schoolName}`;
   };
 
   const handleCopyLevelCode = async (lvl: number) => {
-    const code = `${teacherCode}-${lvl}`;
+    const code = getTeacherLevelCode(teacherCode, lvl);
     try {
       await navigator.clipboard.writeText(code);
       setCopiedLvlCode(lvl);
@@ -132,7 +133,8 @@ ${schoolName}`;
   };
 
   const handleCopyLevelLink = async (lvl: number) => {
-    const link = `${publicUrl}?lvl=${lvl}`;
+    const code = getTeacherLevelCode(teacherCode, lvl);
+    const link = `${publicUrl}?code=${code}`;
     try {
       await navigator.clipboard.writeText(link);
       setCopiedLvlLink(lvl);
@@ -141,11 +143,12 @@ ${schoolName}`;
   };
 
   const handleShareLevelWhatsApp = (lvl: number) => {
+    const code = getTeacherLevelCode(teacherCode, lvl);
     const lvlText = `السلام عليكم ورحمة الله وبركاته،
 أولياء وتلاميذ السنة ${lvl} متوسط المحترمين:
 لمتابعة كراس الدروس وصور السبورة اليومية والواجبات لمستوى ابنكم حصراً، يرجى الدخول عبر رابط منصة جسور التعليمية:
-🔗 ${publicUrl}?lvl=${lvl}
-🔑 أو ادخل لمنصة جسور (${homeUrl}) واكتب رمز المستوى: *${teacherCode}-${lvl}*
+🔗 ${publicUrl}?code=${code}
+🔑 أو ادخل لمنصة جسور (${homeUrl}) واكتب رمز المستوى: *${code}*
 
 الأستاذ(ة): ${teacherName}
 ${schoolName}`;
@@ -203,7 +206,7 @@ ${schoolName}`;
 
             <div className="grid gap-2.5">
               {levels.map((lvl) => {
-                const lvlCode = `${teacherCode}-${lvl}`;
+                const lvlCode = getTeacherLevelCode(teacherCode, lvl);
                 const isCodeCopied = copiedLvlCode === lvl;
                 const isLinkCopied = copiedLvlLink === lvl;
 

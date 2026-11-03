@@ -27,6 +27,7 @@ import SaveToWalletButton from "@/components/SaveToWalletButton";
 import { AutoSaveTeacherWallet } from "@/components/AutoSaveTeacherWallet";
 import { normalizeData, readPublicTeacherData } from "@/lib/storage";
 import { findPublicTeacher } from "@/lib/teachers";
+import { parseTeacherInputCode, getTeacherLevelCode } from "@/lib/teacherCodes";
 import { TeacherQR } from "@/components/TeacherQR";
 import { SafeHarborDisclaimer } from "@/components/SafeHarborDisclaimer";
 import { TeacherInquiryActions } from "@/components/TeacherInquiryActions";
@@ -44,11 +45,23 @@ export const revalidate = 0;
 export default async function TeacherPublicSpace({ params, searchParams }: TeacherPageProps) {
   const { slug } = await params;
   const sParams = searchParams ? await searchParams : {};
+  const codeParam = typeof sParams.code === "string" ? sParams.code : undefined;
   const requestedLvlStr = typeof sParams.lvl === "string" ? sParams.lvl : undefined;
   const requestedLevel = requestedLvlStr ? parseInt(requestedLvlStr, 10) : null;
-  const isValidLevel = requestedLevel !== null && requestedLevel >= 1 && requestedLevel <= 4;
+  const isValidLvlParam = requestedLevel !== null && requestedLevel >= 1 && requestedLevel <= 4;
 
-  const profile = await findPublicTeacher(slug);
+  const parsedSlug = parseTeacherInputCode(slug);
+  const parsedCode = codeParam ? parseTeacherInputCode(codeParam) : null;
+
+  // فحص ما إذا كان الدخول برمز مستوى محدد
+  const lockedLevel =
+    (parsedCode?.isLockedToLevel ? parsedCode.level : null) ??
+    (parsedSlug.isLockedToLevel ? parsedSlug.level : null) ??
+    (isValidLvlParam ? requestedLevel : null);
+
+  const isLockedToLevel = lockedLevel !== null && lockedLevel >= 1 && lockedLevel <= 4;
+
+  const profile = await findPublicTeacher(parsedSlug.baseCode || slug);
   if (!profile) {
     notFound();
   }
@@ -79,8 +92,13 @@ export default async function TeacherPublicSpace({ params, searchParams }: Teach
     ? profile.levels_taught
     : [1, 2, 3, 4];
 
-  // إذا حدد الولي رمز مستوى معين (مثلاً ?lvl=1)، نظهر له حصراً هذا المستوى ونخفي الباقي
-  const activeLevels = isValidLevel ? [requestedLevel] : teacherDeclaredLevels;
+  // المستويات النشطة: إذا كان الدخول برمز مستوى محدد، نظهر هذا المستوى حصراً ونحجب باقي السنوات
+  const activeLevels = isLockedToLevel && lockedLevel ? [lockedLevel] : teacherDeclaredLevels;
+
+  const baseTeacherCode = profile.teacher_code || "MTH";
+  const activeCode = isLockedToLevel && lockedLevel
+    ? getTeacherLevelCode(baseTeacherCode, lockedLevel)
+    : baseTeacherCode;
 
   const codePrefix = (profile.teacher_code || "").split("-")[0]?.toUpperCase() || "MTH";
   const subjectObj =
@@ -104,6 +122,8 @@ export default async function TeacherPublicSpace({ params, searchParams }: Teach
           ...profile,
           subject: subjectObj.id,
         }}
+        customCode={activeCode}
+        customLevels={activeLevels}
       />
 
       {/* رأس الصفحة والهوية البصرية للأستاذ بشاشة عريضة للحاسوب والهاتف */}
@@ -124,21 +144,21 @@ export default async function TeacherPublicSpace({ params, searchParams }: Teach
 
             <div className="flex items-center gap-2">
               <span className="font-mono bg-white/15 backdrop-blur-md px-3 py-1 rounded-xl font-black text-xs text-emerald-100 border border-white/20">
-                {isValidLevel ? `${profile.teacher_code || "MTH"}-${requestedLevel}` : profile.teacher_code || "MTH"}
+                {activeCode}
               </span>
               <SaveToWalletButton
-                slug={slug}
+                slug={profile.slug || slug}
                 name={profile.full_name || ""}
-                code={isValidLevel ? `${profile.teacher_code || ""}-${requestedLevel}` : profile.teacher_code || ""}
+                code={activeCode}
                 school={profile.school_custom_name || ""}
               />
               <TeacherInquiryActions
                 teacherId={profile.id}
-                teacherCode={profile.teacher_code || "MTH"}
+                teacherCode={activeCode}
                 teacherName={profile.full_name || "الأستاذ"}
                 subject={subjectName}
                 availableLevels={activeLevels}
-                defaultLevel={isValidLevel ? requestedLevel : undefined}
+                defaultLevel={isLockedToLevel && lockedLevel ? lockedLevel : undefined}
                 compact={true}
               />
             </div>
@@ -157,9 +177,9 @@ export default async function TeacherPublicSpace({ params, searchParams }: Teach
                     مادة {subjectName}
                   </span>
 
-                  {isValidLevel && (
+                  {isLockedToLevel && lockedLevel && (
                     <span className="inline-flex items-center gap-1 bg-amber-400/25 px-3 py-0.5 rounded-full text-xs font-black text-amber-200 border border-amber-300/40">
-                      ⭐ فضاء {levelTitles[requestedLevel]?.title || `السنة ${requestedLevel}م`}
+                      🔒 فضاء {levelTitles[lockedLevel]?.title || `السنة ${lockedLevel}م`}
                     </span>
                   )}
                 </div>
@@ -210,27 +230,26 @@ export default async function TeacherPublicSpace({ params, searchParams }: Teach
       {/* ─── الحاوية الرئيسية للشاشات الكبيرة والمحمولة ─── */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-6 sm:-mt-8 space-y-6 relative z-20">
         {/* تنبيه المستوى المخصص إذا دخل الولي برمز مستوى */}
-        {isValidLevel && (
+        {isLockedToLevel && lockedLevel && (
           <div className="bg-white rounded-3xl p-4 border border-emerald-200 shadow-sm flex flex-wrap items-center justify-between gap-3 text-xs">
             <div className="flex items-center gap-2.5 text-emerald-900 font-bold">
               <span className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
-              <span>
-                أنت تتصفح حالياً المحتوى المخصص لـ <strong>{levelTitles[requestedLevel]?.title}</strong> (الرمز:{" "}
-                <code className="font-mono font-black text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-200">
-                  {profile.teacher_code}-{requestedLevel}
-                </code>
-                )
-              </span>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full text-[11px] font-black">
+                  🔒 فضاء خاص محمي
+                </span>
+                <span>
+                  أنت تتصفح المحتوى المخصص حصرياً لـ <strong>{levelTitles[lockedLevel]?.title}</strong> (الرمز المعتمد:{" "}
+                  <code className="font-mono font-black text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-200">
+                    {activeCode}
+                  </code>
+                  )
+                </span>
+              </div>
             </div>
-            {teacherDeclaredLevels.length > 1 && (
-              <Link
-                href={`/t/${slug}`}
-                className="text-xs text-emerald-700 hover:text-emerald-900 font-black underline shrink-0 flex items-center gap-1"
-              >
-                <span>عرض جميع المستويات المسندة للأستاذ</span>
-                <ArrowRight className="w-3.5 h-3.5 rotate-180" />
-              </Link>
-            )}
+            <div className="text-[11px] text-slate-500 font-medium">
+              مخصص لتلاميذ وأولياء {levelTitles[lockedLevel]?.tag}
+            </div>
           </div>
         )}
 
@@ -243,8 +262,8 @@ export default async function TeacherPublicSpace({ params, searchParams }: Teach
                 <span>المستويات والمناهج التعليمية المقررة</span>
               </div>
               <h2 className="text-base sm:text-xl font-black text-slate-900">
-                {isValidLevel
-                  ? `الدروس والواجبات المقررة للسنة ${requestedLevel} متوسط:`
+                {isLockedToLevel && lockedLevel
+                  ? `الدروس والواجبات المقررة لـ ${levelTitles[lockedLevel]?.title || `السنة ${lockedLevel} متوسط`}:`
                   : "اختر السنة الدراسية لمتابعة الدروس والواجبات اليومية:"}
               </h2>
               <p className="text-xs text-slate-500 mt-1 font-medium">
@@ -325,7 +344,7 @@ export default async function TeacherPublicSpace({ params, searchParams }: Teach
                   </div>
 
                   <Link
-                    href={`/year/${lvl}?teacher=${profile.id}`}
+                    href={`/year/${lvl}?teacher=${profile.id}${isLockedToLevel ? `&code=${encodeURIComponent(activeCode)}` : ""}`}
                     className="w-full py-3 px-4 rounded-2xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs sm:text-sm font-black flex items-center justify-center gap-2 transition-all shadow-2xs hover:shadow-md"
                   >
                     <span>دخول فضاء دروس وواجبات {item.tag}</span>
@@ -381,16 +400,16 @@ export default async function TeacherPublicSpace({ params, searchParams }: Teach
               <div className="space-y-2">
                 <TeacherInquiryActions
                   teacherId={profile.id}
-                  teacherCode={profile.teacher_code || "MTH"}
+                  teacherCode={activeCode}
                   teacherName={profile.full_name || "الأستاذ"}
                   subject={subjectName}
                   availableLevels={activeLevels}
-                  defaultLevel={isValidLevel ? requestedLevel : undefined}
+                  defaultLevel={isLockedToLevel && lockedLevel ? lockedLevel : undefined}
                 />
 
                 <div className="text-center pt-1">
                   <Link
-                    href={`/messages/send?teacher=${profile.id}${isValidLevel ? `&lvl=${requestedLevel}` : ""}`}
+                    href={`/messages/send?teacher=${profile.id}${isLockedToLevel && lockedLevel ? `&lvl=${lockedLevel}` : ""}`}
                     className="text-[11px] text-slate-400 hover:text-slate-600 transition underline"
                   >
                     أو إرسال ملاحظة في صندوق الصراحة المجهول 🔒
@@ -434,7 +453,7 @@ export default async function TeacherPublicSpace({ params, searchParams }: Teach
               </div>
 
               <Link
-                href={`/honor?teacher=${profile.id}${isValidLevel ? `&lvl=${requestedLevel}` : ""}`}
+                href={`/honor?teacher=${profile.id}${isLockedToLevel && lockedLevel ? `&lvl=${lockedLevel}` : ""}`}
                 className="w-full py-2.5 px-4 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-black flex items-center justify-center gap-2 transition shadow-xs hover:shadow-md"
               >
                 <span>مشاهدة المتفوقين وشهادات التقدير 🌟</span>
@@ -464,11 +483,11 @@ export default async function TeacherPublicSpace({ params, searchParams }: Teach
         {/* ─── 3. بطاقة الربط والمشاركة ورمز QR ─── */}
         <section className="bg-white rounded-3xl p-4 sm:p-6 border border-slate-200/90 shadow-2xs">
           <TeacherQR
-            path={`/t/${profile.slug || profile.id}${isValidLevel ? `?lvl=${requestedLevel}` : ""}`}
+            path={`/t/${profile.slug || profile.id}${isLockedToLevel ? `?code=${activeCode}` : ""}`}
             teacherName={profile.full_name || "الأستاذ"}
-            code={isValidLevel ? `${profile.teacher_code || "MTH"}-${requestedLevel}` : profile.teacher_code}
+            code={activeCode}
             schoolName={profile.school_custom_name || ""}
-            levelsTaught={isValidLevel ? [requestedLevel] : (profile.levels_taught || [1, 2, 3, 4])}
+            levelsTaught={activeLevels}
           />
         </section>
 

@@ -15,9 +15,11 @@ interface AutoSaveProps {
     school_custom_name?: string | null;
     levels_taught?: number[] | null;
   };
+  customCode?: string;
+  customLevels?: number[];
 }
 
-export function AutoSaveTeacherWallet({ profile }: AutoSaveProps) {
+export function AutoSaveTeacherWallet({ profile, customCode, customLevels }: AutoSaveProps) {
   const [showToast, setShowToast] = useState(false);
   const [mounted, setMounted] = useState(false);
 
@@ -25,8 +27,8 @@ export function AutoSaveTeacherWallet({ profile }: AutoSaveProps) {
     setMounted(true);
     if (!profile) return;
 
-    const teacherCode = profile.teacher_code || "MTH";
-    const slug = profile.slug || teacherCode;
+    const teacherCode = customCode || profile.teacher_code || "MTH";
+    const slug = profile.slug || profile.teacher_code || teacherCode;
     const name = profile.full_name || "الأستاذ";
 
     const alreadyInWallet = isTeacherInWallet(slug) || isTeacherInWallet(teacherCode);
@@ -38,7 +40,7 @@ export function AutoSaveTeacherWallet({ profile }: AutoSaveProps) {
       code: teacherCode,
       subject: profile.subject || "mathematics",
       school: profile.school_custom_name || "متوسطة ولاية الوادي",
-      levels: profile.levels_taught || undefined,
+      levels: customLevels || profile.levels_taught || undefined,
     });
 
     // إظهار التنبيه الترحيبي عند الزيارة الأولى للأستاذ

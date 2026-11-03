@@ -24,7 +24,12 @@ export function useTeacherId(): string | null {
 
 // العودة لصفحة الأستاذ العامة إن وُجد، وإلا للبوابة الرئيسية
 export function teacherHomeHref(teacherId: string | null): string {
-  return teacherId ? `/t/${teacherId}` : "/";
+  if (!teacherId) return "/";
+  if (typeof window !== "undefined") {
+    const code = new URLSearchParams(window.location.search).get("code");
+    if (code) return `/t/${teacherId}?code=${encodeURIComponent(code)}`;
+  }
+  return `/t/${teacherId}`;
 }
 
 // اسم الأستاذ ومتوسطته لعرضهما في رأس صفحات الولي (من الملف العام)

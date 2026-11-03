@@ -89,6 +89,7 @@ import {
   type ParentInquiry,
 } from "@/lib/types";
 import { INQUIRY_CATEGORIES, buildWhatsAppReplyUrl } from "@/lib/inquiries";
+import { getTeacherLevelCode } from "@/lib/teacherCodes";
 
 export type TeacherSession = {
   id: string;
@@ -1477,8 +1478,8 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
               } gap-2`}
             >
               {levelsTaught.map((lvl: number) => {
-                const lvlCode = `${profile.teacher_code || "MTH"}-${lvl}`;
-                const lvlUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/t/${profile.slug || profile.teacher_code}?lvl=${lvl}`;
+                const lvlCode = getTeacherLevelCode(profile.teacher_code || "MTH", lvl);
+                const lvlUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/t/${profile.slug || profile.teacher_code}?code=${lvlCode}`;
                 return (
                   <div
                     key={lvl}
