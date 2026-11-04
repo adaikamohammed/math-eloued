@@ -53,9 +53,14 @@ interface NavCategory {
 export function DesktopSidebar() {
   const pathname = usePathname() || "/";
   const { isSidebarCollapsed, toggleSidebar, isMobileMenuOpen, setIsMobileMenuOpen, user } = useLayout();
+  const [mounted, setMounted] = useState(false);
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
   const [featureFlags, setFeatureFlags] = useState<TeacherFeatureFlags | null>(null);
   const [isSharedSession, setIsSharedSession] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // جلب تفضيلات الأستاذ لإظهار وإخفاء الصفحات ديناميكياً ولحظياً
   useEffect(() => {
@@ -102,8 +107,10 @@ export function DesktopSidebar() {
 
   // بناء القوائم وفق رتبة المستخدم وإعداداته
   const categories: NavCategory[] = React.useMemo(() => {
+    const activeUser = mounted ? user : null;
+
     // ─── 0. إذا كان المستخدم المشرف العام ومدير المنصة ───
-    if (user && user.role === "admin") {
+    if (activeUser && activeUser.role === "admin") {
       return [
         {
           title: "الإدارة العامة للمنصة 🛡️",
@@ -185,7 +192,7 @@ export function DesktopSidebar() {
     }
 
     // ─── 1. إذا كان المستخدم أستاذاً مسجلاً ───
-    if (user && user.role === "teacher") {
+    if (activeUser && activeUser.role === "teacher") {
       const flags = featureFlags || {};
 
       const pedagogyItems: NavItem[] = [
@@ -333,7 +340,7 @@ export function DesktopSidebar() {
     }
 
     // ─── 2. إذا كان المستخدم مفتشاً ───
-    if (user && user.role === "inspector") {
+    if (activeUser && activeUser.role === "inspector") {
       return [
         {
           title: "فضاء التفتيش",
@@ -350,7 +357,7 @@ export function DesktopSidebar() {
     }
 
     // ─── 2.5 إذا كان المستخدم مدير متوسطة / ناظر ───
-    if (user && user.role === "principal") {
+    if (activeUser && activeUser.role === "principal") {
       return [
         {
           title: "إدارة المؤسسة التعليمية",
@@ -397,7 +404,7 @@ export function DesktopSidebar() {
         ],
       },
     ];
-  }, [user, featureFlags]);
+  }, [user, mounted, featureFlags]);
 
   // إغلاق قائمة الهاتف عند النقر على رابط
   const handleItemClick = () => {
@@ -427,6 +434,7 @@ export function DesktopSidebar() {
         `}
         aria-label="الشريط الجانبي للتنقل"
         dir="rtl"
+        suppressHydrationWarning
       >
         {/* ── رأس الشريط الجانبي (مطابق لارتفاع الهيدر h-16 تماماً) ── */}
         <div className="h-16 border-b border-[#e8e8e0] flex items-center justify-between px-4 shrink-0">
@@ -476,7 +484,7 @@ export function DesktopSidebar() {
         </div>
 
         {/* ── بطاقة سريعة للمستخدم المسجل ── */}
-        {user && !isSidebarCollapsed && (
+        {mounted && user && !isSidebarCollapsed && (
           <div className="p-3 mx-3 mt-3 rounded-2xl bg-gradient-to-br from-[#f2f8f5] to-[#e6f4ee] border border-[#d2ebe0] shrink-0">
             <div className="flex items-center gap-2.5">
               <div className="w-9 h-9 rounded-xl bg-[#107a57] text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-2xs">
@@ -597,7 +605,7 @@ export function DesktopSidebar() {
 
         {/* ── تذييل الشريط الجانبي (نسخة المنصة وحالة النظام) ── */}
         <div className="p-3 border-t border-[#e8e8e0] shrink-0 text-center space-y-1.5">
-          {!isSidebarCollapsed && user && isSharedSession && (
+          {!isSidebarCollapsed && mounted && user && isSharedSession && (
             <button
               type="button"
               onClick={async () => {
