@@ -1246,6 +1246,14 @@ export default function TeacherDiaryPage() {
               <span>تحميل PDF أفقياً 📄</span>
             </button>
             <Link
+              href="/admin/diary/weekly"
+              className="px-3.5 py-1.5 rounded-xl border border-sky-300 bg-sky-50 hover:bg-sky-100 text-xs font-black text-sky-800 transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
+              title="المخطط الأسبوعي للدفتر اليومي — رؤية أسبوع كامل وطباعة المخطط الأسبوعي"
+            >
+              <CalendarDays className="w-3.5 h-3.5 text-sky-600" />
+              <span>المخطط الأسبوعي 🖨️</span>
+            </Link>
+            <Link
               href="/admin/cahier-textes"
               className="px-3.5 py-1.5 rounded-xl border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-xs font-black text-indigo-800 transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
               title="الانتقال إلى دفتر النصوص الميداني للأفواج وتوثيق سيرورة الحصص والواجبات"

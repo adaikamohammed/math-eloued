@@ -18,6 +18,7 @@ import {
   LogOut,
   BookOpen,
   Calendar,
+  CalendarDays,
   ClipboardList,
   Sliders,
   X,
@@ -158,6 +159,7 @@ export function DesktopSidebar() {
             { label: "إدارة الأفواج والتلاميذ", href: "/admin/students", icon: Users },
             { label: "التوقيت الأسبوعي", href: "/admin/timetable", icon: Calendar },
             { label: "الدفتر اليومي", href: "/admin/diary", icon: ClipboardList },
+            { label: "المخطط الأسبوعي للدفتر 🖨️", href: "/admin/diary/weekly", icon: CalendarDays },
             { label: "دفتر النصوص الميداني", href: "/admin/cahier-textes", icon: BookMarked },
             { label: "دفتر التقويم المستمر الصفي 📱", href: "/eval/continuous", icon: Smartphone },
             { label: "سجل التنقيط والتقويم المستمر", href: "/eval", icon: Scale },
@@ -223,6 +225,11 @@ export function DesktopSidebar() {
           label: "الدفتر اليومي (ماذا سأدرس غداً)",
           href: "/admin/diary",
           icon: ClipboardList,
+        });
+        pedagogyItems.push({
+          label: "المخطط الأسبوعي للدفتر 🖨️",
+          href: "/admin/diary/weekly",
+          icon: CalendarDays,
         });
       }
 
