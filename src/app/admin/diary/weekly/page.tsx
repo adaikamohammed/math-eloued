@@ -198,6 +198,43 @@ function findEntryForSlot(
   return undefined;
 }
 
+/**
+ * استخراج تفاصيل الفوج المقرر في جدول التوقيت الأسبوعي للأستاذ لتلك الخانة
+ */
+function getScheduledSlotDetails(
+  timetable: TeacherTimetable | null,
+  dayName: string,
+  slot: SlotDefinition
+): { className?: string; sessionType?: string; isFree?: boolean } {
+  if (!timetable?.slots || timetable.slots.length === 0) return {};
+  const startHour = slot.start.split(":")[0];
+  const found = timetable.slots.find((s) => {
+    if (s.day !== dayName) return false;
+    const sHour = s.start.split(":")[0];
+    return sHour === startHour || s.start === slot.start;
+  });
+  if (!found) return {};
+  const isFree = found.className === "فراغ" || found.className === "راحة" || found.sessionType === "free";
+  if (isFree) return { isFree: true };
+  return {
+    className: found.className && found.className.trim() ? found.className.trim() : undefined,
+    sessionType: found.sessionType || undefined,
+  };
+}
+
+/**
+ * بناء رابط التحضير الفوري الموجه مع تمرير التاريخ والتوقيت والفوج بدقة
+ */
+function buildPrepareUrl(dateStr: string, slotLabel: string, scheduledClass?: string): string {
+  const params = new URLSearchParams();
+  params.set("date", dateStr);
+  params.set("time", slotLabel);
+  if (scheduledClass && scheduledClass !== "فراغ") {
+    params.set("class", scheduledClass);
+  }
+  return `/admin/diary?${params.toString()}`;
+}
+
 export default function WeeklyDiaryPage() {
   const { profile } = useProfile();
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
@@ -923,20 +960,32 @@ export default function WeeklyDiaryPage() {
                                   )}
                                 </div>
                               ) : (
-                                /* خانة فارغة للحصص غير المسجلة */
-                                <div className="h-full min-h-[70px] rounded-xl border border-dashed border-gray-200 bg-gray-50/50 flex flex-col items-center justify-center p-2 text-gray-400 group hover:border-emerald-300 hover:bg-emerald-50/30 transition print:border-none print:bg-transparent">
-                                  <span className="text-[10px] font-medium text-gray-400 print:hidden group-hover:hidden">
-                                    — فارغة —
-                                  </span>
-                                  <Link
-                                    href={`/admin/diary`}
-                                    className="hidden group-hover:flex items-center gap-1 text-[10px] text-emerald-700 font-bold print:hidden"
-                                    title="تحضير حصة في الدفتر"
-                                  >
-                                    <Plus className="w-3 h-3" />
-                                    <span>تحضير</span>
-                                  </Link>
-                                </div>
+                                /* خانة فارغة للحصص غير المسجلة مع تحضير فوري محدد التوقيت واليوم */
+                                (() => {
+                                  const scheduled = getScheduledSlotDetails(timetable, day.dayName, slot);
+                                  return (
+                                    <Link
+                                      href={buildPrepareUrl(day.dateStr, slot.label, scheduled.className)}
+                                      className="h-full min-h-[70px] rounded-xl border border-dashed border-gray-200 bg-gray-50/50 flex flex-col items-center justify-center p-2 text-gray-400 group hover:border-emerald-400 hover:bg-emerald-50/50 hover:text-emerald-800 transition cursor-pointer print:border-none print:bg-transparent"
+                                      title={`تحضير حصة ${day.dayName} (${slot.label})${scheduled.className ? ` لفوج ${scheduled.className}` : ""}`}
+                                    >
+                                      <span className="text-[10px] font-medium text-gray-400 print:hidden group-hover:hidden">
+                                        — فارغة —
+                                      </span>
+                                      <div className="hidden group-hover:flex flex-col items-center gap-0.5 text-emerald-700 font-bold print:hidden">
+                                        <div className="flex items-center gap-1 text-[11px] font-black">
+                                          <Plus className="w-3.5 h-3.5" />
+                                          <span>تحضير</span>
+                                        </div>
+                                        {scheduled.className && (
+                                          <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-black">
+                                            {scheduled.className}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </Link>
+                                  );
+                                })()
                               )}
                             </td>
                           );
@@ -1014,20 +1063,32 @@ export default function WeeklyDiaryPage() {
                                   )}
                                 </div>
                               ) : (
-                                /* خانة فارغة */
-                                <div className="h-full min-h-[70px] rounded-xl border border-dashed border-gray-200 bg-gray-50/50 flex flex-col items-center justify-center p-2 text-gray-400 group hover:border-emerald-300 hover:bg-emerald-50/30 transition print:border-none print:bg-transparent">
-                                  <span className="text-[10px] font-medium text-gray-400 print:hidden group-hover:hidden">
-                                    — فارغة —
-                                  </span>
-                                  <Link
-                                    href={`/admin/diary`}
-                                    className="hidden group-hover:flex items-center gap-1 text-[10px] text-emerald-700 font-bold print:hidden"
-                                    title="تحضير حصة في الدفتر"
-                                  >
-                                    <Plus className="w-3 h-3" />
-                                    <span>تحضير</span>
-                                  </Link>
-                                </div>
+                                /* خانة فارغة للحصص غير المسجلة مع تحضير فوري محدد التوقيت واليوم */
+                                (() => {
+                                  const scheduled = getScheduledSlotDetails(timetable, day.dayName, slot);
+                                  return (
+                                    <Link
+                                      href={buildPrepareUrl(day.dateStr, slot.label, scheduled.className)}
+                                      className="h-full min-h-[70px] rounded-xl border border-dashed border-gray-200 bg-gray-50/50 flex flex-col items-center justify-center p-2 text-gray-400 group hover:border-emerald-400 hover:bg-emerald-50/50 hover:text-emerald-800 transition cursor-pointer print:border-none print:bg-transparent"
+                                      title={`تحضير حصة ${day.dayName} (${slot.label})${scheduled.className ? ` لفوج ${scheduled.className}` : ""}`}
+                                    >
+                                      <span className="text-[10px] font-medium text-gray-400 print:hidden group-hover:hidden">
+                                        — فارغة —
+                                      </span>
+                                      <div className="hidden group-hover:flex flex-col items-center gap-0.5 text-emerald-700 font-bold print:hidden">
+                                        <div className="flex items-center gap-1 text-[11px] font-black">
+                                          <Plus className="w-3.5 h-3.5" />
+                                          <span>تحضير</span>
+                                        </div>
+                                        {scheduled.className && (
+                                          <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-black">
+                                            {scheduled.className}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </Link>
+                                  );
+                                })()
                               )}
                             </td>
                           );
@@ -1143,16 +1204,30 @@ export default function WeeklyDiaryPage() {
                                 )}
                               </div>
                             ) : (
-                              <div className="h-full min-h-[65px] rounded-xl border border-dashed border-gray-200 bg-gray-50/50 flex flex-col items-center justify-center p-2 text-gray-400 group hover:border-emerald-300 hover:bg-emerald-50/30 transition print:border-none print:bg-transparent">
-                                <span className="text-[10px] font-medium text-gray-400 print:hidden group-hover:hidden">— فارغة —</span>
-                                <Link
-                                  href="/admin/diary"
-                                  className="hidden group-hover:flex items-center gap-1 text-[10px] text-emerald-700 font-bold print:hidden"
-                                >
-                                  <Plus className="w-3 h-3" />
-                                  <span>تحضير</span>
-                                </Link>
-                              </div>
+                              /* خانة فارغة للحصص غير المسجلة مع تحضير فوري محدد التوقيت واليوم */
+                              (() => {
+                                const scheduled = getScheduledSlotDetails(timetable, day.dayName, slot);
+                                return (
+                                  <Link
+                                    href={buildPrepareUrl(day.dateStr, slot.label, scheduled.className)}
+                                    className="h-full min-h-[65px] rounded-xl border border-dashed border-gray-200 bg-gray-50/50 flex flex-col items-center justify-center p-2 text-gray-400 group hover:border-emerald-400 hover:bg-emerald-50/50 hover:text-emerald-800 transition cursor-pointer print:border-none print:bg-transparent"
+                                    title={`تحضير حصة ${day.dayName} (${slot.label})${scheduled.className ? ` لفوج ${scheduled.className}` : ""}`}
+                                  >
+                                    <span className="text-[10px] font-medium text-gray-400 print:hidden group-hover:hidden">— فارغة —</span>
+                                    <div className="hidden group-hover:flex flex-col items-center gap-0.5 text-emerald-700 font-bold print:hidden">
+                                      <div className="flex items-center gap-1 text-[11px] font-black">
+                                        <Plus className="w-3.5 h-3.5" />
+                                        <span>تحضير</span>
+                                      </div>
+                                      {scheduled.className && (
+                                        <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-black">
+                                          {scheduled.className}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </Link>
+                                );
+                              })()
                             )}
                           </td>
                         );
@@ -1259,16 +1334,30 @@ export default function WeeklyDiaryPage() {
                                 )}
                               </div>
                             ) : (
-                              <div className="h-full min-h-[65px] rounded-xl border border-dashed border-gray-200 bg-gray-50/50 flex flex-col items-center justify-center p-2 text-gray-400 group hover:border-emerald-300 hover:bg-emerald-50/30 transition print:border-none print:bg-transparent">
-                                <span className="text-[10px] font-medium text-gray-400 print:hidden group-hover:hidden">— فارغة —</span>
-                                <Link
-                                  href="/admin/diary"
-                                  className="hidden group-hover:flex items-center gap-1 text-[10px] text-emerald-700 font-bold print:hidden"
-                                >
-                                  <Plus className="w-3 h-3" />
-                                  <span>تحضير</span>
-                                </Link>
-                              </div>
+                              /* خانة فارغة للحصص غير المسجلة مع تحضير فوري محدد التوقيت واليوم */
+                              (() => {
+                                const scheduled = getScheduledSlotDetails(timetable, day.dayName, slot);
+                                return (
+                                  <Link
+                                    href={buildPrepareUrl(day.dateStr, slot.label, scheduled.className)}
+                                    className="h-full min-h-[65px] rounded-xl border border-dashed border-gray-200 bg-gray-50/50 flex flex-col items-center justify-center p-2 text-gray-400 group hover:border-emerald-400 hover:bg-emerald-50/50 hover:text-emerald-800 transition cursor-pointer print:border-none print:bg-transparent"
+                                    title={`تحضير حصة ${day.dayName} (${slot.label})${scheduled.className ? ` لفوج ${scheduled.className}` : ""}`}
+                                  >
+                                    <span className="text-[10px] font-medium text-gray-400 print:hidden group-hover:hidden">— فارغة —</span>
+                                    <div className="hidden group-hover:flex flex-col items-center gap-0.5 text-emerald-700 font-bold print:hidden">
+                                      <div className="flex items-center gap-1 text-[11px] font-black">
+                                        <Plus className="w-3.5 h-3.5" />
+                                        <span>تحضير</span>
+                                      </div>
+                                      {scheduled.className && (
+                                        <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-black">
+                                          {scheduled.className}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </Link>
+                                );
+                              })()
                             )}
                           </td>
                         );
@@ -1369,14 +1458,25 @@ export default function WeeklyDiaryPage() {
                           );
                         }
 
+                        const scheduled = getScheduledSlotDetails(timetable, day.dayName, slot);
                         return (
-                          <div
+                          <Link
                             key={slot.id}
-                            className="p-1.5 rounded-lg border border-dashed border-gray-200 bg-gray-50/50 flex items-center justify-between text-gray-400 text-[10px]"
+                            href={buildPrepareUrl(day.dateStr, slot.label, scheduled.className)}
+                            className="p-1.5 rounded-lg border border-dashed border-gray-200 bg-gray-50/50 flex items-center justify-between text-gray-400 text-[10px] hover:border-emerald-400 hover:bg-emerald-50/50 hover:text-emerald-800 transition cursor-pointer"
+                            title={`تحضير حصة ${day.dayName} (${slot.label})${scheduled.className ? ` لفوج ${scheduled.className}` : ""}`}
                           >
                             <span className="font-mono">{slot.label}</span>
-                            <span className="text-[9px] text-gray-400">فارغة</span>
-                          </div>
+                            <div className="flex items-center gap-1 text-emerald-700 font-bold">
+                              <Plus className="w-3 h-3" />
+                              <span>تحضير</span>
+                              {scheduled.className && (
+                                <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1 rounded font-black">
+                                  {scheduled.className}
+                                </span>
+                              )}
+                            </div>
+                          </Link>
                         );
                       })}
                     </div>
@@ -1429,14 +1529,25 @@ export default function WeeklyDiaryPage() {
                             );
                           }
 
+                          const scheduled = getScheduledSlotDetails(timetable, day.dayName, slot);
                           return (
-                            <div
+                            <Link
                               key={slot.id}
-                              className="p-1.5 rounded-lg border border-dashed border-gray-200 bg-gray-50/50 flex items-center justify-between text-gray-400 text-[10px]"
+                              href={buildPrepareUrl(day.dateStr, slot.label, scheduled.className)}
+                              className="p-1.5 rounded-lg border border-dashed border-gray-200 bg-gray-50/50 flex items-center justify-between text-gray-400 text-[10px] hover:border-emerald-400 hover:bg-emerald-50/50 hover:text-emerald-800 transition cursor-pointer"
+                              title={`تحضير حصة ${day.dayName} (${slot.label})${scheduled.className ? ` لفوج ${scheduled.className}` : ""}`}
                             >
                               <span className="font-mono">{slot.label}</span>
-                              <span className="text-[9px] text-gray-400">فارغة</span>
-                            </div>
+                              <div className="flex items-center gap-1 text-emerald-700 font-bold">
+                                <Plus className="w-3 h-3" />
+                                <span>تحضير</span>
+                                {scheduled.className && (
+                                  <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1 rounded font-black">
+                                    {scheduled.className}
+                                  </span>
+                                )}
+                              </div>
+                            </Link>
                           );
                         })
                       )}

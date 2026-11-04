@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, useMemo, useRef, useCallback } from "react";
+import { useEffect, useState, useMemo, useRef, useCallback, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   BookOpen,
   Calendar,
@@ -211,8 +212,10 @@ function getDefaultStages(): DiaryStage[] {
   ];
 }
 
-export default function TeacherDiaryPage() {
+function TeacherDiaryContent() {
   const { profile } = useProfile();
+  const searchParams = useSearchParams();
+  const initialParamsHandled = useRef<string | null>(null);
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -404,9 +407,69 @@ export default function TeacherDiaryPage() {
     }
   };
 
+  // ─── استجابة لمعاملات الرابط (URL Query Params) للتحضير الفوري الموجه من المخطط الأسبوعي ───
+  useEffect(() => {
+    const pDate = searchParams?.get("date") || (typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("date") : null);
+    const pTime = searchParams?.get("time") || (typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("time") : null);
+    const pClass = searchParams?.get("class") || (typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("class") : null);
+
+    if (!pDate && !pTime && !pClass) return;
+
+    const signature = `${pDate || ""}_${pTime || ""}_${pClass || ""}`;
+    if (initialParamsHandled.current === signature) return;
+    initialParamsHandled.current = signature;
+
+    if (pDate) {
+      setFormDate(pDate);
+      setDateFilterTab("custom");
+      setCustomFilterDate(pDate);
+    }
+
+    if (pTime) {
+      const decodedTime = decodeURIComponent(pTime).trim();
+      if (STANDARD_PERIODS.includes(decodedTime)) {
+        setFormPeriodTime(decodedTime);
+        setIsCustomTimeInput(false);
+        setCustomTimeValue("");
+      } else {
+        setFormPeriodTime(decodedTime);
+        setIsCustomTimeInput(true);
+        setCustomTimeValue(decodedTime);
+      }
+    }
+
+    if (pClass) {
+      const decodedClass = decodeURIComponent(pClass).trim();
+      setFormClass(decodedClass);
+      setIsCustomClassInput(false);
+      setCustomClassName("");
+
+      // اقتراح رقم المذكرة والميدان تلقائياً للفوج
+      const nextNote = getNextNoteNumber(decodedClass, entries);
+      setFormNoteNumber(nextNote);
+      const prevFieldSection = getLastFieldAndSection(decodedClass, entries);
+      setFormField(prevFieldSection.field);
+      setFormSection(prevFieldSection.section);
+    }
+
+    // فتح استمارة التحضير فوراً والتمرير السلس إليها والتركيز على خانة عنوان الدرس
+    setIsFormExpanded(true);
+    setTimeout(() => {
+      formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      titleInputRef.current?.focus();
+    }, 250);
+
+    const dayName = pDate ? getArabicDayName(pDate) : "";
+    setMessage({
+      type: "ok",
+      text: `🎯 تم تحديد موعد الحصة للتحضير الفوري: ${dayName} ${pDate || ""} (الساعة: ${pTime || ""})${pClass ? ` لفوج ${pClass}` : ""} — جاهزة للتدوين الآن!`,
+    });
+    setTimeout(() => setMessage(null), 6000);
+  }, [searchParams, entries]);
+
   // تفريغ وتجهيز الاستمارة لحصة جديدة مع التعبئة الذكية للتوقيت والميدان
   const handleResetForm = useCallback(
-    (targetDate = tomorrowStr, targetClass?: string) => {
+    (targetDate = tomorrowStr, targetClass?: string, targetTime?: string) => {
       setEditingEntry(null);
       setFormDate(targetDate);
 
@@ -415,12 +478,24 @@ export default function TeacherDiaryPage() {
       setIsCustomClassInput(false);
       setCustomClassName("");
 
-      // 1. حساب التوقيت الذكي تلقائياً: يبدأ بعد انتهاء الحصة السابقة في نفس اليوم!
-      const existingToday = entries.filter((e) => e.date === targetDate);
-      const nextTime = getNextPeriodTime(existingToday);
-      setFormPeriodTime(nextTime);
-      setIsCustomTimeInput(false);
-      setCustomTimeValue("");
+      // 1. التوقيت: إذا حُدد توقيت، يُعتمد مباشرة، وإلا يُحسب تلقائياً بعد الحصة السابقة
+      if (targetTime) {
+        if (STANDARD_PERIODS.includes(targetTime)) {
+          setFormPeriodTime(targetTime);
+          setIsCustomTimeInput(false);
+          setCustomTimeValue("");
+        } else {
+          setFormPeriodTime(targetTime);
+          setIsCustomTimeInput(true);
+          setCustomTimeValue(targetTime);
+        }
+      } else {
+        const existingToday = entries.filter((e) => e.date === targetDate);
+        const nextTime = getNextPeriodTime(existingToday);
+        setFormPeriodTime(nextTime);
+        setIsCustomTimeInput(false);
+        setCustomTimeValue("");
+      }
 
       // 2. اقتراح رقم المذكرة تلقائياً
       const nextNote = getNextNoteNumber(cls, entries);
@@ -2518,5 +2593,22 @@ export default function TeacherDiaryPage() {
 
       </div>
     </div>
+  );
+}
+
+export default function TeacherDiaryPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#fafaf7] flex items-center justify-center p-8 text-center text-gray-500 font-sans" dir="rtl">
+          <div className="flex flex-col items-center gap-2">
+            <Loader2 className="w-6 h-6 animate-spin text-emerald-600" />
+            <p className="text-xs font-bold text-gray-600">جاري تحميل الدفتر اليومي...</p>
+          </div>
+        </div>
+      }
+    >
+      <TeacherDiaryContent />
+    </Suspense>
   );
 }
