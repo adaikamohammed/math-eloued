@@ -29,6 +29,7 @@ import {
   Coffee,
   LayoutGrid,
   TableProperties,
+  Check,
 } from "lucide-react";
 import { LoginRequired } from "@/components/LoginRequired";
 import { useProfile } from "@/lib/useProfile";
@@ -212,7 +213,27 @@ export default function WeeklyDiaryPage() {
   // التحكم بالأسبوع والتاريخ والوضع
   const [currentRefDate, setCurrentRefDate] = useState<Date>(() => new Date());
   const [selectedClassFilter, setSelectedClassFilter] = useState<string>("all");
-  const [viewMode, setViewMode] = useState<"table" | "columns">("table"); // الافتراضي هو جدول التوقيت الشبكي المقسم صباحاً ومساءً
+  const [viewMode, setViewMode] = useState<"table" | "columns">("table");
+
+  // تدوير شكل الجدول: الأيام كصفوف (أفقي) أو الأيام كأعمدة (عمودي)
+  const [orientation, setOrientation] = useState<"days-as-rows" | "days-as-cols">("days-as-rows");
+
+  // استرجاع تفضيل تدوير الجدول
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("jusoor_weekly_diary_orientation");
+      if (saved === "days-as-rows" || saved === "days-as-cols") {
+        setOrientation(saved);
+      }
+    } catch {}
+  }, []);
+
+  const handleSetOrientation = (newOrientation: "days-as-rows" | "days-as-cols") => {
+    setOrientation(newOrientation);
+    try {
+      localStorage.setItem("jusoor_weekly_diary_orientation", newOrientation);
+    } catch {}
+  };
 
   // حساب أيام الأسبوع الحالي
   const weekInfo = useMemo(() => getSchoolWeek(currentRefDate), [currentRefDate]);
@@ -286,7 +307,6 @@ export default function WeeklyDiaryPage() {
 
   // تحديد ساعات الفترة المسائية ديناميكياً بناءً على مدخلات الأستاذ وتوقيت مؤسسته
   const afternoonSlots = useMemo<SlotDefinition[]>(() => {
-    // فحص ما إذا كان الأستاذ يستخدم توقيت 13:30 أو 14:00 أو 13:00
     let uses1330 = false;
     let uses1300 = false;
 
@@ -313,7 +333,6 @@ export default function WeeklyDiaryPage() {
       ];
     }
 
-    // التوقيت الشائع في ولاية الوادي والجنوب والوطني (14:00 إلى 17:00)
     return [
       { id: "a1", start: "14:00", end: "15:00", label: "14:00 - 15:00", period: "afternoon" },
       { id: "a2", start: "15:00", end: "16:00", label: "15:00 - 16:00", period: "afternoon" },
@@ -588,7 +607,7 @@ export default function WeeklyDiaryPage() {
           </div>
         )}
 
-        {/* ─── لوحة التحكم العلوية: التنقل بين الأسابيع والفلاتر (يختفي في الطباعة) ─── */}
+        {/* ─── لوحة التحكم العلوية: التنقل بين الأسابيع والفلاتر وتدوير الجدول ─── */}
         <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 shadow-xs space-y-4 print:hidden">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
 
@@ -646,8 +665,8 @@ export default function WeeklyDiaryPage() {
             </div>
           </div>
 
-          {/* سطر نطاق التواريخ والفلترة حسب الفوج */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-gray-100 text-xs">
+          {/* سطر نطاق التواريخ والفلترة وتدوير الجدول */}
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pt-3 border-t border-gray-100 text-xs">
             {/* عرض نطاق الأسبوع مع منتقي التاريخ */}
             <div className="flex items-center gap-2.5 flex-wrap">
               <span className="font-bold text-gray-500">نطاق الأسبوع:</span>
@@ -666,29 +685,68 @@ export default function WeeklyDiaryPage() {
               </div>
             </div>
 
-            {/* فلتر الفوج */}
-            <div className="flex items-center gap-2">
-              <Filter className="w-3.5 h-3.5 text-gray-500" />
-              <span className="font-bold text-gray-600">الفوج التربوي:</span>
-              <select
-                value={selectedClassFilter}
-                onChange={(e) => setSelectedClassFilter(e.target.value)}
-                className="px-2.5 py-1 rounded-lg border border-gray-300 bg-white text-xs font-bold text-gray-800 focus:outline-emerald-500"
-              >
-                <option value="all">كل الأفواج ({allClasses.length})</option>
-                {allClasses.map((cls) => (
-                  <option key={cls} value={cls}>
-                    {cls}
-                  </option>
-                ))}
-              </select>
+            {/* تدوير شكل الجدول (أفقي / عمودي) + فلتر الفوج */}
+            <div className="flex items-center gap-3 flex-wrap">
+              {/* محدد تدوير الجدول: الأيام كصفوف أو الأيام كأعمدة */}
+              {viewMode === "table" && (
+                <div className="flex items-center gap-1.5">
+                  <span className="font-bold text-gray-600">شكل الجدول:</span>
+                  <div className="inline-flex p-0.5 bg-gray-100 rounded-xl border border-gray-200">
+                    <button
+                      type="button"
+                      onClick={() => handleSetOrientation("days-as-rows")}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-black transition flex items-center gap-1 cursor-pointer ${
+                        orientation === "days-as-rows"
+                          ? "bg-white text-emerald-800 shadow-xs border border-gray-200"
+                          : "text-gray-600 hover:text-gray-900"
+                      }`}
+                      title="الأيام كصفوف والساعات كأعمدة (الوضع الأفقي الشائع)"
+                    >
+                      <span>▤ الأيام صفوف</span>
+                      {orientation === "days-as-rows" && <Check className="w-3 h-3 text-emerald-600" />}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleSetOrientation("days-as-cols")}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-black transition flex items-center gap-1 cursor-pointer ${
+                        orientation === "days-as-cols"
+                          ? "bg-white text-emerald-800 shadow-xs border border-gray-200"
+                          : "text-gray-600 hover:text-gray-900"
+                      }`}
+                      title="الأيام كأعمدة والساعات كصفوف (قلب وتدوير الجدول)"
+                    >
+                      <span>▥ الأيام أعمدة</span>
+                      {orientation === "days-as-cols" && <Check className="w-3 h-3 text-emerald-600" />}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* فلتر الفوج */}
+              <div className="flex items-center gap-2">
+                <Filter className="w-3.5 h-3.5 text-gray-500" />
+                <span className="font-bold text-gray-600">الفوج:</span>
+                <select
+                  value={selectedClassFilter}
+                  onChange={(e) => setSelectedClassFilter(e.target.value)}
+                  className="px-2.5 py-1 rounded-lg border border-gray-300 bg-white text-xs font-bold text-gray-800 focus:outline-emerald-500"
+                >
+                  <option value="all">كل الأفواج ({allClasses.length})</option>
+                  {allClasses.map((cls) => (
+                    <option key={cls} value={cls}>
+                      {cls}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
         </div>
 
         {/* ═════════════════════════════════════════════════════════════════════
             النمط 1: شبكة الجدول الأسبوعي المقسم صباحاً ومساءً (مثل /admin/timetable)
-            وهو النمط المعروض افتراضياً والمعتمد في الطباعة الرسمية
+            يدعم التدوير في الاتجاهين: days-as-rows أو days-as-cols
         ═════════════════════════════════════════════════════════════════════ */}
         <div
           className={`bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden ${
@@ -696,233 +754,366 @@ export default function WeeklyDiaryPage() {
           }`}
         >
           <div className="overflow-x-auto relative scrollbar-thin">
-            <table className="w-full border-collapse text-right min-w-[950px] print:min-w-full print:border print:border-black">
-              <thead>
-                {/* سطر العناوين الكبرى: اليوم، الفترة الصباحية، الاستراحة، الفترة المسائية */}
-                <tr className="bg-gray-100 border-b border-gray-300 text-xs font-black text-gray-800 print:bg-gray-200 print:border-black print:text-black">
-                  <th
-                    rowSpan={2}
-                    className="py-3 px-3 w-32 border-l border-gray-300 bg-gray-200/90 text-center sticky right-0 z-20 shadow-xs print:static print:border-black print:bg-gray-200"
-                  >
-                    اليوم والتاريخ
-                  </th>
 
-                  {/* ترويسة الفترة الصباحية */}
-                  <th
-                    colSpan={MORNING_SLOTS.length}
-                    className="py-2 px-2 text-center bg-sky-50 text-sky-900 border-l border-gray-300 print:bg-gray-100 print:text-black print:border-black"
-                  >
-                    <div className="flex items-center justify-center gap-1.5">
-                      <Sun className="w-4 h-4 text-amber-500 print:hidden" />
-                      <span>الفترة الصباحية (08:00 — 12:00)</span>
-                    </div>
-                  </th>
-
-                  {/* ترويسة استراحة منتصف النهار */}
-                  <th
-                    rowSpan={2}
-                    className="py-2 px-2 w-16 bg-slate-100 text-slate-700 border-l border-gray-300 text-center font-black text-[11px] print:border-black print:bg-gray-200 print:text-black"
-                  >
-                    <div className="flex flex-col items-center justify-center gap-0.5">
-                      <Coffee className="w-4 h-4 text-amber-700 print:hidden" />
-                      <span>استراحة</span>
-                      <span className="text-[9px] text-gray-500 font-mono print:text-black">
-                        12:00 - 14:00
-                      </span>
-                    </div>
-                  </th>
-
-                  {/* ترويسة الفترة المسائية */}
-                  <th
-                    colSpan={afternoonSlots.length}
-                    className="py-2 px-2 text-center bg-amber-50 text-amber-900 border-l border-gray-300 print:bg-gray-100 print:text-black print:border-black"
-                  >
-                    <div className="flex items-center justify-center gap-1.5">
-                      <Moon className="w-4 h-4 text-indigo-500 print:hidden" />
-                      <span>الفترة المسائية ({afternoonSlots[0]?.start} — {afternoonSlots[afternoonSlots.length - 1]?.end})</span>
-                    </div>
-                  </th>
-                </tr>
-
-                {/* سطر الساعات التفصيلية لكل فترة */}
-                <tr className="bg-gray-50 border-b border-gray-300 text-[11px] font-bold text-gray-700 print:bg-gray-100 print:border-black print:text-black">
-                  {/* ساعات الصباح */}
-                  {MORNING_SLOTS.map((slot) => (
-                    <th key={slot.id} className="py-2 px-1 text-center border-l border-gray-300 print:border-black">
-                      <span className="block font-black text-gray-900 print:text-black">{slot.label}</span>
+            {/* ─── الوضع أ: الأيام كصفوف والساعات كأعمدة (days-as-rows) ─── */}
+            {orientation === "days-as-rows" ? (
+              <table className="w-full border-collapse text-right min-w-[950px] print:min-w-full print:border print:border-black">
+                <thead>
+                  {/* سطر العناوين الكبرى: اليوم، الفترة الصباحية، الاستراحة، الفترة المسائية */}
+                  <tr className="bg-gray-100 border-b border-gray-300 text-xs font-black text-gray-800 print:bg-gray-200 print:border-black print:text-black">
+                    <th
+                      rowSpan={2}
+                      className="py-3 px-3 w-32 border-l border-gray-300 bg-gray-200/90 text-center sticky right-0 z-20 shadow-xs print:static print:border-black print:bg-gray-200"
+                    >
+                      اليوم والتاريخ
                     </th>
-                  ))}
 
-                  {/* ساعات المساء */}
-                  {afternoonSlots.map((slot) => (
-                    <th key={slot.id} className="py-2 px-1 text-center border-l border-gray-300 last:border-l-0 print:border-black">
-                      <span className="block font-black text-gray-900 print:text-black">{slot.label}</span>
+                    {/* ترويسة الفترة الصباحية */}
+                    <th
+                      colSpan={MORNING_SLOTS.length}
+                      className="py-2 px-2 text-center bg-sky-50 text-sky-900 border-l border-gray-300 print:bg-gray-100 print:text-black print:border-black"
+                    >
+                      <div className="flex items-center justify-center gap-1.5">
+                        <Sun className="w-4 h-4 text-amber-500 print:hidden" />
+                        <span>الفترة الصباحية (08:00 — 12:00)</span>
+                      </div>
                     </th>
-                  ))}
-                </tr>
-              </thead>
 
-              <tbody>
-                {weekInfo.days.map((day) => {
-                  const dayEntries = weekEntriesByDate[day.dateStr] || [];
-                  const specialDay = weekSpecialDaysByDate[day.dateStr];
-                  const isTuesday = day.dayName === "الثلاثاء";
+                    {/* ترويسة استراحة منتصف النهار */}
+                    <th
+                      rowSpan={2}
+                      className="py-2 px-2 w-16 bg-slate-100 text-slate-700 border-l border-gray-300 text-center font-black text-[11px] print:border-black print:bg-gray-200 print:text-black"
+                    >
+                      <div className="flex flex-col items-center justify-center gap-0.5">
+                        <Coffee className="w-4 h-4 text-amber-700 print:hidden" />
+                        <span>استراحة</span>
+                        <span className="text-[9px] text-gray-500 font-mono print:text-black">
+                          12:00 - 14:00
+                        </span>
+                      </div>
+                    </th>
 
-                  // إذا كان اليوم عطلة أو يوماً خاصاً
-                  if (specialDay) {
+                    {/* ترويسة الفترة المسائية */}
+                    <th
+                      colSpan={afternoonSlots.length}
+                      className="py-2 px-2 text-center bg-amber-50 text-amber-900 border-l border-gray-300 print:bg-gray-100 print:text-black print:border-black"
+                    >
+                      <div className="flex items-center justify-center gap-1.5">
+                        <Moon className="w-4 h-4 text-indigo-500 print:hidden" />
+                        <span>الفترة المسائية ({afternoonSlots[0]?.start} — {afternoonSlots[afternoonSlots.length - 1]?.end})</span>
+                      </div>
+                    </th>
+                  </tr>
+
+                  {/* سطر الساعات التفصيلية لكل فترة */}
+                  <tr className="bg-gray-50 border-b border-gray-300 text-[11px] font-bold text-gray-700 print:bg-gray-100 print:border-black print:text-black">
+                    {/* ساعات الصباح */}
+                    {MORNING_SLOTS.map((slot) => (
+                      <th key={slot.id} className="py-2 px-1 text-center border-l border-gray-300 print:border-black">
+                        <span className="block font-black text-gray-900 print:text-black">{slot.label}</span>
+                      </th>
+                    ))}
+
+                    {/* ساعات المساء */}
+                    {afternoonSlots.map((slot) => (
+                      <th key={slot.id} className="py-2 px-1 text-center border-l border-gray-300 last:border-l-0 print:border-black">
+                        <span className="block font-black text-gray-900 print:text-black">{slot.label}</span>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {weekInfo.days.map((day) => {
+                    const dayEntries = weekEntriesByDate[day.dateStr] || [];
+                    const specialDay = weekSpecialDaysByDate[day.dateStr];
+                    const isTuesday = day.dayName === "الثلاثاء";
+
+                    // إذا كان اليوم عطلة أو يوماً خاصاً
+                    if (specialDay) {
+                      return (
+                        <tr key={day.dateStr} className="border-b border-gray-300 break-inside-avoid print:border-black">
+                          <td className="py-3 px-2 font-black text-xs text-gray-900 bg-gray-100 border-l border-gray-300 sticky right-0 z-10 shadow-xs text-center print:static print:border-black print:bg-gray-100">
+                            <div className="font-black text-sm">{day.dayName}</div>
+                            <div className="text-[10px] text-gray-600 font-bold">{formatArabicDate(day.dateStr)}</div>
+                          </td>
+                          <td
+                            colSpan={MORNING_SLOTS.length + 1 + afternoonSlots.length}
+                            className="p-4 text-center bg-amber-50/70 border-l border-gray-300 print:border-black"
+                          >
+                            <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-100 border border-amber-300 rounded-full text-xs font-black text-amber-950">
+                              <span>📌</span>
+                              <span>{specialDay.title}</span>
+                            </div>
+                            {specialDay.description && (
+                              <p className="text-xs text-amber-900 mt-1 max-w-xl mx-auto font-medium">
+                                {specialDay.description}
+                              </p>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    }
+
                     return (
-                      <tr key={day.dateStr} className="border-b border-gray-300 break-inside-avoid print:border-black">
-                        <td className="py-3 px-2 font-black text-xs text-gray-900 bg-gray-100 border-l border-gray-300 sticky right-0 z-10 shadow-xs text-center print:static print:border-black print:bg-gray-100">
-                          <div className="font-black text-sm">{day.dayName}</div>
-                          <div className="text-[10px] text-gray-600 font-bold">{formatArabicDate(day.dateStr)}</div>
-                        </td>
-                        <td
-                          colSpan={MORNING_SLOTS.length + 1 + afternoonSlots.length}
-                          className="p-4 text-center bg-amber-50/70 border-l border-gray-300 print:border-black"
-                        >
-                          <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-100 border border-amber-300 rounded-full text-xs font-black text-amber-950">
-                            <span>📌</span>
-                            <span>{specialDay.title}</span>
+                      <tr
+                        key={day.dateStr}
+                        className={`border-b border-gray-200 transition hover:bg-slate-50/40 break-inside-avoid print:border-black ${
+                          day.isToday ? "bg-emerald-50/20" : ""
+                        }`}
+                      >
+                        {/* عمود اسم اليوم والتاريخ */}
+                        <td className="py-3 px-2.5 font-black text-xs text-gray-900 bg-gray-50 border-l border-gray-300 sticky right-0 z-10 shadow-xs text-center print:static print:border-black print:bg-gray-100">
+                          <div className="flex items-center justify-center gap-1">
+                            <span className="font-black text-sm">{day.dayName}</span>
+                            {day.isToday && (
+                              <span className="text-[9px] bg-emerald-700 text-white px-1.5 py-0.2 rounded font-black print:hidden">
+                                اليوم
+                              </span>
+                            )}
                           </div>
-                          {specialDay.description && (
-                            <p className="text-xs text-amber-900 mt-1 max-w-xl mx-auto font-medium">
-                              {specialDay.description}
-                            </p>
-                          )}
+                          <div className="text-[10px] text-gray-600 font-bold mt-0.5">
+                            {formatArabicDate(day.dateStr)}
+                          </div>
                         </td>
+
+                        {/* ─── خانات الفترة الصباحية ─── */}
+                        {MORNING_SLOTS.map((slot) => {
+                          const entry = findEntryForSlot(dayEntries, slot);
+                          const color = entry ? getClassColor(entry.className) : null;
+
+                          return (
+                            <td
+                              key={slot.id}
+                              className="p-1.5 border-l border-gray-300 align-top min-w-[130px] max-w-[170px] print:border-black print:p-1"
+                            >
+                              {entry ? (
+                                <div
+                                  className={`p-2 rounded-xl border ${color?.bg} ${color?.border} shadow-2xs space-y-1 h-full flex flex-col justify-between print:p-1 print:border-black print:bg-white`}
+                                >
+                                  <div>
+                                    <div className="flex items-center justify-between gap-1 mb-1">
+                                      <span className={`text-[10px] font-black px-1.5 py-0.2 rounded ${color?.badge} print:border print:border-black print:text-black print:bg-gray-100`}>
+                                        {entry.className}
+                                      </span>
+                                      {entry.lessonNoteNumber && (
+                                        <span className="text-[9px] font-bold text-gray-700 bg-white/90 px-1 py-0.2 rounded border border-gray-300">
+                                          {entry.lessonNoteNumber}
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    {/* عنوان المورد فقط */}
+                                    <div className="text-right">
+                                      <h4 className="text-[11px] font-black text-gray-900 leading-tight print:text-black">
+                                        {entry.lessonTitle}
+                                      </h4>
+                                      {entry.section && (
+                                        <p className="text-[9px] text-gray-600 mt-0.5 line-clamp-1 font-medium print:text-gray-800">
+                                          {entry.section}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {entry.homework && (
+                                    <div className="pt-1 border-t border-dashed border-gray-300/80 text-[9px] text-gray-700 font-medium line-clamp-1 print:hidden">
+                                      <span className="font-bold">واجب:</span> {entry.homework}
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                /* خانة فارغة للحصص غير المسجلة */
+                                <div className="h-full min-h-[70px] rounded-xl border border-dashed border-gray-200 bg-gray-50/50 flex flex-col items-center justify-center p-2 text-gray-400 group hover:border-emerald-300 hover:bg-emerald-50/30 transition print:border-none print:bg-transparent">
+                                  <span className="text-[10px] font-medium text-gray-400 print:hidden group-hover:hidden">
+                                    — فارغة —
+                                  </span>
+                                  <Link
+                                    href={`/admin/diary`}
+                                    className="hidden group-hover:flex items-center gap-1 text-[10px] text-emerald-700 font-bold print:hidden"
+                                    title="تحضير حصة في الدفتر"
+                                  >
+                                    <Plus className="w-3 h-3" />
+                                    <span>تحضير</span>
+                                  </Link>
+                                </div>
+                              )}
+                            </td>
+                          );
+                        })}
+
+                        {/* ─── عمود استراحة منتصف النهار ─── */}
+                        <td className="p-1 border-l border-gray-300 bg-slate-100/80 text-center align-middle print:border-black print:bg-gray-100">
+                          <div className="text-[10px] font-bold text-slate-500 font-mono rotate-90 sm:rotate-0 print:rotate-0 print:text-black">
+                            استراحة
+                          </div>
+                        </td>
+
+                        {/* ─── خانات الفترة المسائية ─── */}
+                        {afternoonSlots.map((slot, sIdx) => {
+                          const entry = findEntryForSlot(dayEntries, slot);
+                          const color = entry ? getClassColor(entry.className) : null;
+
+                          // مساء الثلاثاء: راحة رسمية إن لم تسجل حصة
+                          if (isTuesday && !entry) {
+                            if (sIdx === 0) {
+                              return (
+                                <td
+                                  key={slot.id}
+                                  colSpan={afternoonSlots.length}
+                                  className="p-2 border-l border-gray-300 bg-slate-100/60 text-center align-middle print:border-black print:bg-gray-50"
+                                >
+                                  <div className="text-xs font-black text-slate-600 flex items-center justify-center gap-1.5">
+                                    <span>☕</span>
+                                    <span>راحة رسمية (مساء يوم الثلاثاء)</span>
+                                  </div>
+                                </td>
+                              );
+                            }
+                            return null;
+                          }
+
+                          return (
+                            <td
+                              key={slot.id}
+                              className="p-1.5 border-l border-gray-300 last:border-l-0 align-top min-w-[130px] max-w-[170px] print:border-black print:p-1"
+                            >
+                              {entry ? (
+                                <div
+                                  className={`p-2 rounded-xl border ${color?.bg} ${color?.border} shadow-2xs space-y-1 h-full flex flex-col justify-between print:p-1 print:border-black print:bg-white`}
+                                >
+                                  <div>
+                                    <div className="flex items-center justify-between gap-1 mb-1">
+                                      <span className={`text-[10px] font-black px-1.5 py-0.2 rounded ${color?.badge} print:border print:border-black print:text-black print:bg-gray-100`}>
+                                        {entry.className}
+                                      </span>
+                                      {entry.lessonNoteNumber && (
+                                        <span className="text-[9px] font-bold text-gray-700 bg-white/90 px-1 py-0.2 rounded border border-gray-300">
+                                          {entry.lessonNoteNumber}
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    {/* عنوان المورد فقط */}
+                                    <div className="text-right">
+                                      <h4 className="text-[11px] font-black text-gray-900 leading-tight print:text-black">
+                                        {entry.lessonTitle}
+                                      </h4>
+                                      {entry.section && (
+                                        <p className="text-[9px] text-gray-600 mt-0.5 line-clamp-1 font-medium print:text-gray-800">
+                                          {entry.section}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {entry.homework && (
+                                    <div className="pt-1 border-t border-dashed border-gray-300/80 text-[9px] text-gray-700 font-medium line-clamp-1 print:hidden">
+                                      <span className="font-bold">واجب:</span> {entry.homework}
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                /* خانة فارغة */
+                                <div className="h-full min-h-[70px] rounded-xl border border-dashed border-gray-200 bg-gray-50/50 flex flex-col items-center justify-center p-2 text-gray-400 group hover:border-emerald-300 hover:bg-emerald-50/30 transition print:border-none print:bg-transparent">
+                                  <span className="text-[10px] font-medium text-gray-400 print:hidden group-hover:hidden">
+                                    — فارغة —
+                                  </span>
+                                  <Link
+                                    href={`/admin/diary`}
+                                    className="hidden group-hover:flex items-center gap-1 text-[10px] text-emerald-700 font-bold print:hidden"
+                                    title="تحضير حصة في الدفتر"
+                                  >
+                                    <Plus className="w-3 h-3" />
+                                    <span>تحضير</span>
+                                  </Link>
+                                </div>
+                              )}
+                            </td>
+                          );
+                        })}
                       </tr>
                     );
-                  }
-
-                  return (
-                    <tr
-                      key={day.dateStr}
-                      className={`border-b border-gray-200 transition hover:bg-slate-50/40 break-inside-avoid print:border-black ${
-                        day.isToday ? "bg-emerald-50/20" : ""
-                      }`}
-                    >
-                      {/* عمود اسم اليوم والتاريخ */}
-                      <td className="py-3 px-2.5 font-black text-xs text-gray-900 bg-gray-50 border-l border-gray-300 sticky right-0 z-10 shadow-xs text-center print:static print:border-black print:bg-gray-100">
+                  })}
+                </tbody>
+              </table>
+            ) : (
+              /* ─── الوضع ب: الأيام كأعمدة والساعات كصفوف (days-as-cols - تدوير الجدول) ─── */
+              <table className="w-full border-collapse text-right min-w-[900px] print:min-w-full print:border print:border-black">
+                <thead>
+                  <tr className="bg-gray-100 border-b border-gray-300 text-xs font-black text-gray-800 print:bg-gray-200 print:border-black print:text-black">
+                    <th className="py-2.5 px-3 w-32 border-l border-gray-300 bg-gray-200/90 text-center sticky right-0 z-20 shadow-xs print:static print:border-black print:bg-gray-200">
+                      التوقيت / اليوم
+                    </th>
+                    {weekInfo.days.map((day) => (
+                      <th
+                        key={day.dateStr}
+                        className={`py-2 px-3 border-l border-gray-300 last:border-l-0 text-center font-black text-xs print:border-black ${
+                          day.isToday ? "bg-emerald-50 text-emerald-950" : "text-gray-900"
+                        }`}
+                      >
                         <div className="flex items-center justify-center gap-1">
-                          <span className="font-black text-sm">{day.dayName}</span>
+                          <span>{day.dayName}</span>
                           {day.isToday && (
                             <span className="text-[9px] bg-emerald-700 text-white px-1.5 py-0.2 rounded font-black print:hidden">
                               اليوم
                             </span>
                           )}
                         </div>
-                        <div className="text-[10px] text-gray-600 font-bold mt-0.5">
-                          {formatArabicDate(day.dateStr)}
+                        <div className="text-[10px] text-gray-500 font-bold mt-0.5">
+                          {day.dayNum} {day.monthName}
                         </div>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {/* ── 1. ساعات الفترة الصباحية ── */}
+                  {MORNING_SLOTS.map((slot, sIdx) => (
+                    <tr key={slot.id} className="border-b border-gray-200 hover:bg-slate-50/40 transition break-inside-avoid print:border-black">
+                      <td className="py-2 px-2 bg-gray-50 border-l border-gray-300 font-mono text-xs font-black text-gray-800 sticky right-0 z-10 shadow-xs text-center print:static print:border-black print:bg-gray-100">
+                        <div className="text-gray-900">{slot.label}</div>
+                        <span className="text-[10px] text-sky-700 font-bold font-sans print:hidden">الفترة الصباحية</span>
                       </td>
 
-                      {/* ─── خانات الفترة الصباحية ─── */}
-                      {MORNING_SLOTS.map((slot) => {
-                        const entry = findEntryForSlot(dayEntries, slot);
-                        const color = entry ? getClassColor(entry.className) : null;
+                      {weekInfo.days.map((day) => {
+                        const dayEntries = weekEntriesByDate[day.dateStr] || [];
+                        const specialDay = weekSpecialDaysByDate[day.dateStr];
 
-                        return (
-                          <td
-                            key={slot.id}
-                            className="p-1.5 border-l border-gray-300 align-top min-w-[130px] max-w-[170px] print:border-black print:p-1"
-                          >
-                            {entry ? (
-                              <div
-                                className={`p-2 rounded-xl border ${color?.bg} ${color?.border} shadow-2xs space-y-1 h-full flex flex-col justify-between print:p-1 print:border-black print:bg-white`}
-                              >
-                                <div>
-                                  {/* شارة الفوج ورقم المذكرة ونوع الحصة */}
-                                  <div className="flex items-center justify-between gap-1 mb-1">
-                                    <span className={`text-[10px] font-black px-1.5 py-0.2 rounded ${color?.badge} print:border print:border-black print:text-black print:bg-gray-100`}>
-                                      {entry.className}
-                                    </span>
-                                    {entry.lessonNoteNumber && (
-                                      <span className="text-[9px] font-bold text-gray-700 bg-white/90 px-1 py-0.2 rounded border border-gray-300">
-                                        {entry.lessonNoteNumber}
-                                      </span>
-                                    )}
-                                  </div>
-
-                                  {/* ── عنوان المورد فقط (المطلب الأساسي) ── */}
-                                  <div className="text-right">
-                                    <h4 className="text-[11px] font-black text-gray-900 leading-tight print:text-black">
-                                      {entry.lessonTitle}
-                                    </h4>
-                                    {entry.section && (
-                                      <p className="text-[9px] text-gray-600 mt-0.5 line-clamp-1 font-medium print:text-gray-800">
-                                        {entry.section}
-                                      </p>
-                                    )}
-                                  </div>
-                                </div>
-
-                                {/* الواجب إن وجد */}
-                                {entry.homework && (
-                                  <div className="pt-1 border-t border-dashed border-gray-300/80 text-[9px] text-gray-700 font-medium line-clamp-1 print:hidden">
-                                    <span className="font-bold">واجب:</span> {entry.homework}
-                                  </div>
-                                )}
-                              </div>
-                            ) : (
-                              /* ── خانة فارغة للحصص غير المسجلة (المطلب: وحصص التي لم اسجلها تكون فارغة) ── */
-                              <div className="h-full min-h-[70px] rounded-xl border border-dashed border-gray-200 bg-gray-50/50 flex flex-col items-center justify-center p-2 text-gray-400 group hover:border-emerald-300 hover:bg-emerald-50/30 transition print:border-none print:bg-transparent">
-                                <span className="text-[10px] font-medium text-gray-400 print:hidden group-hover:hidden">
-                                  — فارغة —
-                                </span>
-                                <Link
-                                  href={`/admin/diary`}
-                                  className="hidden group-hover:flex items-center gap-1 text-[10px] text-emerald-700 font-bold print:hidden"
-                                  title="تحضير حصة في الدفتر"
-                                >
-                                  <Plus className="w-3 h-3" />
-                                  <span>تحضير</span>
-                                </Link>
-                              </div>
-                            )}
-                          </td>
-                        );
-                      })}
-
-                      {/* ─── عمود استراحة منتصف النهار ─── */}
-                      <td className="p-1 border-l border-gray-300 bg-slate-100/80 text-center align-middle print:border-black print:bg-gray-100">
-                        <div className="text-[10px] font-bold text-slate-500 font-mono rotate-90 sm:rotate-0 print:rotate-0 print:text-black">
-                          استراحة
-                        </div>
-                      </td>
-
-                      {/* ─── خانات الفترة المسائية ─── */}
-                      {afternoonSlots.map((slot, sIdx) => {
-                        const entry = findEntryForSlot(dayEntries, slot);
-                        const color = entry ? getClassColor(entry.className) : null;
-
-                        // مساء الثلاثاء: راحة رسمية إن لم تسجل حصة
-                        if (isTuesday && !entry) {
+                        if (specialDay) {
                           if (sIdx === 0) {
                             return (
                               <td
-                                key={slot.id}
-                                colSpan={afternoonSlots.length}
-                                className="p-2 border-l border-gray-300 bg-slate-100/60 text-center align-middle print:border-black print:bg-gray-50"
+                                key={day.dateStr}
+                                rowSpan={MORNING_SLOTS.length}
+                                className="p-3 border-l border-gray-300 last:border-l-0 text-center bg-amber-50/80 align-middle print:border-black"
                               >
-                                <div className="text-xs font-black text-slate-600 flex items-center justify-center gap-1.5">
-                                  <span>☕</span>
-                                  <span>راحة رسمية (مساء يوم الثلاثاء)</span>
+                                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-100 border border-amber-300 rounded-full text-xs font-black text-amber-950">
+                                  <span>📌</span>
+                                  <span>{specialDay.title}</span>
                                 </div>
+                                {specialDay.description && (
+                                  <p className="text-[10px] text-amber-900 mt-1 line-clamp-3 font-medium">
+                                    {specialDay.description}
+                                  </p>
+                                )}
                               </td>
                             );
                           }
                           return null;
                         }
 
+                        const entry = findEntryForSlot(dayEntries, slot);
+                        const color = entry ? getClassColor(entry.className) : null;
+
                         return (
                           <td
-                            key={slot.id}
-                            className="p-1.5 border-l border-gray-300 last:border-l-0 align-top min-w-[130px] max-w-[170px] print:border-black print:p-1"
+                            key={day.dateStr}
+                            className="p-1.5 border-l border-gray-300 last:border-l-0 align-top min-w-[140px] max-w-[190px] print:border-black print:p-1"
                           >
                             {entry ? (
-                              <div
-                                className={`p-2 rounded-xl border ${color?.bg} ${color?.border} shadow-2xs space-y-1 h-full flex flex-col justify-between print:p-1 print:border-black print:bg-white`}
-                              >
+                              <div className={`p-2 rounded-xl border ${color?.bg} ${color?.border} shadow-2xs space-y-1 h-full flex flex-col justify-between print:p-1 print:border-black print:bg-white`}>
                                 <div>
                                   <div className="flex items-center justify-between gap-1 mb-1">
                                     <span className={`text-[10px] font-black px-1.5 py-0.2 rounded ${color?.badge} print:border print:border-black print:text-black print:bg-gray-100`}>
@@ -934,8 +1125,6 @@ export default function WeeklyDiaryPage() {
                                       </span>
                                     )}
                                   </div>
-
-                                  {/* عنوان المورد فقط */}
                                   <div className="text-right">
                                     <h4 className="text-[11px] font-black text-gray-900 leading-tight print:text-black">
                                       {entry.lessonTitle}
@@ -947,7 +1136,6 @@ export default function WeeklyDiaryPage() {
                                     )}
                                   </div>
                                 </div>
-
                                 {entry.homework && (
                                   <div className="pt-1 border-t border-dashed border-gray-300/80 text-[9px] text-gray-700 font-medium line-clamp-1 print:hidden">
                                     <span className="font-bold">واجب:</span> {entry.homework}
@@ -955,15 +1143,11 @@ export default function WeeklyDiaryPage() {
                                 )}
                               </div>
                             ) : (
-                              /* خانة فارغة */
-                              <div className="h-full min-h-[70px] rounded-xl border border-dashed border-gray-200 bg-gray-50/50 flex flex-col items-center justify-center p-2 text-gray-400 group hover:border-emerald-300 hover:bg-emerald-50/30 transition print:border-none print:bg-transparent">
-                                <span className="text-[10px] font-medium text-gray-400 print:hidden group-hover:hidden">
-                                  — فارغة —
-                                </span>
+                              <div className="h-full min-h-[65px] rounded-xl border border-dashed border-gray-200 bg-gray-50/50 flex flex-col items-center justify-center p-2 text-gray-400 group hover:border-emerald-300 hover:bg-emerald-50/30 transition print:border-none print:bg-transparent">
+                                <span className="text-[10px] font-medium text-gray-400 print:hidden group-hover:hidden">— فارغة —</span>
                                 <Link
-                                  href={`/admin/diary`}
+                                  href="/admin/diary"
                                   className="hidden group-hover:flex items-center gap-1 text-[10px] text-emerald-700 font-bold print:hidden"
-                                  title="تحضير حصة في الدفتر"
                                 >
                                   <Plus className="w-3 h-3" />
                                   <span>تحضير</span>
@@ -974,10 +1158,126 @@ export default function WeeklyDiaryPage() {
                         );
                       })}
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                  ))}
+
+                  {/* ── صف استراحة منتصف النهار ── */}
+                  <tr className="bg-slate-100 border-y-2 border-slate-300 print:border-black print:bg-gray-200">
+                    <td className="py-1.5 px-2 font-mono text-xs font-black text-slate-700 border-l border-slate-300 sticky right-0 z-10 bg-slate-200 shadow-xs text-center print:static print:border-black print:text-black">
+                      12:00 - 14:00
+                    </td>
+                    <td colSpan={weekInfo.days.length} className="py-2 text-center text-xs font-black text-slate-700 tracking-wider print:text-black">
+                      🍱 استراحة منتصف النهار / وجبة الغداء (12:00 — 14:00)
+                    </td>
+                  </tr>
+
+                  {/* ── 2. ساعات الفترة المسائية ── */}
+                  {afternoonSlots.map((slot, aIdx) => (
+                    <tr key={slot.id} className="border-b border-gray-200 hover:bg-slate-50/40 transition break-inside-avoid print:border-black">
+                      <td className="py-2 px-2 bg-gray-50 border-l border-gray-300 font-mono text-xs font-black text-gray-800 sticky right-0 z-10 shadow-xs text-center print:static print:border-black print:bg-gray-100">
+                        <div className="text-gray-900">{slot.label}</div>
+                        <span className="text-[10px] text-amber-700 font-bold font-sans print:hidden">الفترة المسائية</span>
+                      </td>
+
+                      {weekInfo.days.map((day) => {
+                        const dayEntries = weekEntriesByDate[day.dateStr] || [];
+                        const specialDay = weekSpecialDaysByDate[day.dateStr];
+                        const isTuesday = day.dayName === "الثلاثاء";
+
+                        if (specialDay) {
+                          if (aIdx === 0) {
+                            return (
+                              <td
+                                key={day.dateStr}
+                                rowSpan={afternoonSlots.length}
+                                className="p-3 border-l border-gray-300 last:border-l-0 text-center bg-amber-50/80 align-middle print:border-black"
+                              >
+                                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-100 border border-amber-300 rounded-full text-xs font-black text-amber-950">
+                                  <span>📌</span>
+                                  <span>{specialDay.title}</span>
+                                </div>
+                              </td>
+                            );
+                          }
+                          return null;
+                        }
+
+                        const entry = findEntryForSlot(dayEntries, slot);
+                        const color = entry ? getClassColor(entry.className) : null;
+
+                        // مساء الثلاثاء راحة رسمية إن لم تسجل حصة
+                        if (isTuesday && !entry) {
+                          if (aIdx === 0) {
+                            return (
+                              <td
+                                key={day.dateStr}
+                                rowSpan={afternoonSlots.length}
+                                className="p-2 border-l border-gray-300 last:border-l-0 bg-slate-100/70 text-center align-middle print:border-black print:bg-gray-50"
+                              >
+                                <div className="text-xs font-black text-slate-600 flex flex-col items-center justify-center gap-1">
+                                  <span>☕</span>
+                                  <span>راحة رسمية (مساء الثلاثاء)</span>
+                                </div>
+                              </td>
+                            );
+                          }
+                          return null;
+                        }
+
+                        return (
+                          <td
+                            key={day.dateStr}
+                            className="p-1.5 border-l border-gray-300 last:border-l-0 align-top min-w-[140px] max-w-[190px] print:border-black print:p-1"
+                          >
+                            {entry ? (
+                              <div className={`p-2 rounded-xl border ${color?.bg} ${color?.border} shadow-2xs space-y-1 h-full flex flex-col justify-between print:p-1 print:border-black print:bg-white`}>
+                                <div>
+                                  <div className="flex items-center justify-between gap-1 mb-1">
+                                    <span className={`text-[10px] font-black px-1.5 py-0.2 rounded ${color?.badge} print:border print:border-black print:text-black print:bg-gray-100`}>
+                                      {entry.className}
+                                    </span>
+                                    {entry.lessonNoteNumber && (
+                                      <span className="text-[9px] font-bold text-gray-700 bg-white/90 px-1 py-0.2 rounded border border-gray-300">
+                                        {entry.lessonNoteNumber}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-right">
+                                    <h4 className="text-[11px] font-black text-gray-900 leading-tight print:text-black">
+                                      {entry.lessonTitle}
+                                    </h4>
+                                    {entry.section && (
+                                      <p className="text-[9px] text-gray-600 mt-0.5 line-clamp-1 font-medium print:text-gray-800">
+                                        {entry.section}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                                {entry.homework && (
+                                  <div className="pt-1 border-t border-dashed border-gray-300/80 text-[9px] text-gray-700 font-medium line-clamp-1 print:hidden">
+                                    <span className="font-bold">واجب:</span> {entry.homework}
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="h-full min-h-[65px] rounded-xl border border-dashed border-gray-200 bg-gray-50/50 flex flex-col items-center justify-center p-2 text-gray-400 group hover:border-emerald-300 hover:bg-emerald-50/30 transition print:border-none print:bg-transparent">
+                                <span className="text-[10px] font-medium text-gray-400 print:hidden group-hover:hidden">— فارغة —</span>
+                                <Link
+                                  href="/admin/diary"
+                                  className="hidden group-hover:flex items-center gap-1 text-[10px] text-emerald-700 font-bold print:hidden"
+                                >
+                                  <Plus className="w-3 h-3" />
+                                  <span>تحضير</span>
+                                </Link>
+                              </div>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
 
