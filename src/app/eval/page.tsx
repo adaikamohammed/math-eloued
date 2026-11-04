@@ -18,6 +18,8 @@ import {
   OFFICIAL_MINISTERIAL_CRITERIA,
   EQUAL_FOUR_CRITERIA,
 } from "@/lib/types";
+import { checkTeacherSession, getPersistedTeacherSession } from "@/lib/offlineAuth";
+import { saveTeacherOfflineData, setupAutoSync } from "@/lib/offlineStorage";
 import {
   printGradebookReport,
   downloadGradebookPDF,
@@ -132,19 +134,21 @@ export default function GradebookEvaluationPage() {
   // مرجع للتركيز بالأسهم ولوحة المفاتيح
   const tableRef = useRef<HTMLTableElement | null>(null);
 
-  // التحقق من الحساب
+  // التحقق من الحساب مع دعم وضع عدم الاتصال (Offline-First)
   const checkAuth = useCallback(async () => {
-    try {
-      const res = await fetch("/api/auth");
-      const data = await res.json();
-      setAuthenticated(Boolean(data.authenticated));
-    } catch {
-      setAuthenticated(false);
-    }
+    const res = await checkTeacherSession();
+    setAuthenticated(res.authenticated);
   }, []);
 
   useEffect(() => {
     checkAuth();
+    const session = getPersistedTeacherSession();
+    if (session?.id) {
+      const cleanup = setupAutoSync(session.id, () => {
+        showToast("ok", "🟢 تم استعادة الاتصال ومزامنة سجل التقويم تلقائياً مع السحابة!");
+      });
+      return cleanup;
+    }
   }, [checkAuth]);
 
   // إشعار سريع للمستخدم
@@ -425,8 +429,23 @@ export default function GradebookEvaluationPage() {
   // حفظ التغييرات سحابياً
   const handleSaveToServer = async () => {
     setSaving(true);
+    const allRecords = Object.values(gradeRecords);
+    const teacherSession = getPersistedTeacherSession();
+    if (teacherSession?.id) {
+      saveTeacherOfflineData(
+        teacherSession.id,
+        {
+          gradebookRecords: allRecords,
+          continuousEvalConfig: { [selectedClass]: rubricConfig },
+        },
+        true
+      );
+    }
+
     try {
-      const allRecords = Object.values(gradeRecords);
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        throw new Error("offline");
+      }
       const res = await fetch("/api/lessons", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -438,12 +457,12 @@ export default function GradebookEvaluationPage() {
 
       if (res.ok) {
         setHasUnsavedChanges(false);
-        showToast("ok", "✅ تم حفظ سجل التنقيط والتقويم المستمر سحابياً بنجاح!");
+        showToast("ok", "✅ تم حفظ سجل التنقيط والتقويم المستمر سحابياً ومحلياً بنجاح!");
       } else {
-        showToast("err", "تعذر الحفظ في السحابة، تم الحفظ محلياً في جهازك بأمان.");
+        showToast("ok", "⚡ تم الحفظ محلياً في جهازك بأمان (أوفلاين) وسيُرفع تلقائياً عند عودة النت.");
       }
     } catch {
-      showToast("err", "أنت الآن في وضع الأوفلاين، تم الحفظ محلياً في متصفحك.");
+      showToast("ok", "⚡ تم الحفظ محلياً في جهازك بأمان (وضع أوفلاين) وسيتم الرفع تلقائياً عند عودة النت.");
     } finally {
       setSaving(false);
     }

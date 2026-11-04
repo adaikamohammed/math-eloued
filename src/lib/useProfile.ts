@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "./supabase";
 import type { UserProfile } from "./types";
+import { getPersistedTeacherSession, savePersistedTeacherSession, type TeacherSession } from "./offlineAuth";
 
 // الملف الشخصي للمستخدم المسجل (أستاذ / مفتش / مشرف) من جلسة المتصفح أو الكوكيز
 export function useProfile() {
@@ -18,6 +19,7 @@ export function useProfile() {
       if (res.ok) {
         const d = await res.json();
         if (d?.authenticated && d.profile) {
+          savePersistedTeacherSession(d.profile as TeacherSession);
           setProfile(d.profile as UserProfile);
           setLoading(false);
           return;
@@ -48,6 +50,14 @@ export function useProfile() {
       }
     } catch {
       // خطأ في الجلب
+    }
+
+    // 3. فحص الجلسة المحفوظة في وضع عدم الاتصال (Offline Fallback)
+    const persisted = getPersistedTeacherSession();
+    if (persisted) {
+      setProfile(persisted as unknown as UserProfile);
+      setLoading(false);
+      return;
     }
 
     setProfile(null);

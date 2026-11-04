@@ -11,7 +11,7 @@ const CODE_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
  * لا يمكن لتلميذ الأولى متوسط تخمين رمز الثانية أو الثالثة متوسط بتغيير رقم فقط
  */
 export function generateLevelToken(baseCode: string, level: number): string {
-  const cleanCode = (baseCode || "").trim().toUpperCase();
+  const cleanCode = (baseCode || "").trim().toUpperCase().replace(/\s*[-_/\s]\s*/g, "-");
   const input = `${cleanCode}:${level}:${PLATFORM_LEVEL_SALT}`;
   const hash = createHash("sha256").update(input).digest();
 
@@ -26,10 +26,10 @@ export function generateLevelToken(baseCode: string, level: number): string {
 
 /**
  * إرجاع الرمز الكامل للمستوى
- * مثال: getTeacherLevelCode("MTH-704", 1) => "MTH-704-K7R"
+ * مثال: getTeacherLevelCode("MTH-704", 1) => "MTH-704-8EX"
  */
 export function getTeacherLevelCode(baseTeacherCode: string, level: number): string {
-  const clean = (baseTeacherCode || "").trim().toUpperCase();
+  const clean = (baseTeacherCode || "").trim().toUpperCase().replace(/\s*[-_/\s]\s*/g, "-");
   const token = generateLevelToken(clean, level);
   return `${clean}-${token}`;
 }
@@ -44,17 +44,20 @@ export interface ParsedTeacherCode {
 /**
  * فك تشفير وتحليل أي كود يدخله الولي أو التلميذ:
  * 1. الكود العام: MTH-704 => { baseCode: "MTH-704", level: null, isLockedToLevel: false }
- * 2. كود المستوى المشفر: MTH-704-K7R => { baseCode: "MTH-704", level: 1, isLockedToLevel: true }
+ * 2. كود المستوى المشفر: MTH-704-8EX => { baseCode: "MTH-704", level: 1, isLockedToLevel: true }
  * 3. التوافق العكسي للأكواد القديمة: MTH-704-1 => { baseCode: "MTH-704", level: 1, isLockedToLevel: true }
  */
 export function parseTeacherInputCode(input: string): ParsedTeacherCode {
-  const clean = (input || "").trim().toUpperCase();
-  if (!clean) {
+  const raw = (input || "").trim().toUpperCase();
+  if (!raw) {
     return { baseCode: "", level: null, isLockedToLevel: false, rawInput: input };
   }
 
+  // توحيد المسافات والشرطات تلقائياً (مثلاً: MTH - 704 - 8EX يصبح MTH-704-8EX)
+  const clean = raw.replace(/\s*[-_/\s]\s*/g, "-");
+
   // 1. فحص كود المستوى المشفر: [BASE]-[TOKEN_3_CHARS]
-  // مثل MTH-704-K7R أو ARB-102-X9P
+  // مثل MTH-704-8EX أو ARB-102-X9P
   const secureMatch = clean.match(/^([A-Z]{2,5}[-_]?\d{2,5})[-_]([A-Z0-9]{3})$/);
   if (secureMatch) {
     const base = secureMatch[1];

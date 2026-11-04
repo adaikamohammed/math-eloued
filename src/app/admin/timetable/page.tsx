@@ -30,6 +30,13 @@ import {
   ArrowUpDown,
 } from "lucide-react";
 import { LoginRequired } from "@/components/LoginRequired";
+import { checkTeacherSession, getPersistedTeacherSession } from "@/lib/offlineAuth";
+import {
+  getTeacherOfflineData,
+  saveTeacherOfflineData,
+  cacheServerDataLocally,
+  setupAutoSync,
+} from "@/lib/offlineStorage";
 import {
   TimetableSlot,
   TeacherTimetable,
@@ -322,75 +329,97 @@ export default function TeacherTimetablePage() {
     }
 
     setLoading(true);
-    Promise.all([
-      fetch("/api/auth")
-        .then((res) => res.json())
-        .catch(() => ({ authenticated: false })),
+    checkTeacherSession().then((auth) => {
+      setAuthenticated(auth.authenticated);
+      const teacherId = auth.profile?.id;
+      if (teacherId) {
+        setupAutoSync(teacherId, () => {
+          setMessage({ type: "ok", text: "🟢 تم استعادة الاتصال ومزامنة جدول التوقيت تلقائياً مع السحابة!" });
+        });
+      }
+
       fetch("/api/lessons")
         .then((res) => (res.ok ? res.json() : null))
-        .catch(() => null),
-    ])
-      .then(([authData, data]: [any, LessonsData | null]) => {
-        setAuthenticated(authData?.authenticated === true);
-
-        if (data) {
-          if (Array.isArray(data.studentRoster)) {
-            setStudentRoster(data.studentRoster);
+        .then((data: LessonsData | null) => {
+          if (data && teacherId) {
+            cacheServerDataLocally(teacherId, data);
           }
+          const active = data || (teacherId ? getTeacherOfflineData(teacherId) : null);
+          if (active) {
+            if (Array.isArray(active.studentRoster)) {
+              setStudentRoster(active.studentRoster);
+            }
 
-          let candidateClasses: string[] = [];
-          if (Array.isArray(data.customClasses) && data.customClasses.length > 0) {
-            candidateClasses = data.customClasses;
-          } else if (Array.isArray(data.studentRoster) && data.studentRoster.length > 0) {
-            candidateClasses = Array.from(
-              new Set(data.studentRoster.map((s) => s.className).filter(Boolean))
-            );
-          }
+            let candidateClasses: string[] = [];
+            if (Array.isArray(active.customClasses) && active.customClasses.length > 0) {
+              candidateClasses = active.customClasses;
+            } else if (Array.isArray(active.studentRoster) && active.studentRoster.length > 0) {
+              candidateClasses = Array.from(
+                new Set(active.studentRoster.map((s) => s.className).filter(Boolean))
+              );
+            }
 
-          if (candidateClasses.length > 0) {
-            const sorted = sortClasses(candidateClasses);
-            setCustomClasses(sorted);
-            setSelectedClass((prev) => (sorted.includes(prev) ? prev : sorted[0]));
-            if (typeof window !== "undefined") {
-              LOCAL_STORAGE_CLASSES_KEYS.forEach((k) => {
+            if (candidateClasses.length > 0) {
+              const sorted = sortClasses(candidateClasses);
+              setCustomClasses(sorted);
+              setSelectedClass((prev) => (sorted.includes(prev) ? prev : sorted[0]));
+              if (typeof window !== "undefined") {
+                LOCAL_STORAGE_CLASSES_KEYS.forEach((k) => {
+                  try {
+                    localStorage.setItem(k, JSON.stringify(sorted));
+                  } catch {}
+                });
+              }
+            }
+
+            if (active.timetable && Array.isArray(active.timetable.slots)) {
+              setSlots(active.timetable.slots);
+              setOfficialImagePath(active.timetable.image_path || null);
+              if (active.timetable.settings) {
+                const merged = { ...DEFAULT_SETTINGS, ...active.timetable.settings };
+                setSettings(merged);
+                setPrintFormData({
+                  schoolName: merged.schoolName || "",
+                  teacherName: merged.teacherName || "",
+                  inspectorName: merged.inspectorName || "",
+                  principalName: merged.principalName || "",
+                  wilayaName: merged.wilayaName || "الوادي",
+                  subjectName: merged.subjectName || "الرياضيات",
+                });
+              }
+
+              if (typeof window !== "undefined") {
                 try {
-                  localStorage.setItem(k, JSON.stringify(sorted));
+                  localStorage.setItem(LOCAL_STORAGE_TIMETABLE_KEY, JSON.stringify(active.timetable));
                 } catch {}
-              });
+              }
             }
           }
-
-          if (data.timetable && Array.isArray(data.timetable.slots)) {
-            setSlots(data.timetable.slots);
-            setOfficialImagePath(data.timetable.image_path || null);
-            if (data.timetable.settings) {
-              const merged = { ...DEFAULT_SETTINGS, ...data.timetable.settings };
-              setSettings(merged);
-              setPrintFormData({
-                schoolName: merged.schoolName || "",
-                teacherName: merged.teacherName || "",
-                inspectorName: merged.inspectorName || "",
-                principalName: merged.principalName || "",
-                wilayaName: merged.wilayaName || "الوادي",
-                subjectName: merged.subjectName || "الرياضيات",
-              });
-            }
-
-            if (typeof window !== "undefined") {
-              try {
-                localStorage.setItem(LOCAL_STORAGE_TIMETABLE_KEY, JSON.stringify(data.timetable));
-              } catch {}
+        })
+        .catch(() => {
+          if (teacherId) {
+            const offline = getTeacherOfflineData(teacherId);
+            if (offline) {
+              if (Array.isArray(offline.studentRoster)) setStudentRoster(offline.studentRoster);
+              if (Array.isArray(offline.customClasses) && offline.customClasses.length > 0) {
+                const sorted = sortClasses(offline.customClasses);
+                setCustomClasses(sorted);
+                setSelectedClass((prev) => (sorted.includes(prev) ? prev : sorted[0]));
+              }
+              if (offline.timetable && Array.isArray(offline.timetable.slots)) {
+                setSlots(offline.timetable.slots);
+                setOfficialImagePath(offline.timetable.image_path || null);
+                if (offline.timetable.settings) {
+                  setSettings({ ...DEFAULT_SETTINGS, ...offline.timetable.settings });
+                }
+              }
             }
           }
-        }
-      })
-      .catch((err) => {
-        console.error(err);
-        setMessage({ type: "err", text: "حدث خطأ أثناء تحميل جدول التوقيت" });
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+        })
+        .finally(() => {
+          setLoading(false);
+        });
+    });
   }, []);
 
   // قفل تمرير الصفحة أثناء فتح النوافذ المنبثقة
@@ -436,7 +465,22 @@ export default function TeacherTimetablePage() {
       } catch {}
     }
 
+    const session = getPersistedTeacherSession();
+    if (session?.id) {
+      saveTeacherOfflineData(
+        session.id,
+        {
+          timetable: payload,
+          customClasses: currentClasses,
+        },
+        true
+      );
+    }
+
     try {
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        throw new Error("offline");
+      }
       const res = await fetch("/api/lessons", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -451,9 +495,12 @@ export default function TeacherTimetablePage() {
       }
       setMessage({ type: "ok", text: "تم تحديث جدول التوقيت الأسبوعي بنجاح 🗓️✨" });
       setTimeout(() => setMessage(null), 3000);
-    } catch (err: any) {
-      console.error(err);
-      setMessage({ type: "err", text: err.message || "فشل حفظ جدول التوقيت" });
+    } catch {
+      setMessage({
+        type: "ok",
+        text: "⚡ تم حفظ جدول التوقيت محلياً في جهازك بأمان وسيُرفع تلقائياً عند عودة النت 🗓️✨",
+      });
+      setTimeout(() => setMessage(null), 4000);
     } finally {
       setSaving(false);
     }

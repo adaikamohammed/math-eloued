@@ -31,6 +31,13 @@ import {
 } from "lucide-react";
 import { LoginRequired } from "@/components/LoginRequired";
 import { PageExplainer } from "@/components/PageExplainer";
+import { checkTeacherSession, getPersistedTeacherSession } from "@/lib/offlineAuth";
+import {
+  getTeacherOfflineData,
+  saveTeacherOfflineData,
+  cacheServerDataLocally,
+  setupAutoSync,
+} from "@/lib/offlineStorage";
 import { StudentRosterItem, LessonsData, sortClasses } from "@/lib/types";
 
 const LOCAL_STORAGE_CLASSES_KEY = "last_active_classes";
@@ -143,66 +150,80 @@ export default function StudentsManagementPage() {
 
     // جلب متوازٍ وسريع للمصادقة وبيانات الأستاذ
     setLoading(true);
-    Promise.all([
-      fetch("/api/auth")
-        .then((res) => res.json())
-        .catch(() => ({ authenticated: false })),
+    checkTeacherSession().then((auth) => {
+      setAuthenticated(auth.authenticated);
+      const teacherId = auth.profile?.id;
+      if (teacherId) {
+        setupAutoSync(teacherId, () => {
+          setMessage({ type: "ok", text: "🟢 تم استعادة الاتصال ومزامنة قائمة التلاميذ تلقائياً مع السحابة!" });
+        });
+      }
+
       fetch("/api/lessons")
         .then((res) => (res.ok ? res.json() : null))
-        .catch(() => null),
-    ])
-      .then(([authData, lessonsData]: [any, LessonsData | null]) => {
-        setAuthenticated(authData?.authenticated === true);
-
-        if (lessonsData) {
-          const teacherClasses = sortClasses(
-            Array.isArray(lessonsData.customClasses) && lessonsData.customClasses.length > 0
-              ? lessonsData.customClasses
-              : cachedCls
-          );
-
-          setCustomClasses(teacherClasses);
-
-          let loadedStudents: StudentRosterItem[] = [];
-          if (Array.isArray(lessonsData.studentRoster)) {
-            loadedStudents = lessonsData.studentRoster;
-          } else if (Array.isArray(lessonsData.evaluations) && lessonsData.evaluations.length > 0) {
-            loadedStudents = lessonsData.evaluations.map((ev) => ({
-              id: ev.id,
-              studentName: ev.studentName,
-              className: ev.className,
-              groupName: ev.groupName || "فوج 1",
-              createdAt: ev.updatedAt || new Date().toISOString(),
-            }));
+        .then((lessonsData: LessonsData | null) => {
+          if (lessonsData && teacherId) {
+            cacheServerDataLocally(teacherId, lessonsData);
           }
-          setStudents(loadedStudents);
+          const active = lessonsData || (teacherId ? getTeacherOfflineData(teacherId) : null);
+          if (active) {
+            const teacherClasses = sortClasses(
+              Array.isArray(active.customClasses) && active.customClasses.length > 0
+                ? active.customClasses
+                : cachedCls
+            );
 
-          // تحديث التخزين المحلي للاستجابة الفورية
-          if (typeof window !== "undefined") {
-            try {
-              localStorage.setItem(LOCAL_STORAGE_STUDENTS_KEY, JSON.stringify(loadedStudents));
-              if (teacherClasses.length > 0) {
-                localStorage.setItem(LOCAL_STORAGE_CLASSES_KEY, JSON.stringify(teacherClasses));
+            setCustomClasses(teacherClasses);
+
+            let loadedStudents: StudentRosterItem[] = [];
+            if (Array.isArray(active.studentRoster)) {
+              loadedStudents = active.studentRoster;
+            } else if (Array.isArray(active.evaluations) && active.evaluations.length > 0) {
+              loadedStudents = active.evaluations.map((ev) => ({
+                id: ev.id,
+                studentName: ev.studentName,
+                className: ev.className,
+                groupName: ev.groupName || "فوج 1",
+                createdAt: ev.updatedAt || new Date().toISOString(),
+              }));
+            }
+            setStudents(loadedStudents);
+
+            if (typeof window !== "undefined") {
+              try {
+                localStorage.setItem(LOCAL_STORAGE_STUDENTS_KEY, JSON.stringify(loadedStudents));
+                if (teacherClasses.length > 0) {
+                  localStorage.setItem(LOCAL_STORAGE_CLASSES_KEY, JSON.stringify(teacherClasses));
+                }
+              } catch (e) {
+                console.warn("Storage save error", e);
               }
-            } catch (e) {
-              console.warn("Storage save error", e);
+            }
+
+            setSelectedClass((curr) => {
+              if (curr && curr !== "all" && teacherClasses.includes(curr)) return curr;
+              if (activeParam && teacherClasses.includes(activeParam)) return activeParam;
+              return teacherClasses[0] || "all";
+            });
+          }
+        })
+        .catch(() => {
+          if (teacherId) {
+            const offline = getTeacherOfflineData(teacherId);
+            if (offline) {
+              if (Array.isArray(offline.customClasses) && offline.customClasses.length > 0) {
+                setCustomClasses(sortClasses(offline.customClasses));
+              }
+              if (Array.isArray(offline.studentRoster)) {
+                setStudents(offline.studentRoster);
+              }
             }
           }
-
-          // ضبط الفوج النشط
-          setSelectedClass((curr) => {
-            if (curr && curr !== "all" && teacherClasses.includes(curr)) return curr;
-            if (activeParam && teacherClasses.includes(activeParam)) return activeParam;
-            return teacherClasses[0] || "all";
-          });
-        }
-      })
-      .catch((err) => {
-        console.error("Data fetch error", err);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+        })
+        .finally(() => {
+          setLoading(false);
+        });
+    });
   }, []);
 
   // تلاميذ الفوج النشط المحدد
@@ -268,7 +289,22 @@ export default function StudentsManagementPage() {
       } catch {}
     }
 
+    const session = getPersistedTeacherSession();
+    if (session?.id) {
+      saveTeacherOfflineData(
+        session.id,
+        {
+          studentRoster: newStudents,
+          customClasses: newClasses,
+        },
+        true
+      );
+    }
+
     try {
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        throw new Error("offline");
+      }
       const res = await fetch("/api/lessons", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -280,9 +316,12 @@ export default function StudentsManagementPage() {
       if (!res.ok) throw new Error("فشل حفظ التعديلات");
       setMessage({ type: "ok", text: "تم حفظ التعديلات بنجاح ✨" });
       setTimeout(() => setMessage(null), 3500);
-    } catch (err: any) {
-      console.error(err);
-      setMessage({ type: "err", text: err.message || "حدث خطأ أثناء الحفظ" });
+    } catch {
+      setMessage({
+        type: "ok",
+        text: "⚡ تم حفظ قائمة التلاميذ محلياً في جهازك بأمان وسيُرفع تلقائياً عند عودة النت 👥✨",
+      });
+      setTimeout(() => setMessage(null), 4000);
     } finally {
       setSaving(false);
     }

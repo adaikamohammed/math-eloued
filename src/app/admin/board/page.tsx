@@ -33,6 +33,13 @@ import {
 } from "lucide-react";
 import { LoginRequired } from "@/components/LoginRequired";
 import { PageExplainer } from "@/components/PageExplainer";
+import { checkTeacherSession, getPersistedTeacherSession } from "@/lib/offlineAuth";
+import {
+  getTeacherOfflineData,
+  saveTeacherOfflineData,
+  cacheServerDataLocally,
+  setupAutoSync,
+} from "@/lib/offlineStorage";
 import {
   Lesson,
   LessonImage,
@@ -152,21 +159,19 @@ export default function AdminBoardPage() {
       } catch {}
     }
 
-    fetch("/api/auth")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (d?.authenticated) {
-          setAuthenticated(true);
-          const p = d.profile || d.user;
-          setProfile(p);
-          if (p?.levels_taught?.length > 0) {
-            setFormLevel(p.levels_taught[0]);
-          }
-        } else {
-          setAuthenticated(false);
+    checkTeacherSession().then((d) => {
+      setAuthenticated(d.authenticated);
+      if (d.profile) {
+        const p = d.profile;
+        setProfile(p);
+        if (p?.levels_taught && p.levels_taught.length > 0) {
+          setFormLevel(p.levels_taught[0]);
         }
-      })
-      .catch(() => setAuthenticated(false));
+        setupAutoSync(p.id, () => {
+          showToast("ok", "🟢 تم استعادة الاتصال ومزامنة السبورة تلقائياً مع السحابة!");
+        });
+      }
+    });
 
     loadLessons();
   }, []);
@@ -176,7 +181,7 @@ export default function AdminBoardPage() {
     setTimeout(() => setToast(null), 3500);
   };
 
-  // تحميل الدروس والكراريس والتسميات من الخادم
+  // تحميل الدروس والكراريس والتسميات من الخادم مع كاش محلي
   const loadLessons = useCallback(async () => {
     try {
       setLoading(true);
@@ -184,6 +189,11 @@ export default function AdminBoardPage() {
       if (!res.ok) throw new Error("تعذر جلب الدروس");
       const data: LessonsData = await res.json();
       setLessons(data.lessons || []);
+
+      const session = getPersistedTeacherSession();
+      if (session?.id) {
+        cacheServerDataLocally(session.id, data);
+      }
 
       if (Array.isArray(data.customNotebooks) && data.customNotebooks.length > 0) {
         setNotebooks(data.customNotebooks);
@@ -195,9 +205,19 @@ export default function AdminBoardPage() {
         setTempNomenclature(data.boardNomenclature);
         localStorage.setItem(LOCAL_STORAGE_NOMENCLATURE_KEY, JSON.stringify(data.boardNomenclature));
       }
-    } catch (err: any) {
-      console.error(err);
-      showToast("err", err.message || "حدث خطأ أثناء تحميل الدروس");
+    } catch {
+      const session = getPersistedTeacherSession();
+      if (session?.id) {
+        const offline = getTeacherOfflineData(session.id);
+        if (offline) {
+          setLessons(offline.lessons || []);
+          if (Array.isArray(offline.customNotebooks)) setNotebooks(offline.customNotebooks);
+          if (offline.boardNomenclature) {
+            setNomenclature(offline.boardNomenclature);
+            setTempNomenclature(offline.boardNomenclature);
+          }
+        }
+      }
     } finally {
       setLoading(false);
     }

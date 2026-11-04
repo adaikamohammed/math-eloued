@@ -23,6 +23,8 @@ import {
   LessonsData,
   sortClasses,
 } from "@/lib/types";
+import { checkTeacherSession, getPersistedTeacherSession } from "@/lib/offlineAuth";
+import { saveTeacherOfflineData, setupAutoSync } from "@/lib/offlineStorage";
 
 // تعريف بنية العمود المرن في التقويم المستمر
 export interface ContinuousColumn {
@@ -107,16 +109,14 @@ export default function ContinuousEvalMobilePage() {
   }, []);
 
   useEffect(() => {
-    fetch("/api/auth")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data && data.authenticated !== undefined) {
-          setAuthenticated(Boolean(data.authenticated));
-        } else {
-          setAuthenticated(true);
-        }
-      })
-      .catch(() => setAuthenticated(true));
+    checkTeacherSession().then((res) => {
+      setAuthenticated(res.authenticated);
+    });
+    const session = getPersistedTeacherSession();
+    if (session?.id) {
+      const cleanup = setupAutoSync(session.id);
+      return cleanup;
+    }
   }, []);
 
   // الفوج والفصل
@@ -365,8 +365,18 @@ export default function ContinuousEvalMobilePage() {
       } catch {}
 
       saveTimeoutRef.current = setTimeout(async () => {
+        const recordsArray = Object.values(newRecords);
+        const session = getPersistedTeacherSession();
+        if (session?.id) {
+          saveTeacherOfflineData(session.id, { gradebookRecords: recordsArray }, true);
+        }
+
         try {
-          const recordsArray = Object.values(newRecords);
+          if (typeof navigator !== "undefined" && !navigator.onLine) {
+            setSaveStatus("saved");
+            setTimeout(() => setSaveStatus("idle"), 2500);
+            return;
+          }
           const res = await fetch("/api/lessons", {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
@@ -379,7 +389,9 @@ export default function ContinuousEvalMobilePage() {
             setSaveStatus("idle");
           }
         } catch {
-          setSaveStatus("idle");
+          // في وضع عدم الاتصال، البيانات حُفظت محلياً بنجاح
+          setSaveStatus("saved");
+          setTimeout(() => setSaveStatus("idle"), 2500);
         }
       }, 700);
     },

@@ -39,6 +39,13 @@ import {
 import { LoginRequired } from "@/components/LoginRequired";
 import { PageExplainer } from "@/components/PageExplainer";
 import { useProfile } from "@/lib/useProfile";
+import { checkTeacherSession, getPersistedTeacherSession } from "@/lib/offlineAuth";
+import {
+  getTeacherOfflineData,
+  saveTeacherOfflineData,
+  cacheServerDataLocally,
+  setupAutoSync,
+} from "@/lib/offlineStorage";
 import {
   DailyDiaryEntry,
   DiaryStage,
@@ -298,64 +305,86 @@ export default function TeacherDiaryPage() {
     }
 
     setLoading(true);
-    Promise.all([
-      fetch("/api/auth")
-        .then((res) => res.json())
-        .catch(() => ({ authenticated: false })),
+    checkTeacherSession().then((auth) => {
+      setAuthenticated(auth.authenticated);
+      const teacherId = auth.profile?.id;
+      if (teacherId) {
+        setupAutoSync(teacherId, () => {
+          setMessage({ type: "ok", text: "🟢 تم استعادة الاتصال ومزامنة الدفتر اليومي تلقائياً مع السحابة!" });
+        });
+      }
+
       fetch("/api/lessons")
         .then((res) => (res.ok ? res.json() : null))
-        .catch(() => null),
-    ])
-      .then(([authData, data]: [any, LessonsData | null]) => {
-        setAuthenticated(authData?.authenticated === true);
-
-        if (data) {
-          const teacherClasses =
-            Array.isArray(data.customClasses) && data.customClasses.length > 0
-              ? sortClasses(data.customClasses)
-              : [];
-          if (teacherClasses.length > 0) {
-            setCustomClasses(teacherClasses);
-            setFormClass((prev) => prev || teacherClasses[0]);
+        .then((data: LessonsData | null) => {
+          if (data && teacherId) {
+            cacheServerDataLocally(teacherId, data);
           }
-
-          if (Array.isArray(data.diaryEntries)) {
-            setEntries(data.diaryEntries);
-          }
-
-          if (Array.isArray(data.specialDays)) {
-            setSpecialDays(data.specialDays);
-          }
-
-          if (data.diaryDayTitles && typeof data.diaryDayTitles === "object") {
-            setDiaryDayTitles(data.diaryDayTitles);
-          }
-
-          if (data.timetable) {
-            setTimetable(data.timetable);
-            if (data.timetable.settings) {
-              setTimetableSettings(data.timetable.settings);
+          const active = data || (teacherId ? getTeacherOfflineData(teacherId) : null);
+          if (active) {
+            const teacherClasses =
+              Array.isArray(active.customClasses) && active.customClasses.length > 0
+                ? sortClasses(active.customClasses)
+                : [];
+            if (teacherClasses.length > 0) {
+              setCustomClasses(teacherClasses);
+              setFormClass((prev) => prev || teacherClasses[0]);
+            }
+            if (Array.isArray(active.diaryEntries)) {
+              setEntries(active.diaryEntries);
+            }
+            if (Array.isArray(active.specialDays)) {
+              setSpecialDays(active.specialDays);
+            }
+            if (active.diaryDayTitles && typeof active.diaryDayTitles === "object") {
+              setDiaryDayTitles(active.diaryDayTitles);
+            }
+            if (active.timetable) {
+              setTimetable(active.timetable);
+              if (active.timetable.settings) {
+                setTimetableSettings(active.timetable.settings);
+              }
             }
           }
-        }
-      })
-      .catch((err) => {
-        console.error(err);
-        setMessage({ type: "err", text: "حدث خطأ أثناء تحميل الدفتر اليومي" });
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+        })
+        .catch(() => {
+          if (teacherId) {
+            const offline = getTeacherOfflineData(teacherId);
+            if (offline) {
+              if (Array.isArray(offline.customClasses) && offline.customClasses.length > 0) {
+                const sorted = sortClasses(offline.customClasses);
+                setCustomClasses(sorted);
+                setFormClass((prev) => prev || sorted[0]);
+              }
+              if (Array.isArray(offline.diaryEntries)) setEntries(offline.diaryEntries);
+              if (Array.isArray(offline.specialDays)) setSpecialDays(offline.specialDays);
+              if (offline.diaryDayTitles) setDiaryDayTitles(offline.diaryDayTitles);
+              if (offline.timetable) setTimetable(offline.timetable);
+            }
+          }
+        })
+        .finally(() => {
+          setLoading(false);
+        });
+    });
   }, []);
 
-  // حفظ التعديلات على الخادم
+  // حفظ التعديلات على الخادم مع الحفظ المحلي المحمي للأوفلاين
   const persistChanges = async (payload: {
     diaryEntries?: DailyDiaryEntry[];
     specialDays?: SpecialDayRecord[];
     diaryDayTitles?: Record<string, string>;
   }) => {
     setSaving(true);
+    const session = getPersistedTeacherSession();
+    if (session?.id) {
+      saveTeacherOfflineData(session.id, payload, true);
+    }
+
     try {
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        throw new Error("offline");
+      }
       const res = await fetch("/api/lessons", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -364,9 +393,12 @@ export default function TeacherDiaryPage() {
       if (!res.ok) throw new Error("فشل حفظ التعديلات على الخادم");
       setMessage({ type: "ok", text: "تم تحديث الدفتر اليومي بنجاح 📒" });
       setTimeout(() => setMessage(null), 3000);
-    } catch (err: any) {
-      console.error(err);
-      setMessage({ type: "err", text: err.message || "فشل حفظ الدفتر" });
+    } catch {
+      setMessage({
+        type: "ok",
+        text: "⚡ تم حفظ الدفتر اليومي محلياً في جهازك بأمان وسيُرفع تلقائياً عند عودة النت 📒",
+      });
+      setTimeout(() => setMessage(null), 4000);
     } finally {
       setSaving(false);
     }

@@ -69,3 +69,15 @@ test("verifyLevelToken: validates correct token and rejects invalid tokens", () 
   // رمز وهمي يفشل
   assert.equal(verifyLevelToken(teacherCode, 1, "MTH-704-XYZ"), false);
 });
+
+test("parseTeacherInputCode: handles spaces around hyphens and separators gracefully", () => {
+  const parsed1 = parseTeacherInputCode("MTH - 704 - 8EX");
+  assert.equal(parsed1.baseCode, "MTH-704");
+  assert.equal(parsed1.level, 1);
+  assert.equal(parsed1.isLockedToLevel, true);
+
+  const parsed2 = parseTeacherInputCode("MTH 704 8EX");
+  assert.equal(parsed2.baseCode, "MTH-704");
+  assert.equal(parsed2.level, 1);
+  assert.equal(parsed2.isLockedToLevel, true);
+});

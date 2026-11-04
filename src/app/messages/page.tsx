@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { MessageCategory, AnonymousMessage } from "@/lib/types";
 import { LoginRequired } from "@/components/LoginRequired";
+import { checkTeacherSession } from "@/lib/offlineAuth";
 
 // أصناف الرسائل وتنسيقاتها
 const CATEGORIES: {
@@ -88,15 +89,11 @@ export default function MessagesInboxPage() {
     setMounted(true);
   }, []);
 
-  // فحص المصادقة
+  // فحص المصادقة مع دعم وضع الأوفلاين
   useEffect(() => {
-    fetch("/api/auth")
-      .then((res) => (res.ok ? res.json() : null))
+    checkTeacherSession()
       .then((data) => {
-        setIsTeacher(Boolean(data && data.authenticated));
-      })
-      .catch(() => {
-        setIsTeacher(false);
+        setIsTeacher(Boolean(data.authenticated));
       })
       .finally(() => setAuthLoading(false));
   }, []);

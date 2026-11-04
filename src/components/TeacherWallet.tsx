@@ -25,6 +25,7 @@ import { ParentInquiryModal } from "./ParentInquiryModal";
 import { ParentInquiriesListModal } from "./ParentInquiriesListModal";
 import { getLocalInquiries } from "@/lib/parentInquiriesStore";
 import { parseTeacherInputCode, getTeacherLevelCode } from "@/lib/teacherCodes";
+import { findPublicTeacher } from "@/lib/teachers";
 
 export interface SavedTeacher {
   slug: string;
@@ -251,15 +252,8 @@ export default function TeacherWallet() {
     setAddingLoading(true);
 
     try {
-      // البحث عن الأستاذ بالكود في Supabase
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id, full_name, slug, teacher_code, subject, school_custom_name, levels_taught")
-        .eq("role", "teacher")
-        .ilike("teacher_code", baseCode)
-        .maybeSingle();
-
-      if (error) throw error;
+      // البحث عن الأستاذ بالكود بشكل آمن ومطابق لصلاحيات الأمان
+      const data = await findPublicTeacher(baseCode);
 
       if (!data) {
         setAddMsg({
@@ -279,7 +273,7 @@ export default function TeacherWallet() {
         slug: data.slug || data.teacher_code || data.id,
         name: data.full_name || "الأستاذ",
         code: secureCode,
-        subject: data.subject,
+        subject: (data as any).subject,
         school: data.school_custom_name,
         levels: targetLevel ? [targetLevel] : data.levels_taught,
       });

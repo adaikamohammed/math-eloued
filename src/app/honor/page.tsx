@@ -30,6 +30,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { HonorStudent, StudentRosterItem, StudentEvaluation } from "@/lib/types";
+import { checkTeacherSession } from "@/lib/offlineAuth";
 
 // أوسمة وألقاب التكريم الرسمية والشرفية
 const PRESET_BADGES = [
@@ -135,16 +136,13 @@ export default function HonorRollPage() {
       if (lvl) setUrlLvl(lvl);
     }
 
-    // التحقق من جلسة الأستاذ
-    fetch("/api/auth")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (d?.authenticated) {
-          setIsTeacher(true);
-          setProfile(d.profile || d.user);
-        }
-      })
-      .catch(() => {});
+    // التحقق من جلسة الأستاذ مع دعم وضع الأوفلاين
+    checkTeacherSession().then((d) => {
+      if (d?.authenticated) {
+        setIsTeacher(true);
+        setProfile(d.profile);
+      }
+    });
 
     fetchHonors();
   }, []);

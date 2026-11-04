@@ -3,7 +3,7 @@ import { parseTeacherInputCode } from "./teacherCodes";
 
 // الأعمدة العامة المسموح بها في سياسات الأمان
 export const PUBLIC_TEACHER_COLUMNS =
-  "id, full_name, district_id, middle_school_id, school_custom_name, teacher_code, slug, levels_taught, avatar_url, bio, reception, subject";
+  "id, full_name, district_id, middle_school_id, school_custom_name, teacher_code, slug, levels_taught, avatar_url, bio, reception";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

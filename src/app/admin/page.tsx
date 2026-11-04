@@ -67,6 +67,7 @@ import {
   Mail,
   Send,
   MessageCircle,
+  WifiOff,
 } from "lucide-react";
 import {
   LEVELS,
@@ -90,52 +91,50 @@ import {
 } from "@/lib/types";
 import { INQUIRY_CATEGORIES, buildWhatsAppReplyUrl } from "@/lib/inquiries";
 import { getTeacherLevelCode } from "@/lib/teacherCodes";
+import {
+  checkTeacherSession,
+  clearPersistedTeacherSession,
+  logoutTeacher,
+  type TeacherSession,
+} from "@/lib/offlineAuth";
+import {
+  getTeacherOfflineData,
+  saveTeacherOfflineData,
+  cacheServerDataLocally,
+  setupAutoSync,
+  exportTeacherDataAsJson,
+} from "@/lib/offlineStorage";
 
-export type TeacherSession = {
-  id: string;
-  full_name: string | null;
-  slug: string | null;
-  teacher_code: string | null;
-  school_custom_name: string | null;
-  levels_taught: number[] | null;
-  subject?: string | null;
-  reception?: ReceptionInfo | null;
-};
+export { type TeacherSession };
 
 export default function AdminPage() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
   const [profile, setProfile] = useState<TeacherSession | null>(null);
+  const [isOffline, setIsOffline] = useState(false);
 
   const checkAuth = useCallback(async () => {
-    try {
-      const res = await fetch("/api/auth");
-      const data = await res.json();
-      setProfile(data.profile ?? null);
-      setAuthenticated(Boolean(data.authenticated));
-      if (data.authenticated && data.profile && typeof window !== "undefined") {
-        try {
-          localStorage.setItem("math_teacher_profile_cache", JSON.stringify(data.profile));
-        } catch {}
-      }
-    } catch {
-      setAuthenticated(false);
-    }
+    const res = await checkTeacherSession();
+    setProfile(res.profile);
+    setAuthenticated(res.authenticated);
+    setIsOffline(res.isOffline);
   }, []);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const cached = localStorage.getItem("math_teacher_profile_cache");
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          if (parsed && parsed.id) {
-            setProfile(parsed);
-            setAuthenticated(true);
-          }
-        }
-      } catch {}
-    }
     checkAuth();
+
+    const onOffline = () => setIsOffline(true);
+    const onOnline = () => {
+      setIsOffline(false);
+      checkAuth();
+    };
+
+    window.addEventListener("offline", onOffline);
+    window.addEventListener("online", onOnline);
+
+    return () => {
+      window.removeEventListener("offline", onOffline);
+      window.removeEventListener("online", onOnline);
+    };
   }, [checkAuth]);
 
   if (authenticated === null) {
@@ -147,14 +146,29 @@ export default function AdminPage() {
   }
 
   return authenticated && profile ? (
-    <Dashboard profile={profile} onLogout={() => setAuthenticated(false)} />
+    <Dashboard
+      profile={profile}
+      isOfflineMode={isOffline}
+      onLogout={() => {
+        clearPersistedTeacherSession();
+        setAuthenticated(false);
+      }}
+    />
   ) : (
     <LoginRequired next="/admin" title="لوحة تحكم الأستاذ" />
   );
 }
 
 /* ---------------- 2. لوحة التحكم الرئيسية ---------------- */
-function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: () => void }) {
+function Dashboard({
+  profile,
+  isOfflineMode = false,
+  onLogout,
+}: {
+  profile: TeacherSession;
+  isOfflineMode?: boolean;
+  onLogout: () => void;
+}) {
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [levelsTaughtState, setLevelsTaughtState] = useState<number[]>(
@@ -295,8 +309,11 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
     try {
       setLoading(true);
       const res = await fetch(`/api/lessons?level=${level}&_t=${Date.now()}`, { cache: "no-store" });
+      if (!res.ok) throw new Error("Server response not ok");
       const data = await res.json();
       setAllLessons(data.lessons || []);
+      // حفظ محلي محمي للأستاذ
+      cacheServerDataLocally(profile.id, data);
       if (Array.isArray(data.customClasses)) {
         setTeacherClasses(data.customClasses);
         if (data.customClasses.length > 0) {
@@ -329,10 +346,47 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
       } else {
         setStudentRoster([]);
       }
+    } catch {
+      // وضع عدم الاتصال (أوفلاين): استرجاع البيانات من ملف التخزين المحلي المحمي للأستاذ
+      const offline = getTeacherOfflineData(profile.id);
+      if (offline) {
+        let lessons = offline.lessons || [];
+        if (level) {
+          lessons = lessons.filter((l) => l.level === Number(level));
+        }
+        setAllLessons(lessons);
+        if (Array.isArray(offline.customClasses) && offline.customClasses.length > 0) {
+          setTeacherClasses(offline.customClasses);
+          setEvalClass((prev) => prev || offline.customClasses![0]);
+          setBatchEvalClass((prev) => prev || offline.customClasses![0]);
+          setClassName((prev) => prev || offline.customClasses![0]);
+          setHonorClass((prev) => prev || offline.customClasses![0]);
+          setPenaltyClass((prev) => prev || offline.customClasses![0]);
+        }
+        if (offline.timetable) setHasTimetable(true);
+        if (Array.isArray(offline.diaryEntries) && offline.diaryEntries.length > 0) setHasDiary(true);
+        if (Array.isArray(offline.studentRoster)) {
+          setStudentRoster(offline.studentRoster);
+          setStudentsCount(offline.studentRoster.length);
+        }
+      }
     } finally {
       setLoading(false);
     }
-  }, [level]);
+  }, [level, profile.id]);
+
+  // تفعيل المزامنة التلقائية الفورية فور عودة الاتصال بالإنترنت
+  useEffect(() => {
+    if (!profile.id) return;
+    const cleanup = setupAutoSync(profile.id, (syncedKeys) => {
+      showToast(
+        "success",
+        `🟢 تم الاتصال بالإنترنت ومزامنة كافة التعديلات (${syncedKeys.length} عنصر) تلقائياً مع السحابة! ✨`
+      );
+      loadLessons();
+    });
+    return cleanup;
+  }, [profile.id, loadLessons]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -694,7 +748,7 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
   };
 
   const handleLogout = async () => {
-    await fetch("/api/auth", { method: "DELETE" });
+    await logoutTeacher();
     onLogout();
   };
 
@@ -736,6 +790,9 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
     setIsSubmitting(true);
 
     try {
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        throw new Error("offline");
+      }
       const res = await fetch("/api/lessons", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -775,8 +832,37 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
         "success",
         `✓ تم إضافة "${data.lesson.title}" مباشرة إلى ${tabLabel}!`
       );
-    } catch (e: any) {
-      showToast("error", "خطأ: " + (e.message || "تعذر الإضافة"));
+    } catch {
+      // حفظ محلي محمي للأستاذ في وضع الأوفلاين
+      const offlineLesson: Lesson = {
+        id: `offline_lesson_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        level,
+        type: notebookTab,
+        field: notebookTab === "lessons" ? field.trim() : undefined,
+        section: section.trim() || undefined,
+        number: Number(number) || nextNumber,
+        title: title.trim(),
+        notes: notes.trim() || undefined,
+        homeworkNotes: notebookTab === "lessons" ? lessonHomeworkNotes.trim() || undefined : undefined,
+        createdAt: new Date().toISOString(),
+        images: [],
+        homeworkImages: [],
+      };
+      const existingOffline = getTeacherOfflineData(profile.id) || { lessons: [] };
+      const nextLessons = [...(existingOffline.lessons || []), offlineLesson];
+      saveTeacherOfflineData(profile.id, { lessons: nextLessons }, true);
+
+      setTitle("");
+      setNumber("");
+      setNotes("");
+      setLessonHomeworkNotes("");
+      setAllLessons((prev) => [...prev, offlineLesson]);
+      setOpenId(offlineLesson.id);
+
+      showToast(
+        "success",
+        `⚡ تم حفظ "${offlineLesson.title}" محلياً في جهازك بأمان وسيُرفع تلقائياً عند عودة النت!`
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -1330,6 +1416,15 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={() => exportTeacherDataAsJson(profile.id, profile.full_name || undefined)}
+              className="flex items-center gap-1.5 text-xs text-slate-700 bg-slate-50 hover:bg-slate-100 font-bold px-3 py-2 rounded-xl border border-slate-200 transition cursor-pointer active:scale-95"
+              title="تنزيل نسخة احتياطية من ملف بياناتك JSON محلياً في جهازك"
+            >
+              <Download className="w-3.5 h-3.5 text-emerald-600" />
+              <span className="hidden sm:inline">نسخة JSON</span>
+            </button>
             <Link
               href={`/t/${profile.slug || profile.id}`}
               target="_blank"
@@ -1357,6 +1452,34 @@ function Dashboard({ profile, onLogout }: { profile: TeacherSession; onLogout: (
             </button>
           </div>
         </div>
+
+        {/* شريط وضع عدم الاتصال (أوفلاين) وحفظ البيانات التلقائي */}
+        {isOfflineMode && (
+          <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 text-amber-950 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs animate-in fade-in">
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
+                <WifiOff className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="font-black text-xs text-amber-950 flex items-center gap-1.5">
+                  <span>أنت تعمل حالياً في وضع عدم الاتصال (أوفلاين)</span>
+                  <span className="bg-amber-200 text-amber-900 text-[10px] px-2 py-0.5 rounded-full font-bold">محلياً</span>
+                </p>
+                <p className="text-[11px] text-amber-800 leading-relaxed mt-0.5">
+                  كافة إدخالاتك وتعديلاتك ونقاط التلاميذ محفوظة بأمان في ملف جهازك، وسيتم رفعها ومزامنتها تلقائياً مع السحابة فور استعادة الإنترنت.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => exportTeacherDataAsJson(profile.id, profile.full_name || undefined)}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition shrink-0 shadow-xs cursor-pointer active:scale-95"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>تحميل نسخة JSON لجهازي</span>
+            </button>
+          </div>
+        )}
 
         <div className="hidden lg:block">
           <PedagogyAlerts teacherId={profile.id} />

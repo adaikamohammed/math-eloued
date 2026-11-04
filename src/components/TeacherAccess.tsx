@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Lock, Sparkles, ExternalLink, X, ClipboardCheck, Settings, CheckCircle2 } from "lucide-react";
+import { checkTeacherSession } from "@/lib/offlineAuth";
 
 export function TeacherAccess() {
   const [isOpen, setIsOpen] = useState(false);
@@ -13,14 +14,11 @@ export function TeacherAccess() {
   // حالة جلسة الأستاذ (حساب المنصة) عند فتح النافذة
   useEffect(() => {
     if (!isOpen) return;
-    fetch("/api/auth", { cache: "no-store" })
-      .then((res) => res.json())
-      .then((data) => {
-        setIsAuthenticated(Boolean(data.authenticated));
-        setRole(data.role ?? null);
-        setTeacherName(data.profile?.full_name || "");
-      })
-      .catch(() => setIsAuthenticated(false));
+    checkTeacherSession().then((res) => {
+      setIsAuthenticated(res.authenticated);
+      setRole(res.profile?.role ?? null);
+      setTeacherName(res.profile?.full_name || "");
+    });
   }, [isOpen]);
 
   return (
