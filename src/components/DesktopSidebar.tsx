@@ -123,6 +123,13 @@ export function DesktopSidebar() {
               badgeColor: "bg-indigo-600 text-white",
             },
             {
+              label: "بريد وتذاكر الإدارة 📬",
+              href: "/super-admin?tab=tickets",
+              icon: MessageSquare,
+              badge: "تواصل ودعم",
+              badgeColor: "bg-emerald-600 text-white",
+            },
+            {
               label: "إدارة الحسابات والمسجلين",
               href: "/super-admin?tab=accounts",
               icon: Users,
@@ -315,6 +322,13 @@ export function DesktopSidebar() {
         title: "إدارة الفضاء والتخصيص",
         items: [
           {
+            label: "تواصل مع إدارة المنصة 💬",
+            href: "/contact",
+            icon: MessageSquare,
+            badge: "مباشر أو مجهول",
+            badgeColor: "bg-teal-600 text-white",
+          },
+          {
             label: "لوحة مدير الموقع (المشرف)",
             href: "/super-admin",
             icon: Crown,
@@ -384,6 +398,7 @@ export function DesktopSidebar() {
           { label: "الرئيسية", href: "/", icon: Sparkles },
           { label: "بحث عن أستاذ بكود", href: "/t/search", icon: Search },
           { label: "لوحة الشرف وتكريم النوابغ", href: "/honor", icon: Trophy },
+          { label: "تواصل مع إدارة المنصة 💬", href: "/contact", icon: MessageSquare },
         ],
       },
       {

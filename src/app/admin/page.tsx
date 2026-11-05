@@ -23,6 +23,7 @@ import {
   X,
   ExternalLink,
   ShieldCheck,
+  Crown,
   Settings,
   Lock,
   ArrowRight,
@@ -1772,6 +1773,15 @@ function Dashboard({
             </span>
           )}
         </button>
+
+        <Link
+          href="/contact"
+          className="py-2 px-3.5 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 shrink-0 cursor-pointer text-[#107a57] bg-[#e6f4ee] hover:bg-[#d5eee2] border border-[#107a57]/20"
+          title="مراسلة مدير المنصة والمشرف العام بهويتك أو بسرية تامة من مجهول"
+        >
+          <Crown className="w-3.5 h-3.5 text-[#107a57]" />
+          <span>مراسلة إدارة المنصة 🏛️</span>
+        </Link>
       </div>
 
       {/* ==================== 1. تبويب الدروس والكراريس ==================== */}

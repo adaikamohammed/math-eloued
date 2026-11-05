@@ -33,12 +33,14 @@ import { AuditLogTab } from "./AuditLogTab";
 import { WilayaCircularTab } from "./WilayaCircularTab";
 import { ModerationTab } from "./ModerationTab";
 import { ApprovalsTab } from "./ApprovalsTab";
+import { AdminTicketsTab } from "./AdminTicketsTab";
 import { DISTRICTS_INFO } from "./districts";
 
-type AdminTab = "overview" | "approvals" | "accounts" | "inspectors" | "schools" | "circular" | "moderation" | "log";
+type AdminTab = "overview" | "tickets" | "approvals" | "accounts" | "inspectors" | "schools" | "circular" | "moderation" | "log";
 
 const TABS: [AdminTab, string][] = [
   ["overview", "نظرة عامة"],
+  ["tickets", "بريد وتذاكر الإدارة 📬"],
   ["approvals", "طلبات الانضمام والتحقق 🔔"],
   ["accounts", "الحسابات"],
   ["inspectors", "المفتشون والمقاطعات"],
@@ -74,9 +76,16 @@ export default function SuperAdminPage() {
     fullName: string;
   } | null>(null);
 
-  /* ─── تحقق من صلاحية المشرف العام ─── */
+  /* ─── تحقق من صلاحية المشرف العام وقراءة التبويب من الرابط ─── */
   useEffect(() => {
     checkAdminAuth();
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const requestedTab = params.get("tab") as AdminTab;
+      if (requestedTab && TABS.some(([id]) => id === requestedTab)) {
+        setTab(requestedTab);
+      }
+    }
   }, []);
 
   const checkAdminAuth = async () => {
@@ -556,6 +565,7 @@ export default function SuperAdminPage() {
         </div>
 
         {tab === "overview" && <OverviewTab profiles={profiles} onOpenLog={() => setTab("log")} />}
+        {tab === "tickets" && <AdminTicketsTab />}
         {tab === "approvals" && <ApprovalsTab onUpdate={loadProfiles} />}
         {tab === "inspectors" && <InspectorsTab profiles={profiles} onChanged={loadProfiles} />}
         {tab === "schools" && <SchoolsManager />}

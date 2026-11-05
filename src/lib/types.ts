@@ -354,6 +354,45 @@ export type ParentInquiry = {
   };
 };
 
+// أصناف تذاكر ورسائل إدارة المنصة
+export type AdminInquiryCategory =
+  | "general"         // استفسار عام حول المنصة
+  | "pedagogical"     // استفسار أو اقتراح بيداغوجي
+  | "technical"       // مشكلة تقنية أو خطأ برمجيات
+  | "suggestion"      // اقتراح تطوير ميزة جديدة
+  | "account_issue"   // مشكلة في الحساب أو التسجيل
+  | "complaint";      // شكوى أو ملاحظة خاصة
+
+export type AdminInquiryStatus = "pending" | "answered" | "closed";
+
+// نموذج رسالة / تذكرة موجهة لمدير المنصة (حساب الإدارة)
+export type AdminInquiry = {
+  id: string;               // معرّف فريد
+  trackingCode: string;     // كود التتبع القصير (مثال: ADM-7842-DZ)
+  secretToken: string;      // الرمز السري للاستعلام الخاص
+  senderType: "teacher" | "visitor"; // أستاذ مسجل أم زائر عام
+  isAnonymous: boolean;     // هل الرسالة مرسلة من مجهول تماماً
+  senderName?: string;      // اسم المرسل (إن لم يكن مجهولاً)
+  senderEmail?: string;     // البريد الإلكتروني (اختياري)
+  senderPhone?: string;     // رقم الهاتف أو الواتساب للتواصل والرد (اختياري)
+  senderRole?: string;      // صفة المرسل: أستاذ، ولي أمر، تلميذ، زائر، مجهول
+  teacherId?: string;       // معرّف الأستاذ إن كان مسجلاً بالمنصة
+  teacherCode?: string;     // كود الأستاذ إن وُجد
+  subjectName?: string;     // مادة التدريس إن كان أستاذاً
+  schoolName?: string;      // اسم المتوسطة أو المؤسسة
+  wilaya?: string;          // الولاية (مثال: الوادي)
+  category: AdminInquiryCategory;
+  title: string;            // عنوان الموضوع
+  content: string;          // نص الرسالة أو السؤال
+  status: AdminInquiryStatus;
+  adminReply?: string;      // رد مدير المنصة الرسمي
+  repliedAt?: string;       // تاريخ وتوقيت الرد
+  repliedBy?: string;       // اسم أو صفة مدير المنصة
+  readBySender?: boolean;   // هل اطلع المرسل على الرد
+  createdAt: string;
+  updatedAt?: string;
+};
+
 export type TeacherFeatureFlags = {
   boardLessons?: boolean;          // كراس القسم وصور السبورة
   homework?: boolean;              // الواجبات والأنشطة المنزلية
