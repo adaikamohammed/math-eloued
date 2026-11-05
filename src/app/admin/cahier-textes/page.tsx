@@ -57,6 +57,10 @@ import {
   printCahierTextesReport,
   downloadCahierTextesPDF,
 } from "@/lib/cahierTextesPdfGenerator";
+import {
+  inferCahierTextesFromDiary,
+  cleanPedagogicalTitle,
+} from "@/lib/cahierTextesInference";
 
 // أنواع حصص دفتر النصوص الرسمية
 const CAHIER_SESSION_TYPES = [
@@ -326,31 +330,66 @@ export default function CahierDeTextesPage() {
     let updated: CahierTextesEntry[];
 
     if (editingEntry) {
-      updated = cahierEntries.map((c) =>
-        c.id === editingEntry.id
-          ? {
-              ...c,
-              date: formDate,
-              dayName,
-              periodTime: formPeriodTime,
-              sessionType: formSessionType,
-              field: formField,
-              section: formSection.trim() || undefined,
-              weekLabel: formWeekLabel.trim() || undefined,
-              resourceTitle: formResourceTitle.trim(),
-              warmup: formWarmup.trim() || undefined,
-              proposedSituation: formProposedSituation.trim() || undefined,
-              summary: formSummary.trim() || undefined,
-              reinvestment: formReinvestment.trim() || undefined,
-              homework: formHomework.trim() || undefined,
-              signature: formSignature.trim() || `${teacherFamilyName} ✍`,
-              isTdOrRemediation: formIsTd,
-              subgroup: formIsTd ? formSubgroup : undefined,
-              notes: formNotes.trim() || undefined,
-              updatedAt: new Date().toISOString(),
-            }
-          : c
+      const existsInCahier = cahierEntries.some(
+        (c) => c.id === editingEntry.id || (editingEntry.diaryEntryId && c.diaryEntryId === editingEntry.diaryEntryId)
       );
+
+      if (existsInCahier) {
+        updated = cahierEntries.map((c) =>
+          c.id === editingEntry.id || (editingEntry.diaryEntryId && c.diaryEntryId === editingEntry.diaryEntryId)
+            ? {
+                ...c,
+                date: formDate,
+                dayName,
+                periodTime: formPeriodTime,
+                sessionType: formSessionType,
+                field: formField,
+                section: formSection.trim() || undefined,
+                weekLabel: formWeekLabel.trim() || undefined,
+                resourceTitle: formResourceTitle.trim(),
+                warmup: formWarmup.trim() || undefined,
+                proposedSituation: formProposedSituation.trim() || undefined,
+                summary: formSummary.trim() || undefined,
+                reinvestment: formReinvestment.trim() || undefined,
+                homework: formHomework.trim() || undefined,
+                signature: formSignature.trim() || `${teacherFamilyName} ✍`,
+                isTdOrRemediation: formIsTd,
+                subgroup: formIsTd ? formSubgroup : undefined,
+                notes: formNotes.trim() || undefined,
+                updatedAt: new Date().toISOString(),
+              }
+            : c
+        );
+      } else {
+        // الحصة كانت مستنتجة ذكياً والآن نثبتها كتدوين مخصص ومعدل
+        const overrideEntry: CahierTextesEntry = {
+          id: editingEntry.id.startsWith("cahier_inf_")
+            ? `cahier_saved_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`
+            : editingEntry.id,
+          diaryEntryId: editingEntry.diaryEntryId,
+          className: activeClass,
+          date: formDate,
+          dayName,
+          periodTime: formPeriodTime,
+          sessionType: formSessionType,
+          field: formField,
+          section: formSection.trim() || undefined,
+          weekLabel: formWeekLabel.trim() || undefined,
+          resourceTitle: formResourceTitle.trim(),
+          warmup: formWarmup.trim() || undefined,
+          proposedSituation: formProposedSituation.trim() || undefined,
+          summary: formSummary.trim() || undefined,
+          reinvestment: formReinvestment.trim() || undefined,
+          homework: formHomework.trim() || undefined,
+          signature: formSignature.trim() || `${teacherFamilyName} ✍`,
+          isTdOrRemediation: formIsTd,
+          subgroup: formIsTd ? formSubgroup : undefined,
+          notes: formNotes.trim() || undefined,
+          createdAt: editingEntry.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        updated = [overrideEntry, ...cahierEntries];
+      }
     } else {
       const newEntry: CahierTextesEntry = {
         id: `cahier_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
@@ -390,6 +429,45 @@ export default function CahierDeTextesPage() {
     setCahierEntries(updated);
     if (editingEntry?.id === id) handleResetForm();
     await persistChanges({ cahierTextesEntries: updated });
+  };
+
+  // إعادة الاستنتاج البيداغوجي الذكي لحصة تم تعديلها مسبقاً
+  const handleResetToInferred = async (entry: CahierTextesEntry) => {
+    if (!confirm(`هل تريد استعادة الصياغة البيداغوجية الذكية لهذه الحصة من الدفتر اليومي؟`)) return;
+    const updated = cahierEntries.filter(
+      (c) => c.id !== entry.id && (!entry.diaryEntryId || c.diaryEntryId !== entry.diaryEntryId)
+    );
+    setCahierEntries(updated);
+    if (editingEntry?.id === entry.id) handleResetForm();
+    await persistChanges({ cahierTextesEntries: updated });
+    setMessage({
+      type: "ok",
+      text: "تمت استعادة الصياغة البيداغوجية الذكية للحصة بنجاح ⚡",
+    });
+  };
+
+  // تثبيت وحفظ جميع التدوينات الذكية الحالية لهذا الفوج في قاعدة البيانات
+  const handleSaveAllInferred = async (inferredList: CahierTextesEntry[]) => {
+    if (inferredList.length === 0) {
+      alert(`كافة حصص فوج (${activeClass}) مثبتة ومحفوظة مسبقاً في دفتر النصوص.`);
+      return;
+    }
+    const cleanEntries: CahierTextesEntry[] = inferredList.map((entry) => {
+      const { ...clean } = entry;
+      return {
+        ...clean,
+        id: entry.id.startsWith("cahier_inf_")
+          ? `cahier_saved_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`
+          : entry.id,
+      };
+    });
+    const updated = [...cleanEntries, ...cahierEntries];
+    setCahierEntries(updated);
+    await persistChanges({ cahierTextesEntries: updated });
+    setMessage({
+      type: "ok",
+      text: `تم تثبيت وحفظ (${cleanEntries.length}) حصة مستنتجة بذكاء في دفتر نصوص فوج ${activeClass}! 💾`,
+    });
   };
 
   // ⚡ استيراد الحصص تلقائياً من الدفتر اليومي للفوج النشط
@@ -475,21 +553,70 @@ export default function CahierDeTextesPage() {
     });
   };
 
-  // الحصص المعروضة للفوج النشط
+  // الحصص المعروضة للفوج النشط مع الربط التلقائي والذكي بالدفتر اليومي والمخطط الأسبوعي
   const currentClassEntries = useMemo(() => {
-    let list = cahierEntries.filter((c) => c.className === activeClass);
+    const classDiaryLessons = diaryEntries.filter(
+      (d) =>
+        d.className === activeClass ||
+        (d.className && d.className.replace(/\s+/g, "") === activeClass.replace(/\s+/g, ""))
+    );
 
+    // فهرسة التدوينات المحفوظة مسبقاً بهذا القسم حسب diaryEntryId وحسب (التاريخ + التوقيت)
+    const savedByDiaryId = new Map<string, CahierTextesEntry>();
+    const savedByDateTime = new Map<string, CahierTextesEntry>();
+    const standaloneEntries: CahierTextesEntry[] = [];
+
+    for (const c of cahierEntries) {
+      if (c.className !== activeClass && c.className.replace(/\s+/g, "") !== activeClass.replace(/\s+/g, "")) continue;
+      if (c.diaryEntryId) {
+        savedByDiaryId.set(c.diaryEntryId, c);
+      } else {
+        const key = `${c.date}_${c.periodTime || ""}`.trim();
+        savedByDateTime.set(key, c);
+        standaloneEntries.push(c);
+      }
+    }
+
+    const result: (CahierTextesEntry & { isInferred?: boolean; isSavedOverride?: boolean })[] = [];
+    const matchedStandaloneIds = new Set<string>();
+
+    for (const d of classDiaryLessons) {
+      if (savedByDiaryId.has(d.id)) {
+        result.push({ ...savedByDiaryId.get(d.id)!, isSavedOverride: true });
+        continue;
+      }
+      const key = `${d.date}_${d.periodTime || ""}`.trim();
+      if (savedByDateTime.has(key)) {
+        const matched = savedByDateTime.get(key)!;
+        matchedStandaloneIds.add(matched.id);
+        result.push({ ...matched, diaryEntryId: d.id, isSavedOverride: true });
+        continue;
+      }
+      // استنتاج بيداغوجي ذكي تلقائي مطابق لسجل الأستاذ محمد عدايكة
+      const inferred = inferCahierTextesFromDiary(d, teacherFamilyName);
+      result.push({ ...inferred, isInferred: true });
+    }
+
+    // إضافة التدوينات المستقلة التي تم إدخالها يدوياً بدون تطابق في الدفتر اليومي
+    for (const s of standaloneEntries) {
+      if (!matchedStandaloneIds.has(s.id)) {
+        result.push(s);
+      }
+    }
+
+    // تطبيق الفلاتر
+    let filtered = result;
     if (activeTab === "standard") {
-      list = list.filter((c) => !c.isTdOrRemediation);
+      filtered = filtered.filter((c) => !c.isTdOrRemediation);
     } else if (activeTab === "td") {
-      list = list.filter((c) => !!c.isTdOrRemediation);
+      filtered = filtered.filter((c) => !!c.isTdOrRemediation);
     }
 
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
-      list = list.filter(
+      filtered = filtered.filter(
         (c) =>
-          c.resourceTitle.toLowerCase().includes(q) ||
+          (c.resourceTitle || "").toLowerCase().includes(q) ||
           (c.field || "").toLowerCase().includes(q) ||
           (c.section || "").toLowerCase().includes(q) ||
           (c.summary || "").toLowerCase().includes(q) ||
@@ -498,16 +625,16 @@ export default function CahierDeTextesPage() {
     }
 
     // فرز الحصص تصاعدياً حسب التاريخ ثم التوقيت
-    list.sort((a, b) => {
+    filtered.sort((a, b) => {
       const cmpDate = (a.date || "").localeCompare(b.date || "");
       if (cmpDate !== 0) return cmpDate;
       return (a.periodTime || "").localeCompare(b.periodTime || "");
     });
 
-    return list;
-  }, [cahierEntries, activeClass, activeTab, searchQuery]);
+    return filtered;
+  }, [cahierEntries, diaryEntries, activeClass, activeTab, searchQuery, teacherFamilyName]);
 
-  // تشغيل الطباعة الأفقية A4
+  // تشغيل الطباعة الأفقية A4 (تطبع كافة الحصص المعروضة بما فيها المستنتجة تلقائياً)
   const handlePrintLandscape = () => {
     printCahierTextesReport({
       teacherName: teacherFullName,
@@ -518,7 +645,7 @@ export default function CahierDeTextesPage() {
       subjectName: printSubject,
       className: activeClass,
       timetableSlots: timetable?.slots || [],
-      entries: cahierEntries.filter((c) => c.className === activeClass),
+      entries: currentClassEntries,
     });
   };
 
@@ -533,7 +660,7 @@ export default function CahierDeTextesPage() {
       subjectName: printSubject,
       className: activeClass,
       timetableSlots: timetable?.slots || [],
-      entries: cahierEntries.filter((c) => c.className === activeClass),
+      entries: currentClassEntries,
     });
   };
 
@@ -646,6 +773,18 @@ export default function CahierDeTextesPage() {
           </div>
 
           <div className="flex items-center gap-2 shrink-0 flex-wrap">
+            {currentClassEntries.some((c: any) => c.isInferred) && (
+              <button
+                type="button"
+                onClick={() => handleSaveAllInferred(currentClassEntries.filter((c: any) => (c as any).isInferred))}
+                disabled={saving}
+                className="px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-900 text-xs font-black flex items-center gap-1.5 transition cursor-pointer shadow-2xs disabled:opacity-50"
+                title="تثبيت وحفظ كافة التدوينات المستنتجة بذكاء في دفتر النصوص"
+              >
+                <Check className="w-4 h-4 text-emerald-600" />
+                <span>تثبيت التدوينات الذكية 💾</span>
+              </button>
+            )}
             <button
               type="button"
               onClick={handleSyncFromDiary}
@@ -1151,6 +1290,17 @@ export default function CahierDeTextesPage() {
                             <span className="inline-block text-[10px] font-black text-[#107a57] bg-[#e6f4ee] px-2 py-0.5 rounded-md border border-[#107a57]/25">
                               {item.sessionType || "درس ومورد"}
                             </span>
+                            {(item as any).isInferred && (
+                              <span className="inline-flex items-center gap-1 text-[9.5px] font-black text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-300">
+                                <Sparkles className="w-2.5 h-2.5 text-amber-600" />
+                                <span>استنتاج ذكي من الدفتر اليومي</span>
+                              </span>
+                            )}
+                            {(item as any).isSavedOverride && (
+                              <span className="inline-flex items-center gap-1 text-[9.5px] font-black text-sky-800 bg-sky-50 px-2 py-0.5 rounded-md border border-sky-300">
+                                <span>✍️ تدوين مخصص محفوظ</span>
+                              </span>
+                            )}
                             <span className="text-xs sm:text-sm font-black text-gray-900">
                               {item.resourceTitle}
                             </span>
@@ -1197,12 +1347,23 @@ export default function CahierDeTextesPage() {
                             <button
                               type="button"
                               onClick={() => handleStartEdit(item)}
-                              className="p-1 px-2 rounded-lg bg-gray-100 hover:bg-amber-100 text-gray-700 hover:text-amber-800 text-[10px] font-black transition cursor-pointer flex items-center gap-1 border border-gray-200"
+                              className="p-1 px-2.5 rounded-lg bg-gray-100 hover:bg-amber-100 text-gray-700 hover:text-amber-800 text-[10px] font-black transition cursor-pointer flex items-center gap-1 border border-gray-200"
                               title="تعديل تدوين الحصة في دفتر النصوص"
                             >
                               <Pencil className="w-3 h-3" />
-                              <span>تعديل التدوين</span>
+                              <span>تعديل التدوين ✏️</span>
                             </button>
+                            {(item as any).isSavedOverride && (
+                              <button
+                                type="button"
+                                onClick={() => handleResetToInferred(item)}
+                                className="p-1 px-2 rounded-lg bg-gray-100 hover:bg-sky-100 text-sky-700 hover:text-sky-900 text-[10px] font-black transition cursor-pointer flex items-center gap-1 border border-gray-200"
+                                title="إعادة الاستنتاج البيداغوجي التلقائي من الدفتر اليومي"
+                              >
+                                <RotateCcw className="w-3 h-3" />
+                                <span>استعادة الذكي ⚡</span>
+                              </button>
+                            )}
                             <button
                               type="button"
                               onClick={() => handleDeleteEntry(item.id, item.resourceTitle)}

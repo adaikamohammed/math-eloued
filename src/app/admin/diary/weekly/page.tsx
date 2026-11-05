@@ -30,6 +30,7 @@ import {
   LayoutGrid,
   TableProperties,
   Check,
+  Download,
 } from "lucide-react";
 import { LoginRequired } from "@/components/LoginRequired";
 import { useProfile } from "@/lib/useProfile";
@@ -42,6 +43,10 @@ import {
   sortClasses,
   LessonsData,
 } from "@/lib/types";
+import {
+  printWeeklyDiaryReport,
+  downloadWeeklyDiaryPDF,
+} from "@/lib/weeklyDiaryPdfGenerator";
 
 // ألوان مخصصة للأفواج
 const CLASS_COLORS: Record<string, { bg: string; text: string; border: string; badge: string }> = {
@@ -462,10 +467,51 @@ export default function WeeklyDiaryPage() {
   }, [weekEntriesByDate, weekInfo.days]);
 
   // بيانات الترويسة للطباعة
-  const printTeacherName = profile?.full_name || "الأستاذ";
-  const printSchoolName = profile?.school_custom_name || "المتوسطة";
+  const printTeacherName = profile?.full_name || "الأستاذ محمد عدايكة";
+  const printSchoolName = profile?.school_custom_name || "متوسطة المجاهد باهي علي — قمار";
   const printSubject = profile?.subject || "الرياضيات";
   const printWilaya = "الوادي";
+
+  // تشغيل الطباعة الأفقية A4 عبر المولد الموحد المعزول
+  const handlePrintLandscape = () => {
+    printWeeklyDiaryReport({
+      teacherName: printTeacherName,
+      schoolName: printSchoolName,
+      inspectorName: timetable?.settings?.inspectorName || "السيد عبد الرزاق عبيدي (مفتش التربية الوطنية)",
+      principalName: timetable?.settings?.principalName || "السيد عبد اللطيف عويني (مدير المؤسسة)",
+      wilayaName: printWilaya,
+      subjectName: printSubject,
+      weekStartStr: weekInfo.sundayStr,
+      weekEndStr: weekInfo.thursdayStr,
+      orientation,
+      morningSlots: MORNING_SLOTS.map((s) => s.label),
+      afternoonSlots: afternoonSlots.map((s) => s.label),
+      schoolDays: weekInfo.days.map((d) => ({ name: d.dayName, dateStr: d.dateStr })),
+      dayLessonsMap: weekEntriesByDate,
+      customClasses: allClasses,
+      classColorsMap: timetable?.settings?.classColors,
+    });
+  };
+
+  const handleDownloadPDF = () => {
+    downloadWeeklyDiaryPDF({
+      teacherName: printTeacherName,
+      schoolName: printSchoolName,
+      inspectorName: timetable?.settings?.inspectorName || "السيد عبد الرزاق عبيدي (مفتش التربية الوطنية)",
+      principalName: timetable?.settings?.principalName || "السيد عبد اللطيف عويني (مدير المؤسسة)",
+      wilayaName: printWilaya,
+      subjectName: printSubject,
+      weekStartStr: weekInfo.sundayStr,
+      weekEndStr: weekInfo.thursdayStr,
+      orientation,
+      morningSlots: MORNING_SLOTS.map((s) => s.label),
+      afternoonSlots: afternoonSlots.map((s) => s.label),
+      schoolDays: weekInfo.days.map((d) => ({ name: d.dayName, dateStr: d.dateStr })),
+      dayLessonsMap: weekEntriesByDate,
+      customClasses: allClasses,
+      classColorsMap: timetable?.settings?.classColors,
+    });
+  };
 
   if (authenticated === false) {
     return <LoginRequired next="/admin/diary/weekly" title="المخطط الأسبوعي للدفتر اليومي" />;
@@ -623,12 +669,22 @@ export default function WeeklyDiaryPage() {
             </Link>
 
             <button
-              onClick={() => window.print()}
+              onClick={handlePrintLandscape}
               type="button"
-              className="btn-primary text-xs px-4 py-1.5 flex items-center gap-1.5 shadow-sm cursor-pointer"
+              className="px-3.5 py-1.5 rounded-xl border border-gray-300 bg-white text-xs font-bold text-gray-800 hover:bg-gray-50 transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
+              title="طباعة المخطط الأسبوعي أفقياً A4 بدقة عالية"
             >
-              <Printer className="w-4 h-4" />
-              <span>طباعة المخطط الأسبوعي A4 🖨️</span>
+              <Printer className="w-3.5 h-3.5 text-[#107a57]" />
+              <span>طباعة أفقياً A4 🖨️</span>
+            </button>
+            <button
+              onClick={handleDownloadPDF}
+              type="button"
+              className="btn-primary text-xs px-3.5 py-1.5 flex items-center gap-1.5 shadow-sm cursor-pointer"
+              title="تحميل المخطط الأسبوعي كملف PDF أفقي عالي الدقة"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>تحميل PDF أفقياً 📄</span>
             </button>
           </div>
         </div>
