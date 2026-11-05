@@ -701,10 +701,36 @@ export interface UserProfile {
   isVerified?: boolean;
   reception?: ReceptionInfo | null;
   subject?: string;
+  initial_password?: string;
+  last_sign_in_at?: string;
   feature_flags?: TeacherFeatureFlags;
   terms_accepted_at?: string;
   created_at?: string;
   createdAt?: string;
+}
+
+export interface AccountActivityItem {
+  id: string;
+  type: "lesson" | "evaluation" | "announcement" | "diary" | "login" | "audit" | "other";
+  actionLabel: string;
+  title: string;
+  timestamp: string;
+  details?: string;
+}
+
+export interface DetailedAdminUser extends UserProfile {
+  initial_password?: string;
+  last_sign_in_at?: string;
+  lessons_count?: number;
+  last_lesson?: { title: string; date: string } | null;
+  evaluations_count?: number;
+  last_evaluation_date?: string | null;
+  announcements_count?: number;
+  last_announcement?: { title: string; date: string } | null;
+  diary_count?: number;
+  last_diary?: { title: string; date: string } | null;
+  students_count?: number;
+  recent_activities?: AccountActivityItem[];
 }
 
 export interface PedagogicalNote {

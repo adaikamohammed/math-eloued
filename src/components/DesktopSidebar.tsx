@@ -31,6 +31,7 @@ import {
   Smartphone,
   Crown,
   Printer,
+  History,
 } from "lucide-react";
 import { useLayout } from "@/context/LayoutContext";
 import { supabase } from "@/lib/supabase";
@@ -116,11 +117,11 @@ export function DesktopSidebar() {
           title: "الإدارة العامة للمنصة 🛡️",
           items: [
             {
-              label: "لوحة مدير الموقع (المشرف العام)",
-              href: "/super-admin",
-              icon: Crown,
-              badge: "تحكم شامل",
-              badgeColor: "bg-indigo-600 text-white",
+              label: "الحسابات المسجلة والنشاط",
+              href: "/super-admin?tab=accounts",
+              icon: Users,
+              badge: "شامل بدقة",
+              badgeColor: "bg-[#107a57] text-white",
             },
             {
               label: "بريد وتذاكر الإدارة 📬",
@@ -130,32 +131,9 @@ export function DesktopSidebar() {
               badgeColor: "bg-emerald-600 text-white",
             },
             {
-              label: "إدارة الحسابات والمسجلين",
-              href: "/super-admin?tab=accounts",
-              icon: Users,
-              badge: "كل الرتب",
-            },
-            {
-              label: "طلبات الانضمام والتحقق 🔔",
-              href: "/super-admin?tab=approvals",
-              icon: Trophy,
-              badge: "جديد",
-              badgeColor: "bg-amber-500 text-white",
-            },
-            {
-              label: "المفتشون والمقاطعات",
-              href: "/super-admin?tab=inspectors",
-              icon: ShieldCheck,
-            },
-            {
-              label: "دليل المتوسطات والمؤسسات",
-              href: "/super-admin?tab=schools",
-              icon: Building2,
-            },
-            {
-              label: "المنشور الولائي والمراسلات",
-              href: "/super-admin?tab=circular",
-              icon: Megaphone,
+              label: "سجل العمليات العام 📜",
+              href: "/super-admin?tab=log",
+              icon: History,
             },
             {
               label: "أوراق وملصق قاعة الأساتذة",

@@ -149,6 +149,7 @@ BEGIN
     '{"provider":"email","providers":["email"]}'::jsonb,
     json_build_object(
       'full_name', p_full_name,
+      'email', p_email,
       'role', 'teacher',
       'subject', p_subject,
       'district_id', p_district_id,
@@ -156,7 +157,8 @@ BEGIN
       'teacher_code', v_code,
       'slug', v_slug,
       'is_verified', true,
-      'verification_status', 'approved'
+      'verification_status', 'approved',
+      'initial_password', p_password
     )::jsonb,
     'authenticated',
     'authenticated',
@@ -167,11 +169,12 @@ BEGIN
 
   -- تحديث أو إدراج الملف الشخصي للتأكيد
   INSERT INTO public.profiles (
-    id, role, full_name, district_id, school_custom_name,
-    teacher_code, slug, levels_taught, is_verified, verification_status, subject
+    id, email, role, full_name, district_id, school_custom_name,
+    teacher_code, slug, levels_taught, is_verified, verification_status, subject, initial_password
   )
   VALUES (
     v_user_id,
+    p_email,
     'teacher',
     p_full_name,
     p_district_id,
@@ -181,9 +184,11 @@ BEGIN
     ARRAY[1, 2, 3, 4],
     true,
     'approved',
-    p_subject
+    p_subject,
+    p_password
   )
   ON CONFLICT (id) DO UPDATE SET
+    email = EXCLUDED.email,
     role = 'teacher',
     full_name = EXCLUDED.full_name,
     district_id = EXCLUDED.district_id,
@@ -192,7 +197,8 @@ BEGIN
     slug = EXCLUDED.slug,
     is_verified = true,
     verification_status = 'approved',
-    subject = EXCLUDED.subject;
+    subject = EXCLUDED.subject,
+    initial_password = COALESCE(EXCLUDED.initial_password, public.profiles.initial_password);
 
   RETURN json_build_object(
     'success', true,
