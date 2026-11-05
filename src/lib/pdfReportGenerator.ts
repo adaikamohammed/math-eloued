@@ -20,6 +20,8 @@ export interface DiaryReportOptions {
   timetableSettings?: TimetableSettings | null;
   classColorsMap?: Record<string, string>;
   filterLabel?: string;
+  docTitle?: string;
+  fileName?: string;
 }
 
 // تنسيق التاريخ بالعربية (مثلاً: 05 أكتوبر 2026)
@@ -585,6 +587,15 @@ export function generateLandscapeDiaryHTML(options: DiaryReportOptions): string 
       font-weight: 700;
     }
   </style>
+  <title>${
+    options.docTitle ||
+    options.fileName ||
+    (options.days.length === 1
+      ? `الدفتر_اليومي_الأستاذ_${(options.teacherName || "عدايكة").trim().split(" ")[0]}_ليوم_${options.days[0].dateStr}`
+      : options.days.length > 1
+      ? `الدفتر_اليومي_الأستاذ_${(options.teacherName || "عدايكة").trim().split(" ")[0]}_من_${options.days[0].dateStr}_إلى_${options.days[options.days.length - 1].dateStr}`
+      : `الدفتر_اليومي_البيداغوجي_الأستاذ_${(options.teacherName || "عدايكة").trim().split(" ")[0]}`)
+  }</title>
 </head>
 <body>
   <div class="report-container">
@@ -634,7 +645,20 @@ export function generateLandscapeDiaryHTML(options: DiaryReportOptions): string 
 export function printLandscapeDiaryReport(options: DiaryReportOptions): void {
   if (typeof window === "undefined") return;
 
-  const htmlContent = generateLandscapeDiaryHTML(options);
+  const teacherFamily = (options.teacherName || "عدايكة").trim().split(" ")[0];
+  const calculatedDocTitle =
+    options.docTitle ||
+    options.fileName ||
+    (options.days.length === 1
+      ? `الدفتر_اليومي_الأستاذ_${teacherFamily}_ليوم_${options.days[0].dateStr}`
+      : options.days.length > 1
+      ? `الدفتر_اليومي_الأستاذ_${teacherFamily}_من_${options.days[0].dateStr}_إلى_${options.days[options.days.length - 1].dateStr}`
+      : `الدفتر_اليومي_البيداغوجي_الأستاذ_${teacherFamily}`);
+
+  const htmlContent = generateLandscapeDiaryHTML({
+    ...options,
+    docTitle: calculatedDocTitle,
+  });
 
   // إنشاء iframe خفي لعزل المستند تماماً عن واجهة الويب
   let printIframe = document.getElementById("landscape-diary-print-frame") as HTMLIFrameElement | null;
@@ -660,6 +684,7 @@ export function printLandscapeDiaryReport(options: DiaryReportOptions): void {
     if (win) {
       win.document.open();
       win.document.write(htmlContent);
+      win.document.title = calculatedDocTitle;
       win.document.close();
       win.focus();
       setTimeout(() => win.print(), 350);
@@ -667,8 +692,18 @@ export function printLandscapeDiaryReport(options: DiaryReportOptions): void {
     return;
   }
 
+  // حفظ عنوان النافذة الرئيسي وتعيين اسم الملف المقترح للحفظ كـ PDF
+  let originalTopTitle = "";
+  try {
+    if (window.top && window.top.document) {
+      originalTopTitle = window.top.document.title;
+      window.top.document.title = calculatedDocTitle;
+    }
+  } catch {}
+
   doc.open();
   doc.write(htmlContent);
+  doc.title = calculatedDocTitle;
   doc.close();
 
   // إعطاء وقت كافٍ لتحميل خط Cairo وتطبيق القواعد الأفقية
@@ -682,9 +717,20 @@ export function printLandscapeDiaryReport(options: DiaryReportOptions): void {
       if (win) {
         win.document.open();
         win.document.write(htmlContent);
+        win.document.title = calculatedDocTitle;
         win.document.close();
         win.focus();
         setTimeout(() => win.print(), 350);
+      }
+    } finally {
+      if (originalTopTitle) {
+        setTimeout(() => {
+          try {
+            if (window.top && window.top.document) {
+              window.top.document.title = originalTopTitle;
+            }
+          } catch {}
+        }, 4000);
       }
     }
   }, 400);

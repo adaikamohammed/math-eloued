@@ -669,22 +669,13 @@ export default function WeeklyDiaryPage() {
             </Link>
 
             <button
-              onClick={handlePrintLandscape}
-              type="button"
-              className="px-3.5 py-1.5 rounded-xl border border-gray-300 bg-white text-xs font-bold text-gray-800 hover:bg-gray-50 transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
-              title="طباعة المخطط الأسبوعي أفقياً A4 بدقة عالية"
-            >
-              <Printer className="w-3.5 h-3.5 text-[#107a57]" />
-              <span>طباعة أفقياً A4 🖨️</span>
-            </button>
-            <button
               onClick={handleDownloadPDF}
               type="button"
-              className="btn-primary text-xs px-3.5 py-1.5 flex items-center gap-1.5 shadow-sm cursor-pointer"
-              title="تحميل المخطط الأسبوعي كملف PDF أفقي عالي الدقة"
+              className="px-4 py-1.5 rounded-xl border border-emerald-600 bg-emerald-700 hover:bg-emerald-800 text-xs font-black text-white transition shadow-sm flex items-center gap-1.5 cursor-pointer"
+              title="حفظ وتصدير المخطط الأسبوعي كملف PDF أفقي رسمي (A4 Landscape)"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>تحميل PDF أفقياً 📄</span>
+              <span>حفظ PDF أفقياً 📄</span>
             </button>
           </div>
         </div>

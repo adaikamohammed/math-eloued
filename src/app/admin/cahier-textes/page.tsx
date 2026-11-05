@@ -103,6 +103,51 @@ function formatArabicFullDate(dateStr: string): string {
   }
 }
 
+// قائمة الأشهر المدرسية للموسم الدراسي
+const SCHOOL_MONTHS = [
+  { value: "2026-09", label: "سبتمبر 2026" },
+  { value: "2026-10", label: "أكتوبر 2026" },
+  { value: "2026-11", label: "نوفمبر 2026" },
+  { value: "2026-12", label: "ديسمبر 2026" },
+  { value: "2027-01", label: "جانفي 2027" },
+  { value: "2027-02", label: "فيفري 2027" },
+  { value: "2027-03", label: "مارس 2027" },
+  { value: "2027-04", label: "أفريل 2027" },
+  { value: "2027-05", label: "ماي 2027" },
+  { value: "2027-06", label: "جوان 2027" },
+];
+
+// حساب بداية ونهاية أسبوع دراسي (من الأحد إلى الخميس)
+function getSundayOfDate(dateStr: string): string {
+  try {
+    const [y, m, d] = dateStr.split("-").map(Number);
+    const date = new Date(y, m - 1, d);
+    const day = date.getDay(); // 0 is Sunday
+    date.setDate(date.getDate() - day);
+    const sy = date.getFullYear();
+    const sm = String(date.getMonth() + 1).padStart(2, "0");
+    const sd = String(date.getDate()).padStart(2, "0");
+    return `${sy}-${sm}-${sd}`;
+  } catch {
+    return dateStr;
+  }
+}
+
+function getThursdayOfDate(dateStr: string): string {
+  try {
+    const [y, m, d] = dateStr.split("-").map(Number);
+    const date = new Date(y, m - 1, d);
+    const day = date.getDay();
+    date.setDate(date.getDate() - day + 4);
+    const ty = date.getFullYear();
+    const tm = String(date.getMonth() + 1).padStart(2, "0");
+    const td = String(date.getDate()).padStart(2, "0");
+    return `${ty}-${tm}-${td}`;
+  } catch {
+    return dateStr;
+  }
+}
+
 export default function CahierDeTextesPage() {
   const { profile } = useProfile();
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
@@ -118,12 +163,23 @@ export default function CahierDeTextesPage() {
   const [timetable, setTimetable] = useState<TeacherTimetable | null>(null);
   const [timetableSettings, setTimetableSettings] = useState<TimetableSettings | null>(null);
 
-  // الفلاتر
+  // تاريخ اليوم والغد
+  const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
+
+  // الفلاتر الفئوية والبحث
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"standard" | "td" | "all">("standard");
 
-  // تاريخ اليوم والغد
-  const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
+  // الفلاتر الزمنية (شهر / أسبوع / يوم / كامل الموسم / مخصص)
+  const [periodFilterType, setPeriodFilterType] = useState<"all" | "month" | "week" | "day" | "custom">("all");
+  const [selectedMonth, setSelectedMonth] = useState<string>(() => todayStr.slice(0, 7) || "2026-11");
+  const [selectedWeekDate, setSelectedWeekDate] = useState<string>(() => todayStr);
+  const [selectedSingleDate, setSelectedSingleDate] = useState<string>(() => todayStr);
+  const [customStartDate, setCustomStartDate] = useState<string>(() => todayStr);
+  const [customEndDate, setCustomEndDate] = useState<string>(() => todayStr);
+
+  const currentWeekStart = useMemo(() => getSundayOfDate(selectedWeekDate), [selectedWeekDate]);
+  const currentWeekEnd = useMemo(() => getThursdayOfDate(selectedWeekDate), [selectedWeekDate]);
 
   // حالة استمارة الحصة
   const [isFormExpanded, setIsFormExpanded] = useState(false);
@@ -604,8 +660,19 @@ export default function CahierDeTextesPage() {
       }
     }
 
-    // تطبيق الفلاتر
+    // تطبيق فلتر النطاق الزمني (شهر / أسبوع / يوم / كامل الموسم / مخصص)
     let filtered = result;
+    if (periodFilterType === "month") {
+      filtered = filtered.filter((c) => (c.date || "").startsWith(selectedMonth));
+    } else if (periodFilterType === "week") {
+      filtered = filtered.filter((c) => (c.date || "") >= currentWeekStart && (c.date || "") <= currentWeekEnd);
+    } else if (periodFilterType === "day") {
+      filtered = filtered.filter((c) => c.date === selectedSingleDate);
+    } else if (periodFilterType === "custom") {
+      filtered = filtered.filter((c) => (c.date || "") >= customStartDate && (c.date || "") <= customEndDate);
+    }
+
+    // تطبيق الفلاتر
     if (activeTab === "standard") {
       filtered = filtered.filter((c) => !c.isTdOrRemediation);
     } else if (activeTab === "td") {
@@ -632,24 +699,41 @@ export default function CahierDeTextesPage() {
     });
 
     return filtered;
-  }, [cahierEntries, diaryEntries, activeClass, activeTab, searchQuery, teacherFamilyName]);
+  }, [
+    cahierEntries,
+    diaryEntries,
+    activeClass,
+    activeTab,
+    searchQuery,
+    teacherFamilyName,
+    periodFilterType,
+    selectedMonth,
+    currentWeekStart,
+    currentWeekEnd,
+    selectedSingleDate,
+    customStartDate,
+    customEndDate,
+  ]);
 
-  // تشغيل الطباعة الأفقية A4 (تطبع كافة الحصص المعروضة بما فيها المستنتجة تلقائياً)
-  const handlePrintLandscape = () => {
-    printCahierTextesReport({
-      teacherName: teacherFullName,
-      schoolName: printSchoolName,
-      inspectorName: printInspectorName,
-      principalName: printPrincipalName,
-      wilayaName: printWilaya,
-      subjectName: printSubject,
-      className: activeClass,
-      timetableSlots: timetable?.slots || [],
-      entries: currentClassEntries,
-    });
-  };
+  // تسمية الفترة النشطة لعرضها في الرأس وملف الـ PDF
+  const activePeriodLabel = useMemo(() => {
+    if (periodFilterType === "month") {
+      const mObj = SCHOOL_MONTHS.find((m) => m.value === selectedMonth);
+      return mObj ? `شهر ${mObj.label}` : `شهر ${selectedMonth}`;
+    }
+    if (periodFilterType === "week") {
+      return `الأسبوع من ${formatArabicFullDate(currentWeekStart)} إلى ${formatArabicFullDate(currentWeekEnd)}`;
+    }
+    if (periodFilterType === "day") {
+      return `يوم ${getArabicDayName(selectedSingleDate)} ${formatArabicFullDate(selectedSingleDate)}`;
+    }
+    if (periodFilterType === "custom") {
+      return `الفترة من ${formatArabicFullDate(customStartDate)} إلى ${formatArabicFullDate(customEndDate)}`;
+    }
+    return "كامل الموسم الدراسي 2026 / 2027";
+  }, [periodFilterType, selectedMonth, currentWeekStart, currentWeekEnd, selectedSingleDate, customStartDate, customEndDate]);
 
-  // تشغيل تنزيل الـ PDF الأفقي
+  // تشغيل تنزيل الـ PDF الأفقي للفترة المحددة
   const handleDownloadPDF = () => {
     downloadCahierTextesPDF({
       teacherName: teacherFullName,
@@ -661,6 +745,7 @@ export default function CahierDeTextesPage() {
       className: activeClass,
       timetableSlots: timetable?.slots || [],
       entries: currentClassEntries,
+      periodLabel: activePeriodLabel,
     });
   };
 
@@ -702,22 +787,13 @@ export default function CahierDeTextesPage() {
 
           <div className="flex items-center gap-2 flex-wrap">
             <button
-              onClick={handlePrintLandscape}
-              type="button"
-              className="px-3.5 py-1.5 rounded-xl border border-gray-300 bg-white text-xs font-bold text-gray-800 hover:bg-gray-50 transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
-              title="طباعة دفتر نصوص هذا الفوج أفقياً A4"
-            >
-              <Printer className="w-3.5 h-3.5 text-[#107a57]" />
-              <span>طباعة أفقياً A4 🖨️</span>
-            </button>
-            <button
               onClick={handleDownloadPDF}
               type="button"
-              className="px-3.5 py-1.5 rounded-xl border border-[#107a57]/30 bg-[#e6f4ee] text-xs font-black text-[#107a57] hover:bg-[#d8efe5] transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
-              title="تنزيل دفتر نصوص القسم كملف PDF أفقي عالي الدقة"
+              className="px-4 py-1.5 rounded-xl border border-emerald-600 bg-emerald-700 hover:bg-emerald-800 text-xs font-black text-white transition shadow-sm flex items-center gap-1.5 cursor-pointer"
+              title="حفظ وتصدير دفتر نصوص الفوج كملف PDF رسمي (A4 Landscape) للفترة المحددة"
             >
-              <Download className="w-3.5 h-3.5 text-[#107a57]" />
-              <span>تحميل PDF أفقياً 📄</span>
+              <Download className="w-3.5 h-3.5" />
+              <span>حفظ PDF أفقياً 📄</span>
             </button>
             <Link
               href="/admin/diary"
@@ -1124,6 +1200,201 @@ export default function CahierDeTextesPage() {
               </div>
             </form>
           )}
+        </div>
+
+        {/* ─── شريط الفلترة الزمني المتقدم (شهر / أسبوع / يوم / كامل الموسم / مخصص) ─── */}
+        <div className="bg-white rounded-2xl p-4 border border-[#e8e8e0] shadow-2xs space-y-3 print:hidden">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            {/* أزرار اختيار نوع الفلترة */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-xs font-black text-gray-700 ml-1 flex items-center gap-1">
+                <Calendar className="w-3.5 h-3.5 text-[#107a57]" />
+                <span>نطاق السجل:</span>
+              </span>
+
+              <button
+                type="button"
+                onClick={() => setPeriodFilterType("all")}
+                className={`px-3 py-1.5 rounded-xl text-xs font-black transition cursor-pointer ${
+                  periodFilterType === "all"
+                    ? "bg-[#107a57] text-white shadow-2xs"
+                    : "bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200"
+                }`}
+              >
+                كامل الموسم 📅
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setPeriodFilterType("month")}
+                className={`px-3 py-1.5 rounded-xl text-xs font-black transition cursor-pointer ${
+                  periodFilterType === "month"
+                    ? "bg-[#107a57] text-white shadow-2xs"
+                    : "bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200"
+                }`}
+              >
+                شهر كامل 🗓️
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setPeriodFilterType("week")}
+                className={`px-3 py-1.5 rounded-xl text-xs font-black transition cursor-pointer ${
+                  periodFilterType === "week"
+                    ? "bg-[#107a57] text-white shadow-2xs"
+                    : "bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200"
+                }`}
+              >
+                أسبوع كامل 📆
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setPeriodFilterType("day")}
+                className={`px-3 py-1.5 rounded-xl text-xs font-black transition cursor-pointer ${
+                  periodFilterType === "day"
+                    ? "bg-[#107a57] text-white shadow-2xs"
+                    : "bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200"
+                }`}
+              >
+                يوم محدد 📌
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setPeriodFilterType("custom")}
+                className={`px-3 py-1.5 rounded-xl text-xs font-black transition cursor-pointer ${
+                  periodFilterType === "custom"
+                    ? "bg-[#107a57] text-white shadow-2xs"
+                    : "bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200"
+                }`}
+              >
+                فترة مخصصة ⏳
+              </button>
+            </div>
+
+            {/* شارة توضيحية لعدد الحصص */}
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-black px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
+                {currentClassEntries.length} حصة مسجلة
+              </span>
+            </div>
+          </div>
+
+          {/* محدد التفاصيل حسب نوع الفلترة */}
+          <div className="pt-2 border-t border-gray-100 flex flex-wrap items-center justify-between gap-3">
+            {periodFilterType === "month" && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-bold text-gray-600">اختر الشهر:</span>
+                <select
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                  className="px-3 py-1.5 rounded-xl bg-gray-50 border border-gray-300 text-xs font-black text-gray-900 focus:outline-none focus:border-[#107a57]"
+                >
+                  {SCHOOL_MONTHS.map((m) => (
+                    <option key={m.value} value={m.value}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-xs text-gray-500 font-medium">
+                  حفظ وتصدير دفتر نصوص شهر {SCHOOL_MONTHS.find((m) => m.value === selectedMonth)?.label || selectedMonth} في ملف واحد مع التأشيرات في نهايته.
+                </span>
+              </div>
+            )}
+
+            {periodFilterType === "week" && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const [y, m, d] = selectedWeekDate.split("-").map(Number);
+                    const dt = new Date(y, m - 1, d - 7);
+                    setSelectedWeekDate(dt.toISOString().split("T")[0]);
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-xs font-bold text-gray-700 transition cursor-pointer"
+                  title="الأسبوع السابق"
+                >
+                  ◀ الأسبوع السابق
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedWeekDate(todayStr)}
+                  className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold transition cursor-pointer"
+                  title="الأسبوع الحالي"
+                >
+                  الأسبوع الحالي
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const [y, m, d] = selectedWeekDate.split("-").map(Number);
+                    const dt = new Date(y, m - 1, d + 7);
+                    setSelectedWeekDate(dt.toISOString().split("T")[0]);
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-xs font-bold text-gray-700 transition cursor-pointer"
+                  title="الأسبوع التالي"
+                >
+                  الأسبوع التالي ▶
+                </button>
+                <span className="text-xs font-black text-emerald-900 bg-emerald-100/60 px-3 py-1 rounded-xl">
+                  من {formatArabicFullDate(currentWeekStart)} إلى {formatArabicFullDate(currentWeekEnd)}
+                </span>
+              </div>
+            )}
+
+            {periodFilterType === "day" && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-bold text-gray-600">اختر اليوم:</span>
+                <input
+                  type="date"
+                  value={selectedSingleDate}
+                  onChange={(e) => setSelectedSingleDate(e.target.value)}
+                  className="px-3 py-1.5 rounded-xl bg-gray-50 border border-gray-300 text-xs font-black text-gray-900 focus:outline-none focus:border-[#107a57]"
+                />
+                <button
+                  type="button"
+                  onClick={() => setSelectedSingleDate(todayStr)}
+                  className="px-2.5 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-xs font-bold text-gray-700 transition cursor-pointer"
+                >
+                  اليوم
+                </button>
+                <span className="text-xs font-bold text-gray-700">
+                  {getArabicDayName(selectedSingleDate)} {formatArabicFullDate(selectedSingleDate)}
+                </span>
+              </div>
+            )}
+
+            {periodFilterType === "custom" && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-bold text-gray-600">من:</span>
+                <input
+                  type="date"
+                  value={customStartDate}
+                  onChange={(e) => setCustomStartDate(e.target.value)}
+                  className="px-2.5 py-1 rounded-xl bg-gray-50 border border-gray-300 text-xs font-black text-gray-900 focus:outline-none focus:border-[#107a57]"
+                />
+                <span className="text-xs font-bold text-gray-600">إلى:</span>
+                <input
+                  type="date"
+                  value={customEndDate}
+                  onChange={(e) => setCustomEndDate(e.target.value)}
+                  className="px-2.5 py-1 rounded-xl bg-gray-50 border border-gray-300 text-xs font-black text-gray-900 focus:outline-none focus:border-[#107a57]"
+                />
+              </div>
+            )}
+
+            {periodFilterType === "all" && (
+              <div className="text-xs text-gray-500 font-medium">
+                عرض كامل الحصص المسجلة لفوج ({activeClass}) طيلة الموسم الدراسي 2026 / 2027 م.
+              </div>
+            )}
+
+            <div className="text-xs text-[#107a57] font-black flex items-center gap-1 mr-auto">
+              <span>الفترة النشطة بالسجل:</span>
+              <span className="underline">{activePeriodLabel}</span>
+            </div>
+          </div>
         </div>
 
         {/* ─── شريط التصفية والبحث في حصص الفوج ─── */}

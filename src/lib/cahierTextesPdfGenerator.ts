@@ -14,6 +14,9 @@ export interface CahierTextesPdfOptions {
   weeklyHours?: string;
   timetableSlots?: TimetableSlot[];
   entries: CahierTextesEntry[];
+  periodLabel?: string;
+  docTitle?: string;
+  fileName?: string;
 }
 
 // تنسيق التاريخ بالعربية (مثلاً: 05 أكتوبر 2026)
@@ -569,6 +572,11 @@ export function generateCahierTextesHTML(options: CahierTextesPdfOptions): strin
       font-weight: 700;
     }
   </style>
+  <title>${
+    options.docTitle ||
+    options.fileName ||
+    `دفتر_نصوص_فوج_${cls}_الأستاذ_${(teacher || "عدايكة").trim().split(" ")[0]}_${(options.periodLabel || "كامل_الموسم").replace(/\s+/g, "_")}`
+  }</title>
 </head>
 <body>
   <div class="report-container">
@@ -586,7 +594,7 @@ export function generateCahierTextesHTML(options: CahierTextesPdfOptions): strin
         <div class="header-info-item"><span>المؤسسة: </span><strong>${school}</strong></div>
         <div class="header-info-item"><span>الفوج التربوي المعتمد: </span><strong>فوج ${cls} (${weeklyHours})</strong></div>
         <div class="header-info-item"><span>الأستاذ(ة): </span><strong>${teacher}</strong></div>
-        <div class="header-info-item"><span>الرتبة والمؤهل: </span><strong>${rank} — ${qualification}</strong></div>
+        <div class="header-info-item"><span>الفترة المحددة بالسجل: </span><strong style="color: #0369a1;">${options.periodLabel || "كامل الموسم الدراسي 2026 / 2027"}</strong></div>
         <div class="header-info-item"><span>المقاطعة التفتيشية: </span><strong>${district}</strong></div>
         <div class="header-info-item"><span>السيد مفتش التربية الوطنية: </span><strong>${inspector}</strong></div>
       </div>
@@ -672,7 +680,18 @@ export function generateCahierTextesHTML(options: CahierTextesPdfOptions): strin
 export function printCahierTextesReport(options: CahierTextesPdfOptions): void {
   if (typeof window === "undefined") return;
 
-  const htmlContent = generateCahierTextesHTML(options);
+  const teacherFamily = (options.teacherName || "عدايكة").trim().split(" ")[0];
+  const cls = options.className || "2م3";
+  const periodSafe = (options.periodLabel || "كامل_الموسم").replace(/\s+/g, "_");
+  const calculatedDocTitle =
+    options.docTitle ||
+    options.fileName ||
+    `دفتر_نصوص_فوج_${cls}_الأستاذ_${teacherFamily}_${periodSafe}`;
+
+  const htmlContent = generateCahierTextesHTML({
+    ...options,
+    docTitle: calculatedDocTitle,
+  });
 
   let printIframe = document.getElementById("cahier-textes-print-frame") as HTMLIFrameElement | null;
   if (printIframe) {
@@ -696,6 +715,7 @@ export function printCahierTextesReport(options: CahierTextesPdfOptions): void {
     if (win) {
       win.document.open();
       win.document.write(htmlContent);
+      win.document.title = calculatedDocTitle;
       win.document.close();
       win.focus();
       setTimeout(() => win.print(), 350);
@@ -703,8 +723,18 @@ export function printCahierTextesReport(options: CahierTextesPdfOptions): void {
     return;
   }
 
+  // حفظ عنوان النافذة الأصلي وتعيين اسم المستند ليقترحه المتصفح عند حفظ PDF
+  let originalTopTitle = "";
+  try {
+    if (window.top && window.top.document) {
+      originalTopTitle = window.top.document.title;
+      window.top.document.title = calculatedDocTitle;
+    }
+  } catch {}
+
   doc.open();
   doc.write(htmlContent);
+  doc.title = calculatedDocTitle;
   doc.close();
 
   setTimeout(() => {
@@ -717,9 +747,20 @@ export function printCahierTextesReport(options: CahierTextesPdfOptions): void {
       if (win) {
         win.document.open();
         win.document.write(htmlContent);
+        win.document.title = calculatedDocTitle;
         win.document.close();
         win.focus();
         setTimeout(() => win.print(), 350);
+      }
+    } finally {
+      if (originalTopTitle) {
+        setTimeout(() => {
+          try {
+            if (window.top && window.top.document) {
+              window.top.document.title = originalTopTitle;
+            }
+          } catch {}
+        }, 4000);
       }
     }
   }, 400);

@@ -21,6 +21,8 @@ export interface WeeklyDiaryPdfOptions {
   dayLessonsMap: Record<string, DailyDiaryEntry[]>;
   customClasses?: string[];
   classColorsMap?: Record<string, string>;
+  docTitle?: string;
+  fileName?: string;
 }
 
 // تنسيق التاريخ بالعربية (مثلاً: 05 أكتوبر 2026)
@@ -459,6 +461,7 @@ export function generateWeeklyDiaryHTML(options: WeeklyDiaryPdfOptions): string 
       color: #0f172a;
     }
   </style>
+  <title>${options.docTitle || `المخطط_الأسبوعي_الدفتر_اليومي_من_${options.weekStartStr}_إلى_${options.weekEndStr}_الأستاذ_${(options.teacherName || "عدايكة").trim().split(" ")[0]}`}</title>
 </head>
 <body>
   <div class="page-container">
@@ -508,7 +511,16 @@ export function generateWeeklyDiaryHTML(options: WeeklyDiaryPdfOptions): string 
 export function printWeeklyDiaryReport(options: WeeklyDiaryPdfOptions): void {
   if (typeof window === "undefined") return;
 
-  const htmlContent = generateWeeklyDiaryHTML(options);
+  const teacherFamily = (options.teacherName || "عدايكة").trim().split(" ")[0];
+  const calculatedTitle =
+    options.docTitle ||
+    options.fileName ||
+    `المخطط_الأسبوعي_الدفتر_اليومي_من_${options.weekStartStr}_إلى_${options.weekEndStr}_الأستاذ_${teacherFamily}`;
+
+  const htmlContent = generateWeeklyDiaryHTML({
+    ...options,
+    docTitle: calculatedTitle,
+  });
 
   let printIframe = document.getElementById("weekly-diary-print-frame") as HTMLIFrameElement | null;
   if (printIframe) {
@@ -532,6 +544,7 @@ export function printWeeklyDiaryReport(options: WeeklyDiaryPdfOptions): void {
     if (win) {
       win.document.open();
       win.document.write(htmlContent);
+      win.document.title = calculatedTitle;
       win.document.close();
       win.focus();
       setTimeout(() => win.print(), 350);
@@ -539,8 +552,18 @@ export function printWeeklyDiaryReport(options: WeeklyDiaryPdfOptions): void {
     return;
   }
 
+  // حفظ عنوان النافذة الأصلي وتعيين اسم المستند ليقترحه المتصفح عند حفظ PDF
+  let originalTopTitle = "";
+  try {
+    if (window.top && window.top.document) {
+      originalTopTitle = window.top.document.title;
+      window.top.document.title = calculatedTitle;
+    }
+  } catch {}
+
   doc.open();
   doc.write(htmlContent);
+  doc.title = calculatedTitle;
   doc.close();
 
   setTimeout(() => {
@@ -553,9 +576,20 @@ export function printWeeklyDiaryReport(options: WeeklyDiaryPdfOptions): void {
       if (win) {
         win.document.open();
         win.document.write(htmlContent);
+        win.document.title = calculatedTitle;
         win.document.close();
         win.focus();
         setTimeout(() => win.print(), 350);
+      }
+    } finally {
+      if (originalTopTitle) {
+        setTimeout(() => {
+          try {
+            if (window.top && window.top.document) {
+              window.top.document.title = originalTopTitle;
+            }
+          } catch {}
+        }, 4000);
       }
     }
   }, 400);

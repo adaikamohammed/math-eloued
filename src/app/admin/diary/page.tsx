@@ -1303,22 +1303,13 @@ function TeacherDiaryContent() {
 
           <div className="flex items-center gap-2 flex-wrap">
             <button
-              onClick={handlePrintLandscape}
-              type="button"
-              className="px-3.5 py-1.5 rounded-xl border border-gray-300 bg-white text-xs font-bold text-gray-800 hover:bg-gray-50 transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
-              title="طباعة الدفتر اليومي بيداغوجياً بمقاس A4 أفقي رسمي"
-            >
-              <Printer className="w-3.5 h-3.5 text-[#107a57]" />
-              <span>طباعة أفقياً A4 🖨️</span>
-            </button>
-            <button
               onClick={handleDownloadLandscapePDF}
               type="button"
-              className="px-3.5 py-1.5 rounded-xl border border-[#107a57]/30 bg-[#e6f4ee] text-xs font-black text-[#107a57] hover:bg-[#d8efe5] transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
-              title="حفظ وتنزيل الدفتر اليومي كملف PDF أفقي"
+              className="px-4 py-1.5 rounded-xl border border-emerald-600 bg-emerald-700 hover:bg-emerald-800 text-xs font-black text-white transition shadow-sm flex items-center gap-1.5 cursor-pointer"
+              title="حفظ وتصدير الدفتر اليومي كملف PDF أفقي رسمي (A4 Landscape)"
             >
-              <Download className="w-3.5 h-3.5 text-[#107a57]" />
-              <span>تحميل PDF أفقياً 📄</span>
+              <Download className="w-3.5 h-3.5" />
+              <span>حفظ PDF أفقياً 📄</span>
             </button>
             <Link
               href="/admin/diary/weekly"
