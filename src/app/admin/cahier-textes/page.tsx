@@ -148,6 +148,46 @@ function getThursdayOfDate(dateStr: string): string {
   }
 }
 
+// دالة التحقق من تطابق أسماء الأفواج بمرونة تامة لمعالجة المسافات والأرقام والتسميات المختلفة
+export function isSameClass(a?: string | null, b?: string | null): boolean {
+  if (!a || !b) return false;
+  const normalize = (str: string) =>
+    str
+      .trim()
+      .replace(/[٠-٩]/g, (d) => "٠١٢٣٤٥٦٧٨٩".indexOf(d).toString())
+      .replace(/فوج\s*/g, "")
+      .replace(/قسم\s*/g, "")
+      .replace(/متوسط/g, "م")
+      .replace(/م\s*/g, "م")
+      .replace(/[\s\-_/\\]/g, "")
+      .toLowerCase();
+  return normalize(a) === normalize(b);
+}
+
+// استخراج وتوحيد قائمة الأفواج من الإعدادات والدروس المسجلة ودفتر النصوص لضمان عدم إغفال أي فوج
+export function extractAndUnifyClasses(
+  customClasses?: string[],
+  diaryEntries?: DailyDiaryEntry[],
+  cahierEntries?: CahierTextesEntry[]
+): string[] {
+  const rawList: string[] = [
+    ...(Array.isArray(customClasses) ? customClasses : []),
+    ...(Array.isArray(diaryEntries) ? diaryEntries.map((d) => d.className) : []),
+    ...(Array.isArray(cahierEntries) ? cahierEntries.map((c) => c.className) : []),
+  ].filter(Boolean) as string[];
+
+  const unified: string[] = [];
+  for (const raw of rawList) {
+    const trimmed = raw.trim();
+    if (!trimmed) continue;
+    if (!unified.some((u) => isSameClass(u, trimmed))) {
+      unified.push(trimmed);
+    }
+  }
+
+  return unified.length > 0 ? sortClasses(unified) : ["2م3", "1م1", "1م2", "1م3"];
+}
+
 export default function CahierDeTextesPage() {
   const { profile } = useProfile();
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
@@ -166,9 +206,9 @@ export default function CahierDeTextesPage() {
   // تاريخ اليوم والغد
   const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
 
-  // الفلاتر الفئوية والبحث
+  // الفلاتر الفئوية والبحث (الافتراضي هو عرض الكل لعدم حجب أي حصة)
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState<"standard" | "td" | "all">("standard");
+  const [activeTab, setActiveTab] = useState<"standard" | "td" | "all">("all");
 
   // الفلاتر الزمنية (شهر / أسبوع / يوم / كامل الموسم / مخصص)
   const [periodFilterType, setPeriodFilterType] = useState<"all" | "month" | "week" | "day" | "custom">("all");
@@ -240,13 +280,19 @@ export default function CahierDeTextesPage() {
           }
           const active = data || (teacherId ? getTeacherOfflineData(teacherId) : null);
           if (active) {
-            const sortedCls =
-              Array.isArray(active.customClasses) && active.customClasses.length > 0
-                ? sortClasses(active.customClasses)
-                : ["2م3", "1م1", "1م2", "1م3"];
+            const sortedCls = extractAndUnifyClasses(
+              active.customClasses,
+              active.diaryEntries,
+              active.cahierTextesEntries
+            );
 
             setCustomClasses(sortedCls);
-            setActiveClass((prev) => prev || sortedCls[0]);
+            setActiveClass((prev) => {
+              if (prev && sortedCls.some((c) => isSameClass(c, prev))) {
+                return sortedCls.find((c) => isSameClass(c, prev))!;
+              }
+              return sortedCls[0] || "1م1";
+            });
 
             if (Array.isArray(active.diaryEntries)) {
               setDiaryEntries(active.diaryEntries);
@@ -268,11 +314,18 @@ export default function CahierDeTextesPage() {
           if (teacherId) {
             const offline = getTeacherOfflineData(teacherId);
             if (offline) {
-              if (Array.isArray(offline.customClasses) && offline.customClasses.length > 0) {
-                const sortedCls = sortClasses(offline.customClasses);
-                setCustomClasses(sortedCls);
-                setActiveClass((prev) => prev || sortedCls[0]);
-              }
+              const sortedCls = extractAndUnifyClasses(
+                offline.customClasses,
+                offline.diaryEntries,
+                offline.cahierTextesEntries
+              );
+              setCustomClasses(sortedCls);
+              setActiveClass((prev) => {
+                if (prev && sortedCls.some((c) => isSameClass(c, prev))) {
+                  return sortedCls.find((c) => isSameClass(c, prev))!;
+                }
+                return sortedCls[0] || "1م1";
+              });
               if (Array.isArray(offline.diaryEntries)) setDiaryEntries(offline.diaryEntries);
               if (Array.isArray(offline.cahierTextesEntries)) setCahierEntries(offline.cahierTextesEntries);
               if (offline.timetable) setTimetable(offline.timetable);
@@ -528,9 +581,7 @@ export default function CahierDeTextesPage() {
 
   // ⚡ استيراد الحصص تلقائياً من الدفتر اليومي للفوج النشط
   const handleSyncFromDiary = async () => {
-    const classDiaryLessons = diaryEntries.filter(
-      (d) => d.className === activeClass || d.className.replace(/\s+/g, "") === activeClass.replace(/\s+/g, "")
-    );
+    const classDiaryLessons = diaryEntries.filter((d) => isSameClass(d.className, activeClass));
 
     if (classDiaryLessons.length === 0) {
       alert(`لم يتم العثور على حصص مسجلة لفوج (${activeClass}) في الدفتر اليومي.`);
@@ -538,13 +589,13 @@ export default function CahierDeTextesPage() {
     }
 
     const existingDiaryIds = new Set(
-      cahierEntries.filter((c) => c.className === activeClass && c.diaryEntryId).map((c) => c.diaryEntryId)
+      cahierEntries.filter((c) => isSameClass(c.className, activeClass) && c.diaryEntryId).map((c) => c.diaryEntryId)
     );
 
     const newToImport = classDiaryLessons.filter((d) => !existingDiaryIds.has(d.id));
 
     if (newToImport.length === 0) {
-      alert(`كافة حصص فوج (${activeClass}) المسجلة في الدفتر اليومي مستوردة مسبقاً في دفتر النصوص.`);
+      alert(`كافة حصص فوج (${activeClass}) المسجلة في الدفتر اليومي (${classDiaryLessons.length} حصة) مستوردة ومتاحة مسبقاً في دفتر النصوص.`);
       return;
     }
 
@@ -557,46 +608,12 @@ export default function CahierDeTextesPage() {
     }
 
     const importedEntries: CahierTextesEntry[] = newToImport.map((d) => {
-      const warmupContent =
-        d.stages?.find((s) => s.label.includes("تمهيدي") || s.label.includes("تهيئة") || s.label.includes("انطلاق"))
-          ?.content || "";
-
-      const situationContent =
-        d.stages?.find((s) => s.label.includes("وسيطي") || s.label.includes("وضعية") || s.label.includes("بناء"))
-          ?.content || "";
-
-      const summaryContent =
-        d.concepts ||
-        d.stages?.find((s) => s.label.includes("حوصلة") || s.label.includes("قاعدة"))?.content ||
-        "";
-
-      const reinvestContent =
-        d.stages?.find((s) => s.label.includes("نهائي") || s.label.includes("استثمار") || s.label.includes("تطبيق"))
-          ?.content || "";
-
-      const isTd = d.sessionType?.includes("موجهة") || d.sessionType?.includes("استدراك") || false;
-
+      const inferred = inferCahierTextesFromDiary(d, teacherFamilyName);
       return {
+        ...inferred,
         id: `cahier_sync_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
         diaryEntryId: d.id,
         className: activeClass,
-        date: d.date,
-        dayName: d.day,
-        periodTime: d.periodTime || "08:00 - 09:00",
-        sessionType: d.sessionType || (isTd ? "أعمال موجهة" : "درس ومورد"),
-        field: d.field || "أنشطة عددية",
-        section: d.section || "",
-        resourceTitle: d.lessonTitle,
-        warmup: warmupContent,
-        proposedSituation: situationContent,
-        summary: summaryContent,
-        reinvestment: reinvestContent,
-        homework: d.homework || "",
-        signature: `${teacherFamilyName} ✍`,
-        isTdOrRemediation: isTd,
-        subgroup: isTd ? "القسم كامل" : undefined,
-        notes: d.notes || "",
-        createdAt: new Date().toISOString(),
       };
     });
 
@@ -609,13 +626,28 @@ export default function CahierDeTextesPage() {
     });
   };
 
-  // الحصص المعروضة للفوج النشط مع الربط التلقائي والذكي بالدفتر اليومي والمخطط الأسبوعي
-  const currentClassEntries = useMemo(() => {
-    const classDiaryLessons = diaryEntries.filter(
-      (d) =>
-        d.className === activeClass ||
-        (d.className && d.className.replace(/\s+/g, "") === activeClass.replace(/\s+/g, ""))
-    );
+  // حساب إجمالي عدد الحصص المسجلة لكل فوج (حصص الدفتر اليومي + تدوينات دفتر النصوص المستقلة)
+  const classSessionCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const cls of customClasses) {
+      const classDiary = diaryEntries.filter((d) => isSameClass(d.className, cls));
+      const diaryDateTimes = new Set(classDiary.map((d) => `${d.date}_${d.periodTime || ""}`.trim()));
+      const diaryIds = new Set(classDiary.map((d) => d.id));
+
+      const standalone = cahierEntries.filter(
+        (c) =>
+          isSameClass(c.className, cls) &&
+          (!c.diaryEntryId || !diaryIds.has(c.diaryEntryId)) &&
+          !diaryDateTimes.has(`${c.date}_${c.periodTime || ""}`.trim())
+      );
+      counts[cls] = classDiary.length + standalone.length;
+    }
+    return counts;
+  }, [customClasses, diaryEntries, cahierEntries]);
+
+  // كافة حصص الفوج النشط المستدعاة من الدفتر اليومي ودفتر النصوص طيلة الموسم الدراسي
+  const allActiveClassEntries = useMemo(() => {
+    const classDiaryLessons = diaryEntries.filter((d) => isSameClass(d.className, activeClass));
 
     // فهرسة التدوينات المحفوظة مسبقاً بهذا القسم حسب diaryEntryId وحسب (التاريخ + التوقيت)
     const savedByDiaryId = new Map<string, CahierTextesEntry>();
@@ -623,7 +655,7 @@ export default function CahierDeTextesPage() {
     const standaloneEntries: CahierTextesEntry[] = [];
 
     for (const c of cahierEntries) {
-      if (c.className !== activeClass && c.className.replace(/\s+/g, "") !== activeClass.replace(/\s+/g, "")) continue;
+      if (!isSameClass(c.className, activeClass)) continue;
       if (c.diaryEntryId) {
         savedByDiaryId.set(c.diaryEntryId, c);
       } else {
@@ -660,8 +692,53 @@ export default function CahierDeTextesPage() {
       }
     }
 
+    // فرز الحصص تصاعدياً حسب التاريخ ثم التوقيت
+    result.sort((a, b) => {
+      const cmpDate = (a.date || "").localeCompare(b.date || "");
+      if (cmpDate !== 0) return cmpDate;
+      return (a.periodTime || "").localeCompare(b.periodTime || "");
+    });
+
+    return result;
+  }, [cahierEntries, diaryEntries, activeClass, teacherFamilyName]);
+
+  // إحصائيات أنواع حصص الفوج النشط (العادية / أعمال موجهة واستدراك / الكل)
+  const activeClassCounts = useMemo(() => {
+    const total = allActiveClassEntries.length;
+    const td = allActiveClassEntries.filter((c) => !!c.isTdOrRemediation).length;
+    const standard = total - td;
+    return { total, standard, td };
+  }, [allActiveClassEntries]);
+
+  // الأشهر المتاحة للاختيار مع تضمين أي شهر وردت فيه حصص مسجلة
+  const availableMonths = useMemo(() => {
+    const monthsMap = new Map<string, string>();
+    for (const sm of SCHOOL_MONTHS) {
+      monthsMap.set(sm.value, sm.label);
+    }
+    for (const entry of allActiveClassEntries) {
+      if (entry.date && entry.date.length >= 7) {
+        const ym = entry.date.slice(0, 7);
+        if (!monthsMap.has(ym)) {
+          const [y, m] = ym.split("-");
+          const monthNames = [
+            "جانفي", "فيفري", "مارس", "أفريل", "ماي", "جوان",
+            "جويلية", "أوت", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"
+          ];
+          const mIdx = parseInt(m, 10) - 1;
+          const label = `${monthNames[mIdx] || m} ${y}`;
+          monthsMap.set(ym, label);
+        }
+      }
+    }
+    return Array.from(monthsMap.entries()).map(([value, label]) => ({ value, label }));
+  }, [allActiveClassEntries]);
+
+  // الحصص المعروضة بعد تطبيق فلاتر الفترة ونوع الحصة والبحث
+  const currentClassEntries = useMemo(() => {
+    let filtered = allActiveClassEntries;
+
     // تطبيق فلتر النطاق الزمني (شهر / أسبوع / يوم / كامل الموسم / مخصص)
-    let filtered = result;
     if (periodFilterType === "month") {
       filtered = filtered.filter((c) => (c.date || "").startsWith(selectedMonth));
     } else if (periodFilterType === "week") {
@@ -672,13 +749,14 @@ export default function CahierDeTextesPage() {
       filtered = filtered.filter((c) => (c.date || "") >= customStartDate && (c.date || "") <= customEndDate);
     }
 
-    // تطبيق الفلاتر
+    // تطبيق فلتر نوع الحصة (عادية / أعمال موجهة واستدراك / الكل)
     if (activeTab === "standard") {
       filtered = filtered.filter((c) => !c.isTdOrRemediation);
     } else if (activeTab === "td") {
       filtered = filtered.filter((c) => !!c.isTdOrRemediation);
     }
 
+    // تطبيق البحث النصي
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
       filtered = filtered.filter(
@@ -691,21 +769,9 @@ export default function CahierDeTextesPage() {
       );
     }
 
-    // فرز الحصص تصاعدياً حسب التاريخ ثم التوقيت
-    filtered.sort((a, b) => {
-      const cmpDate = (a.date || "").localeCompare(b.date || "");
-      if (cmpDate !== 0) return cmpDate;
-      return (a.periodTime || "").localeCompare(b.periodTime || "");
-    });
-
     return filtered;
   }, [
-    cahierEntries,
-    diaryEntries,
-    activeClass,
-    activeTab,
-    searchQuery,
-    teacherFamilyName,
+    allActiveClassEntries,
     periodFilterType,
     selectedMonth,
     currentWeekStart,
@@ -713,6 +779,8 @@ export default function CahierDeTextesPage() {
     selectedSingleDate,
     customStartDate,
     customEndDate,
+    activeTab,
+    searchQuery,
   ]);
 
   // تسمية الفترة النشطة لعرضها في الرأس وملف الـ PDF
@@ -890,8 +958,8 @@ export default function CahierDeTextesPage() {
         <div className="flex items-center gap-2 overflow-x-auto pb-1 print:hidden">
           <span className="text-xs font-black text-gray-500 ml-1 shrink-0">اختر الفوج:</span>
           {customClasses.map((cls) => {
-            const isSelected = cls === activeClass;
-            const count = cahierEntries.filter((c) => c.className === cls).length;
+            const isSelected = isSameClass(cls, activeClass);
+            const count = classSessionCounts[cls] ?? 0;
             const classTheme = getClassColors(cls, customClasses, timetableSettings?.colorMode || "distinct", timetableSettings?.classColors);
 
             return (
@@ -911,8 +979,8 @@ export default function CahierDeTextesPage() {
                 ></span>
                 <span>فوج {cls}</span>
                 <span
-                  className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
-                    isSelected ? "bg-white/20 text-white" : "bg-gray-100 text-gray-600"
+                  className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold ${
+                    isSelected ? "bg-white/20 text-white font-black" : "bg-gray-100 text-gray-700"
                   }`}
                 >
                   {count} حصة
@@ -1276,7 +1344,9 @@ export default function CahierDeTextesPage() {
             {/* شارة توضيحية لعدد الحصص */}
             <div className="flex items-center gap-2">
               <span className="text-[11px] font-black px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
-                {currentClassEntries.length} حصة مسجلة
+                {periodFilterType === "all"
+                  ? `${currentClassEntries.length} حصة مسجلة طيلة الموسم`
+                  : `${currentClassEntries.length} حصة من أصل ${allActiveClassEntries.length} حصة`}
               </span>
             </div>
           </div>
@@ -1291,14 +1361,17 @@ export default function CahierDeTextesPage() {
                   onChange={(e) => setSelectedMonth(e.target.value)}
                   className="px-3 py-1.5 rounded-xl bg-gray-50 border border-gray-300 text-xs font-black text-gray-900 focus:outline-none focus:border-[#107a57]"
                 >
-                  {SCHOOL_MONTHS.map((m) => (
-                    <option key={m.value} value={m.value}>
-                      {m.label}
-                    </option>
-                  ))}
+                  {availableMonths.map((m) => {
+                    const countInMonth = allActiveClassEntries.filter((c) => (c.date || "").startsWith(m.value)).length;
+                    return (
+                      <option key={m.value} value={m.value}>
+                        {m.label} {countInMonth > 0 ? `(${countInMonth} حصة)` : "(0 حصة)"}
+                      </option>
+                    );
+                  })}
                 </select>
                 <span className="text-xs text-gray-500 font-medium">
-                  حفظ وتصدير دفتر نصوص شهر {SCHOOL_MONTHS.find((m) => m.value === selectedMonth)?.label || selectedMonth} في ملف واحد مع التأشيرات في نهايته.
+                  حفظ وتصدير دفتر نصوص شهر {availableMonths.find((m) => m.value === selectedMonth)?.label || selectedMonth} في ملف واحد مع التأشيرات في نهايته.
                 </span>
               </div>
             )}
@@ -1351,7 +1424,8 @@ export default function CahierDeTextesPage() {
                   value={selectedSingleDate}
                   onChange={(e) => setSelectedSingleDate(e.target.value)}
                   className="px-3 py-1.5 rounded-xl bg-gray-50 border border-gray-300 text-xs font-black text-gray-900 focus:outline-none focus:border-[#107a57]"
-                />
+                >
+                </input>
                 <button
                   type="button"
                   onClick={() => setSelectedSingleDate(todayStr)}
@@ -1386,7 +1460,7 @@ export default function CahierDeTextesPage() {
 
             {periodFilterType === "all" && (
               <div className="text-xs text-gray-500 font-medium">
-                عرض كامل الحصص المسجلة لفوج ({activeClass}) طيلة الموسم الدراسي 2026 / 2027 م.
+                عرض كامل الحصص المسجلة لفوج ({activeClass}) طيلة الموسم الدراسي 2026 / 2027 م ({allActiveClassEntries.length} حصة).
               </div>
             )}
 
@@ -1396,6 +1470,26 @@ export default function CahierDeTextesPage() {
             </div>
           </div>
         </div>
+
+        {/* ─── تنبيه تفعيل الفلترة الزمنية عند تحديد فترة محدودة ─── */}
+        {periodFilterType !== "all" && allActiveClassEntries.length > currentClassEntries.length && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 sm:p-3.5 flex flex-wrap items-center justify-between gap-3 text-xs text-amber-900 font-bold print:hidden shadow-2xs">
+            <div className="flex items-center gap-2">
+              <Sliders className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>
+                يتم حالياً عرض حصص {activePeriodLabel} فقط ({currentClassEntries.length} من أصل {allActiveClassEntries.length} حصة مسجلة في الدفتر لهذا الفوج).
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setPeriodFilterType("all")}
+              className="px-3 py-1.5 rounded-xl bg-amber-700 hover:bg-amber-800 text-white font-black text-xs transition shrink-0 cursor-pointer shadow-xs flex items-center gap-1.5"
+            >
+              <Calendar className="w-3.5 h-3.5" />
+              <span>عرض كامل حصص الموسم ({allActiveClassEntries.length} حصة) 📅</span>
+            </button>
+          </div>
+        )}
 
         {/* ─── شريط التصفية والبحث في حصص الفوج ─── */}
         <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-[#e8e8e0] print:hidden">
@@ -1410,7 +1504,7 @@ export default function CahierDeTextesPage() {
                   : "bg-gray-50 text-gray-600 hover:bg-gray-100 border border-[#e8e8e0]"
               }`}
             >
-              الحصص الميدانية العادية
+              الحصص الميدانية العادية ({activeClassCounts.standard})
             </button>
             <button
               type="button"
@@ -1421,7 +1515,7 @@ export default function CahierDeTextesPage() {
                   : "bg-gray-50 text-gray-600 hover:bg-gray-100 border border-[#e8e8e0]"
               }`}
             >
-              ملحق الأعمال الموجهة TD والاستدراك
+              ملحق الأعمال الموجهة TD والاستدراك ({activeClassCounts.td})
             </button>
             <button
               type="button"
@@ -1432,7 +1526,7 @@ export default function CahierDeTextesPage() {
                   : "bg-gray-50 text-gray-600 hover:bg-gray-100 border border-[#e8e8e0]"
               }`}
             >
-              الكل ({cahierEntries.filter((c) => c.className === activeClass).length})
+              الكل ({activeClassCounts.total})
             </button>
           </div>
 
@@ -1467,7 +1561,7 @@ export default function CahierDeTextesPage() {
                 <span>سجل التدوين الميداني في دفتر نصوص: فوج {activeClass}</span>
               </span>
               <span className="text-[11px] font-black bg-white/10 text-white px-2.5 py-0.5 rounded-full border border-white/15">
-                {currentClassEntries.length} حصة مسجلة
+                {currentClassEntries.length} حصة معروضة {periodFilterType !== "all" && `(من أصل ${allActiveClassEntries.length})`}
               </span>
             </div>
 
@@ -1494,20 +1588,47 @@ export default function CahierDeTextesPage() {
               <div className="w-12 h-12 rounded-2xl bg-gray-50 border border-gray-200 text-gray-400 flex items-center justify-center mx-auto">
                 <BookOpen className="w-6 h-6" />
               </div>
-              <p className="font-bold text-gray-700">لا توجد حصص مسجلة في دفتر نصوص فوج {activeClass} بعد.</p>
-              <p className="text-gray-500">
-                يمكنك الضغط على زر «استيراد من الدفتر اليومي ⚡» لجلب كل الحصص السابقة تلقائياً وتعديل ما تريد!
-              </p>
-              <div className="flex items-center justify-center gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={handleSyncFromDiary}
-                  className="btn-primary text-xs px-4 py-2 flex items-center gap-1.5 cursor-pointer shadow-sm"
-                >
-                  <Zap className="w-4 h-4" />
-                  <span>استيراد حصص {activeClass} من الدفتر اليومي الآن</span>
-                </button>
-              </div>
+              {allActiveClassEntries.length > 0 ? (
+                <>
+                  <p className="font-bold text-gray-700">
+                    لا توجد حصص تطابق التصفية الحالية في ({activePeriodLabel}).
+                  </p>
+                  <p className="text-gray-500">
+                    توجد ({allActiveClassEntries.length}) حصة مسجلة لهذا الفوج في فترات أخرى من الموسم الدراسي.
+                  </p>
+                  <div className="flex items-center justify-center gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPeriodFilterType("all");
+                        setActiveTab("all");
+                        setSearchQuery("");
+                      }}
+                      className="btn-primary text-xs px-4 py-2 flex items-center gap-1.5 cursor-pointer shadow-sm"
+                    >
+                      <Calendar className="w-4 h-4" />
+                      <span>عرض كامل حصص الموسم ({allActiveClassEntries.length} حصة) 📅</span>
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="font-bold text-gray-700">لا توجد حصص مسجلة في دفتر نصوص فوج {activeClass} بعد.</p>
+                  <p className="text-gray-500">
+                    يمكنك الضغط على زر «استيراد من الدفتر اليومي ⚡» لجلب كل الحصص السابقة تلقائياً وتعديل ما تريد!
+                  </p>
+                  <div className="flex items-center justify-center gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={handleSyncFromDiary}
+                      className="btn-primary text-xs px-4 py-2 flex items-center gap-1.5 cursor-pointer shadow-sm"
+                    >
+                      <Zap className="w-4 h-4" />
+                      <span>استيراد حصص {activeClass} من الدفتر اليومي الآن</span>
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           ) : (
             <div className="overflow-x-auto">
