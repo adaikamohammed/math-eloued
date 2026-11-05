@@ -117,29 +117,11 @@ export function DesktopSidebar() {
           title: "الإدارة العامة للمنصة 🛡️",
           items: [
             {
-              label: "الحسابات المسجلة والنشاط",
-              href: "/super-admin?tab=accounts",
+              label: "الحسابات المسجلة وإدارة المنصة",
+              href: "/super-admin",
               icon: Users,
-              badge: "شامل بدقة",
+              badge: "لوحة التحكم",
               badgeColor: "bg-[#107a57] text-white",
-            },
-            {
-              label: "بريد وتذاكر الإدارة 📬",
-              href: "/super-admin?tab=tickets",
-              icon: MessageSquare,
-              badge: "تواصل ودعم",
-              badgeColor: "bg-emerald-600 text-white",
-            },
-            {
-              label: "سجل العمليات العام 📜",
-              href: "/super-admin?tab=log",
-              icon: History,
-            },
-            {
-              label: "أوراق وملصق قاعة الأساتذة",
-              href: "/admin/announcement",
-              icon: Printer,
-              badge: "A4 جاهز",
             },
           ],
         },
@@ -311,13 +293,6 @@ export function DesktopSidebar() {
             href: "/super-admin",
             icon: Crown,
             badge: "إدارة",
-          },
-          {
-            label: "أوراق وملصق قاعة الأساتذة",
-            href: "/admin/announcement",
-            icon: Printer,
-            badge: "طباعة A4",
-            badgeColor: "bg-emerald-600 text-white",
           },
           {
             label: "تخصيص الواجهة والصفحات",
