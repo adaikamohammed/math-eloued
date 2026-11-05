@@ -28,9 +28,11 @@ import {
   ArrowRightLeft,
   ChevronUp,
   ChevronDown,
+  QrCode,
 } from "lucide-react";
 import { LoginRequired } from "@/components/LoginRequired";
 import { PageExplainer } from "@/components/PageExplainer";
+import { StudentQrCardsModal } from "@/components/StudentQrCardsModal";
 import { checkTeacherSession, getPersistedTeacherSession } from "@/lib/offlineAuth";
 import {
   getTeacherOfflineData,
@@ -97,7 +99,10 @@ export default function StudentsManagementPage() {
   const [targetClassForMove, setTargetClassForMove] = useState("");
   const [customTargetClassInput, setCustomTargetClassInput] = useState("");
   const [deleteSourceClassAfterMove, setDeleteSourceClassAfterMove] = useState(false);
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+
+  const teacherSession = useMemo(() => (mounted ? getPersistedTeacherSession() : null), [mounted]);
 
   // تحميل أولي فوري بدون أي تأخير (0ms) من التخزين المحلي، وجلب متوازٍ في الخلفية
   useEffect(() => {
@@ -922,6 +927,13 @@ export default function StudentsManagementPage() {
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsQrModalOpen(true)}
+              className="px-3.5 py-1.5 rounded-xl border border-emerald-500 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white text-xs font-black transition shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95"
+            >
+              <QrCode className="w-3.5 h-3.5" />
+              <span>بطاقات QR للتلاميذ 🪪</span>
+            </button>
             <button
               onClick={() => window.print()}
               className="px-3 py-1.5 rounded-xl border border-[#e8e8e0] bg-white text-xs font-bold text-gray-700 hover:bg-gray-50 transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
@@ -2012,6 +2024,20 @@ export default function StudentsManagementPage() {
           </div>,
           document.body
         )}
+
+        {/* نافذة بطاقات QR للتلاميذ جاهزة للطباعة A4 */}
+        <StudentQrCardsModal
+          isOpen={isQrModalOpen}
+          onClose={() => setIsQrModalOpen(false)}
+          students={students}
+          classes={customClasses}
+          activeClass={selectedClass}
+          teacherName={teacherSession?.full_name || "الأستاذ"}
+          teacherCode={teacherSession?.teacher_code || "MTH-101"}
+          teacherSlug={teacherSession?.slug || ""}
+          schoolName={teacherSession?.school_custom_name || "متوسطة باهي علي"}
+          subjectName={teacherSession?.subject || "الرياضيات"}
+        />
       </div>
     </div>
   );

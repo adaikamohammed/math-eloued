@@ -3,6 +3,7 @@ import "./globals.css";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 import { AppShell } from "@/components/AppShell";
 import { OfflineIndicator } from "@/components/OfflineIndicator";
+import { PwaInstallPrompt } from "@/components/PwaInstallPrompt";
 
 export const metadata: Metadata = {
   title: "منصة جسور التعليمية — حيث يلتقي الأستاذ، الولي، والتلميذ",
@@ -59,6 +60,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="bg-slate-50 text-slate-900 antialiased selection:bg-emerald-500 selection:text-white">
         <ServiceWorkerRegister />
         <OfflineIndicator />
+        <PwaInstallPrompt />
         <AppShell>{children}</AppShell>
       </body>
     </html>

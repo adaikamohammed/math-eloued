@@ -23,6 +23,7 @@ import { LoginRequired } from "@/components/LoginRequired";
 import { TeacherQR } from "@/components/TeacherQR";
 import { ChangePassword } from "@/components/ChangePassword";
 import { BackupDataCard } from "@/components/BackupDataCard";
+import { NotificationSettingsCard } from "@/components/NotificationSettingsCard";
 import { supabase } from "@/lib/supabase";
 import { useProfile } from "@/lib/useProfile";
 import {
@@ -654,6 +655,9 @@ export default function TeacherSettingsPage() {
           <span>حفظ التعديلات والمعلومات الشخصية</span>
         </button>
       </form>
+
+      {/* ─── إعدادات وتفعيل إشعارات الويب الذكية ─── */}
+      <NotificationSettingsCard />
 
       {/* ─── رمز الاستجابة السريع لمشاركة الفضاء ─── */}
       <TeacherQR
