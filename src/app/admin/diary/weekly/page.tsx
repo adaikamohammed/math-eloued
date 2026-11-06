@@ -39,6 +39,7 @@ import {
   Save,
   ChevronDown,
   ChevronUp,
+  Copy,
 } from "lucide-react";
 import { LoginRequired } from "@/components/LoginRequired";
 import { useProfile } from "@/lib/useProfile";
@@ -366,9 +367,9 @@ export default function WeeklyDiaryPage() {
     }, 4000);
   }, []);
 
-  // نافذة الإضافة والتعديل الشاملة المنبثقة مباشرة (Self-contained Modal)
+  // نافذة الإضافة والتعديل والنسخ الشاملة المنبثقة مباشرة (Self-contained Modal)
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState<"create" | "edit">("create");
+  const [modalMode, setModalMode] = useState<"create" | "edit" | "copy">("create");
   const [formEntryId, setFormEntryId] = useState<string | null>(null);
   const [formDate, setFormDate] = useState("");
   const [formPeriodTime, setFormPeriodTime] = useState("08:00 - 09:00");
@@ -723,6 +724,65 @@ export default function WeeklyDiaryPage() {
     [weekInfo.days, modalClassOptions, entries]
   );
 
+  // نسخ وتكرار بيانات حصة لفوج آخر
+  const handleCopyEntry = useCallback(
+    (entry: DailyDiaryEntry, e?: React.MouseEvent) => {
+      if (e) e.stopPropagation();
+
+      // البحث الذكي عن فوج آخر من نفس المستوى التعليمي أولاً (مثلاً 2م2 إذا كان الفوج الأصلي 2م1)
+      const currentClass = entry.className;
+      const otherClasses = modalClassOptions.filter(
+        (c) => c !== currentClass && c !== "أولياء التلاميذ" && c !== "فراغ"
+      );
+      const levelMatch = currentClass.match(/^(\d+)/);
+      const levelPrefix = levelMatch ? levelMatch[1] : null;
+      const sameLevelOther = otherClasses.find((c) =>
+        levelPrefix ? c.startsWith(levelPrefix) : false
+      );
+      const targetClass = sameLevelOther || otherClasses[0] || currentClass;
+
+      const nextNote = getNextNoteNumber(targetClass, entries);
+
+      setModalMode("copy");
+      setFormEntryId(null); // فارغ لضمان إنشاء حصة جديدة كلياً وعدم المساس بالحصة الأصلية
+      setFormDate(entry.date);
+      setFormPeriodTime(entry.periodTime || "08:00 - 09:00");
+      setFormClassName(targetClass);
+      setFormSessionType(entry.sessionType || "درس ومورد جديد");
+      setFormField(entry.field || "أنشطة عددية");
+      setFormSection(entry.section || "");
+      setFormTitle(entry.lessonTitle || "");
+      setFormNoteNumber(nextNote || entry.lessonNoteNumber || "");
+      setFormHomework(entry.homework || "");
+      setFormNotes(entry.notes || "");
+
+      if (entry.stages && entry.stages.length > 0) {
+        setFormStages(
+          entry.stages.map((stg, i) => ({
+            id: String(i + 1),
+            label: stg.label || `المرحلة ${i + 1}`,
+            content: stg.content || "",
+          }))
+        );
+        setShowStagesAccordion(entry.stages.some((s) => (s.content || "").trim().length > 0));
+      } else {
+        setFormStages([
+          { id: "1", label: "وضعية الانطلاق (تمهيد واستذكار)", content: "" },
+          { id: "2", label: "بناء المورد والتعلمات", content: "" },
+          { id: "3", label: "إعادة الاستثمار والتقويم", content: "" },
+        ]);
+        setShowStagesAccordion(false);
+      }
+
+      setIsModalOpen(true);
+      showToast(
+        "ok",
+        `📋 تم استنساخ بيانات الدرس! حدد الفوج (${targetClass}) والتوقيت ثم اضغط حفظ.`
+      );
+    },
+    [modalClassOptions, entries, showToast]
+  );
+
   // التبديل إلى نوع مسبق (Preset)
   const handleApplyPreset = (type: string) => {
     setFormSessionType(type);
@@ -801,7 +861,14 @@ export default function WeeklyDiaryPage() {
       saveTeacherOfflineData(session.id, { diaryEntries: newEntries }, true);
     }
 
-    showToast("ok", modalMode === "create" ? "✅ تم إضافة الحصة بنجاح إلى المخطط الأسبوعي!" : "✅ تم حفظ تعديل الحصة بنجاح!");
+    showToast(
+      "ok",
+      modalMode === "copy"
+        ? `✅ تم نسخ الحصة بنجاح وتطبيقها على فوج ${formClassName.trim()}!`
+        : modalMode === "create"
+        ? "✅ تم إضافة الحصة بنجاح إلى المخطط الأسبوعي!"
+        : "✅ تم حفظ تعديل الحصة بنجاح!"
+    );
 
     try {
       if (typeof navigator !== "undefined" && !navigator.onLine) {
@@ -1375,6 +1442,14 @@ export default function WeeklyDiaryPage() {
                                         )}
                                         <button
                                           type="button"
+                                          onClick={(e) => handleCopyEntry(entry, e)}
+                                          className="opacity-0 group-hover/slot:opacity-100 p-0.5 rounded bg-white hover:bg-sky-50 text-sky-700 border border-gray-200 transition shadow-2xs print:hidden cursor-pointer"
+                                          title="نسخ بيانات هذه الحصة لفوج آخر 📋"
+                                        >
+                                          <Copy className="w-3 h-3" />
+                                        </button>
+                                        <button
+                                          type="button"
                                           onClick={(e) => {
                                             e.stopPropagation();
                                             handleOpenEditModal(entry);
@@ -1512,6 +1587,14 @@ export default function WeeklyDiaryPage() {
                                             {entry.lessonNoteNumber}
                                           </span>
                                         )}
+                                        <button
+                                          type="button"
+                                          onClick={(e) => handleCopyEntry(entry, e)}
+                                          className="opacity-0 group-hover/slot:opacity-100 p-0.5 rounded bg-white hover:bg-sky-50 text-sky-700 border border-gray-200 transition shadow-2xs print:hidden cursor-pointer"
+                                          title="نسخ بيانات هذه الحصة لفوج آخر 📋"
+                                        >
+                                          <Copy className="w-3 h-3" />
+                                        </button>
                                         <button
                                           type="button"
                                           onClick={(e) => {
@@ -1696,6 +1779,14 @@ export default function WeeklyDiaryPage() {
                                       )}
                                       <button
                                         type="button"
+                                        onClick={(e) => handleCopyEntry(entry, e)}
+                                        className="opacity-0 group-hover/slot:opacity-100 p-0.5 rounded bg-white hover:bg-sky-50 text-sky-700 border border-gray-200 transition shadow-2xs print:hidden cursor-pointer"
+                                        title="نسخ بيانات هذه الحصة لفوج آخر 📋"
+                                      >
+                                        <Copy className="w-3 h-3" />
+                                      </button>
+                                      <button
+                                        type="button"
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           handleOpenEditModal(entry);
@@ -1862,6 +1953,14 @@ export default function WeeklyDiaryPage() {
                                           {entry.lessonNoteNumber}
                                         </span>
                                       )}
+                                      <button
+                                        type="button"
+                                        onClick={(e) => handleCopyEntry(entry, e)}
+                                        className="opacity-0 group-hover/slot:opacity-100 p-0.5 rounded bg-white hover:bg-sky-50 text-sky-700 border border-gray-200 transition shadow-2xs print:hidden cursor-pointer"
+                                        title="نسخ بيانات هذه الحصة لفوج آخر 📋"
+                                      >
+                                        <Copy className="w-3 h-3" />
+                                      </button>
                                       <button
                                         type="button"
                                         onClick={(e) => {
@@ -2032,6 +2131,14 @@ export default function WeeklyDiaryPage() {
                                   </span>
                                   <button
                                     type="button"
+                                    onClick={(e) => handleCopyEntry(entry, e)}
+                                    className="opacity-0 group-hover/slot:opacity-100 p-0.5 rounded bg-white hover:bg-sky-50 text-sky-700 border border-gray-200 transition shadow-2xs cursor-pointer"
+                                    title="نسخ بيانات هذه الحصة لفوج آخر 📋"
+                                  >
+                                    <Copy className="w-3 h-3" />
+                                  </button>
+                                  <button
+                                    type="button"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       handleOpenEditModal(entry);
@@ -2139,6 +2246,14 @@ export default function WeeklyDiaryPage() {
                                     </span>
                                     <button
                                       type="button"
+                                      onClick={(e) => handleCopyEntry(entry, e)}
+                                      className="opacity-0 group-hover/slot:opacity-100 p-0.5 rounded bg-white hover:bg-sky-50 text-sky-700 border border-gray-200 transition shadow-2xs cursor-pointer"
+                                      title="نسخ بيانات هذه الحصة لفوج آخر 📋"
+                                    >
+                                      <Copy className="w-3 h-3" />
+                                    </button>
+                                    <button
+                                      type="button"
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         handleOpenEditModal(entry);
@@ -2237,11 +2352,19 @@ export default function WeeklyDiaryPage() {
               onClick={(e) => e.stopPropagation()}
             >
               {/* ترويسة النافذة */}
-              <div className="bg-gradient-to-r from-emerald-800 via-emerald-700 to-teal-800 text-white p-5 flex items-start justify-between gap-3">
+              <div className={`p-5 flex items-start justify-between gap-3 text-white ${
+                modalMode === "copy"
+                  ? "bg-gradient-to-r from-sky-800 via-sky-700 to-teal-800"
+                  : "bg-gradient-to-r from-emerald-800 via-emerald-700 to-teal-800"
+              }`}>
                 <div className="space-y-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="px-3 py-0.5 rounded-lg bg-white/20 backdrop-blur-md text-xs font-black text-white border border-white/30">
-                      {modalMode === "create" ? "➕ إضافة حصة جديدة" : "✏️ تعديل بيانات الحصة"}
+                      {modalMode === "copy"
+                        ? "📋 نسخ وتكرار الحصة لفوج آخر"
+                        : modalMode === "create"
+                        ? "➕ إضافة حصة جديدة"
+                        : "✏️ تعديل بيانات الحصة"}
                     </span>
                     <span className="text-xs font-bold text-emerald-100 flex items-center gap-1 font-mono">
                       <Clock className="w-3.5 h-3.5" />
@@ -2253,7 +2376,9 @@ export default function WeeklyDiaryPage() {
                     </span>
                   </div>
                   <h3 className="text-base sm:text-xl font-black text-white leading-snug">
-                    {modalMode === "create"
+                    {modalMode === "copy"
+                      ? `نسخ الدرس لفوج آخر: ${formTitle || "الدرس"}`
+                      : modalMode === "create"
                       ? "تسجيل حصة مباشرة في المخطط الأسبوعي"
                       : (formTitle || "تعديل بيانات الحصة")}
                   </h3>
@@ -2271,6 +2396,19 @@ export default function WeeklyDiaryPage() {
 
               {/* جسم النافذة */}
               <div className="p-5 sm:p-6 max-h-[75vh] overflow-y-auto space-y-5">
+                {modalMode === "copy" && (
+                  <div className="p-3.5 bg-sky-50 border border-sky-300 rounded-2xl flex items-center gap-3 text-xs font-bold text-sky-950 shadow-2xs animate-in fade-in">
+                    <div className="w-9 h-9 rounded-xl bg-sky-200/70 flex items-center justify-center shrink-0 text-sky-800">
+                      <Copy className="w-5 h-5" />
+                    </div>
+                    <div className="space-y-0.5">
+                      <div className="font-black text-sky-950 text-sm">وضع نسخ وتكرار الدرس لفوج آخر 📋</div>
+                      <p className="text-[11px] text-sky-800 font-medium leading-relaxed">
+                        تم استنساخ كافة بيانات الدرس وعناصره تلقائياً. حدّد الآن <strong>الفوج المستهدف</strong> وتأكد من <strong>اليوم والتوقيت</strong>، ثم اضغط على زر الحفظ أدناه.
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 {/* 1. أزرار القوالب الجاهزة السريعة (Presets) */}
                 <div className="space-y-2 bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
@@ -2615,6 +2753,23 @@ export default function WeeklyDiaryPage() {
                   </button>
 
                   {modalMode === "edit" && formEntryId && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const currentEntry = entries.find((e) => e.id === formEntryId);
+                        if (currentEntry) {
+                          handleCopyEntry(currentEntry);
+                        }
+                      }}
+                      className="px-3.5 py-2 rounded-xl border border-sky-300 bg-sky-50 hover:bg-sky-100 text-sky-800 text-xs font-black transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                      title="نسخ بيانات هذه الحصة وتطبيقها على فوج آخر"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>نسخ لفوج آخر 📋</span>
+                    </button>
+                  )}
+
+                  {modalMode === "edit" && formEntryId && (
                     <Link
                       href={`/admin/diary?editId=${formEntryId}&date=${formDate}`}
                       className="px-3.5 py-2 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold transition flex items-center gap-1.5"
@@ -2629,14 +2784,24 @@ export default function WeeklyDiaryPage() {
                     type="button"
                     onClick={handleSaveModalEntry}
                     disabled={isSavingEntry || !formTitle.trim()}
-                    className="px-6 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-black transition flex items-center gap-2 shadow-sm cursor-pointer disabled:opacity-50"
+                    className={`px-6 py-2 rounded-xl text-white text-xs font-black transition flex items-center gap-2 shadow-sm cursor-pointer disabled:opacity-50 ${
+                      modalMode === "copy"
+                        ? "bg-sky-700 hover:bg-sky-800"
+                        : "bg-emerald-700 hover:bg-emerald-800"
+                    }`}
                   >
                     {isSavingEntry ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
                     ) : (
                       <Save className="w-4 h-4" />
                     )}
-                    <span>{modalMode === "create" ? "حفظ الحصة في المخطط 💾" : "حفظ التعديلات 💾"}</span>
+                    <span>
+                      {modalMode === "copy"
+                        ? "حفظ الحصة المنسوخة للفوج الجديد 💾"
+                        : modalMode === "create"
+                        ? "حفظ الحصة في المخطط 💾"
+                        : "حفظ التعديلات 💾"}
+                    </span>
                   </button>
                 </div>
               </div>
