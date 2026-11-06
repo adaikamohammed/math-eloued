@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { findPublicTeacher } from "@/lib/teachers";
+import { parseTeacherInputCode } from "@/lib/teacherCodes";
 import { readPublicTeacherData, normalizeData } from "@/lib/storage";
 import { MIDDLE_SCHOOL_SUBJECTS } from "@/lib/types";
 import { AutoSaveTeacherWallet } from "@/components/AutoSaveTeacherWallet";
@@ -26,7 +27,11 @@ export default async function TeacherBoardPage({ params, searchParams }: BoardPa
   const requestedLevel = requestedLvlStr ? parseInt(requestedLvlStr, 10) : null;
   const isValidLevel = requestedLevel !== null && requestedLevel >= 1 && requestedLevel <= 4;
 
-  const profile = await findPublicTeacher(slug);
+  const parsedSlug = parseTeacherInputCode(slug);
+  let profile = await findPublicTeacher(slug);
+  if (!profile && parsedSlug.baseCode && parsedSlug.baseCode !== slug) {
+    profile = await findPublicTeacher(parsedSlug.baseCode);
+  }
   if (!profile) notFound();
 
   const publicData = await readPublicTeacherData(supabase, profile.id).catch(() => normalizeData({}));

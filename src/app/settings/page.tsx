@@ -463,7 +463,7 @@ export default function TeacherSettingsPage() {
                 className={inputCls}
                 value={schoolName}
                 onChange={(e) => setSchoolName(e.target.value)}
-                placeholder="اكتب اسم المتوسطة (مثلاً: متوسطة باهي علي)"
+                placeholder="اكتب اسم المتوسطة (مثلاً: متوسطة الأمير عبد القادر)"
               />
               <p className="text-[10px] text-slate-400 font-medium">
                 يظهر اسم المتوسطة في ترويسة الدروس، لوحة الشرف، والوثائق الرسمية.
@@ -661,7 +661,7 @@ export default function TeacherSettingsPage() {
 
       {/* ─── رمز الاستجابة السريع لمشاركة الفضاء ─── */}
       <TeacherQR
-        path={`/t/${profile.slug || profile.id}`}
+        path={`/t/${profile.slug || profile.teacher_code || profile.id}`}
         teacherName={profile.full_name || "الأستاذ"}
         code={profile.teacher_code}
         schoolName={schoolName || profile.school_custom_name || ""}

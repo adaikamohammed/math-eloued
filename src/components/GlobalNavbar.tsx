@@ -17,6 +17,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { useLayout } from "@/context/LayoutContext";
 import { clearInspectionCache } from "@/app/inspector/shared";
+import { clearAllTeacherBrowserCaches, logoutTeacher } from "@/lib/offlineAuth";
 
 // ─── خريطة عناوين الصفحات المستوحاة من منصة فرسان القرآن ─────────
 const PAGE_INFO: Record<string, { title: string; subtitle: string }> = {
@@ -163,9 +164,10 @@ export function GlobalNavbar() {
 
   const handleLogout = async () => {
     try {
-      localStorage.removeItem("teacher_feature_flags_cache");
+      clearAllTeacherBrowserCaches();
       clearInspectionCache();
       sessionStorage.clear();
+      await logoutTeacher();
     } catch {}
     await supabase.auth.signOut();
     router.push("/");

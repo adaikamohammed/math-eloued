@@ -39,10 +39,10 @@ export function StudentQrCardsModal({
   students,
   classes,
   activeClass = "all",
-  teacherName = "عدايكة محمد",
+  teacherName = "الأستاذ(ة)",
   teacherCode = "MTH-101",
   teacherSlug = "",
-  schoolName = "متوسطة باهي علي",
+  schoolName = "المؤسسة التعليمية",
   subjectName = "الرياضيات",
 }: StudentQrCardsModalProps) {
   const [selectedClass, setSelectedClass] = useState<string>(activeClass);

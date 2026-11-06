@@ -1010,7 +1010,7 @@ function AuthForm() {
                 <input
                   type="text"
                   required
-                  placeholder="مثال: MTH-704 أو محمد عدايكة أو بريدك..."
+                  placeholder="مثال: MTH-101 أو اسمك أو بريدك الإلكتروني..."
                   value={loginEmail}
                   onChange={(e) => setLoginEmail(e.target.value)}
                   className={`w-full py-2.5 pl-9 pr-10 rounded-xl border text-xs sm:text-sm focus:outline-none focus:ring-2 transition ${

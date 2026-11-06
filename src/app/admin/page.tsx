@@ -1427,7 +1427,7 @@ function Dashboard({
               <span className="hidden sm:inline">نسخة JSON</span>
             </button>
             <Link
-              href={`/t/${profile.slug || profile.id}`}
+              href={`/t/${profile.slug || profile.teacher_code || profile.id}`}
               target="_blank"
               className="flex items-center gap-1.5 text-xs text-slate-700 bg-slate-50 hover:bg-slate-100 font-bold px-3 py-2 rounded-xl border border-slate-200 transition"
               title="معاينة الصفحة العامة كما يراها الأولياء والتلاميذ"

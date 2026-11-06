@@ -63,6 +63,8 @@ import {
   Lock,
 } from "lucide-react";
 
+const getScopedGradebookKey = (teacherId: string) => `jusoor_gradebook_${teacherId}`;
+
 // عبارات التوجيه والملاحظات البيداغوجية المعتمدة
 const PRESET_REMARKS = [
   "عمل ممتاز ونتائج مشرفة، واصل التألق 🌟",
@@ -127,6 +129,7 @@ export default function GradebookEvaluationPage() {
   // سجلات النقاط (مفتاحها: `${selectedClass}_${studentName}_T${trimester}`)
   const [gradeRecords, setGradeRecords] = useState<Record<string, OfficialGradeRecord>>({});
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [evalViewMode, setEvalViewMode] = useState<"table" | "cards">("table");
 
   // نافذة تفاصيل تقويم تلميذ محدد (Drawer / Modal)
   const [detailStudentName, setDetailStudentName] = useState<string | null>(null);
@@ -161,32 +164,35 @@ export default function GradebookEvaluationPage() {
 
   // جلب البيانات من الخادم والكاش المحلي
   useEffect(() => {
-    // 1. محاولة القراءة الفورية من الكاش المحلي 0ms
-    try {
-      const cached = localStorage.getItem("jusoor_gradebook_cache");
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (parsed.classes && parsed.classes.length > 0) {
-          setCustomClasses(parsed.classes);
-          setSelectedClass((prev) => prev || parsed.classes[0]);
+    // 1. محاولة القراءة الفورية من الكاش المحلي المعزول لهذا الأستاذ
+    const persisted = getPersistedTeacherSession();
+    if (persisted?.id && typeof window !== "undefined") {
+      try {
+        const cached = localStorage.getItem(getScopedGradebookKey(persisted.id));
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed.classes && parsed.classes.length > 0) {
+            setCustomClasses(parsed.classes);
+            setSelectedClass((prev) => prev || parsed.classes[0]);
+          }
+          if (parsed.roster && Array.isArray(parsed.roster)) {
+            setStudentRoster(parsed.roster);
+          }
+          if (parsed.records && typeof parsed.records === "object") {
+            setGradeRecords(parsed.records);
+          }
+          if (parsed.subject) {
+            const rawSubj = typeof parsed.subject === "string"
+              ? parsed.subject
+              : (parsed.subject?.name || parsed.subject?.id || "الرياضيات");
+            setTeacherSubject(rawSubj);
+          }
+          if (parsed.rubricConfig) {
+            setRubricConfig(parsed.rubricConfig);
+          }
         }
-        if (parsed.roster && Array.isArray(parsed.roster)) {
-          setStudentRoster(parsed.roster);
-        }
-        if (parsed.records && typeof parsed.records === "object") {
-          setGradeRecords(parsed.records);
-        }
-        if (parsed.subject) {
-          const rawSubj = typeof parsed.subject === "string"
-            ? parsed.subject
-            : (parsed.subject?.name || parsed.subject?.id || "الرياضيات");
-          setTeacherSubject(rawSubj);
-        }
-        if (parsed.rubricConfig) {
-          setRubricConfig(parsed.rubricConfig);
-        }
-      }
-    } catch {}
+      } catch {}
+    }
 
     // 2. المزامنة مع الخادم
     setLoading(true);
@@ -240,19 +246,21 @@ export default function GradebookEvaluationPage() {
         }
         setGradeRecords(map);
 
-        // تحديث الكاش
-        try {
-          localStorage.setItem(
-            "jusoor_gradebook_cache",
-            JSON.stringify({
-              classes,
-              roster: data.studentRoster || [],
-              records: map,
-              subject: data.subject || "الرياضيات",
-              rubricConfig,
-            })
-          );
-        } catch {}
+        // تحديث الكاش المعزول
+        if (persisted?.id) {
+          try {
+            localStorage.setItem(
+              getScopedGradebookKey(persisted.id),
+              JSON.stringify({
+                classes,
+                roster: data.studentRoster || [],
+                records: map,
+                subject: data.subject || "الرياضيات",
+                rubricConfig,
+              })
+            );
+          } catch {}
+        }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -390,19 +398,22 @@ export default function GradebookEvaluationPage() {
 
         const next = { ...prev, [key]: merged };
 
-        // حفظ فوري في الكاش المحلي
-        try {
-          localStorage.setItem(
-            "jusoor_gradebook_cache",
-            JSON.stringify({
-              classes: customClasses,
-              roster: studentRoster,
-              records: next,
-              subject: teacherSubject,
-              rubricConfig,
-            })
-          );
-        } catch {}
+        // حفظ فوري في الكاش المحلي المعزول
+        const session = getPersistedTeacherSession();
+        if (session?.id) {
+          try {
+            localStorage.setItem(
+              getScopedGradebookKey(session.id),
+              JSON.stringify({
+                classes: customClasses,
+                roster: studentRoster,
+                records: next,
+                subject: teacherSubject,
+                rubricConfig,
+              })
+            );
+          } catch {}
+        }
 
         return next;
       });
@@ -558,8 +569,8 @@ export default function GradebookEvaluationPage() {
   // تشغيل الطباعة الأفقية الرسمية
   const handlePrintLandscape = () => {
     printGradebookReport({
-      teacherName: profile?.fullName || "الأستاذ محمد عدايكة",
-      schoolName: profile?.schoolCustomName || "متوسطة المجاهد باهي علي — قمار",
+      teacherName: profile?.fullName || "الأستاذ(ة)",
+      schoolName: profile?.schoolCustomName || "المؤسسة التعليمية",
       inspectorName: "السيد مفتش التعليم المتوسط",
       principalName: "السيد مدير المؤسسة",
       wilayaName: "الوادي",
@@ -576,8 +587,8 @@ export default function GradebookEvaluationPage() {
   // تشغيل حفظ وتحميل PDF أفقياً
   const handleDownloadPDF = () => {
     downloadGradebookPDF({
-      teacherName: profile?.fullName || "الأستاذ محمد عدايكة",
-      schoolName: profile?.schoolCustomName || "متوسطة المجاهد باهي علي — قمار",
+      teacherName: profile?.fullName || "الأستاذ(ة)",
+      schoolName: profile?.schoolCustomName || "المؤسسة التعليمية",
       inspectorName: "السيد مفتش التعليم المتوسط",
       principalName: "السيد مدير المؤسسة",
       wilayaName: "الوادي",
@@ -1007,13 +1018,175 @@ export default function GradebookEvaluationPage() {
                 </Link>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table ref={tableRef} className="w-full text-right border-collapse text-xs">
-                  <thead>
-                    <tr className="bg-slate-50 text-slate-800 font-black border-b border-gray-200">
-                      <th className="py-3 px-3 w-10 text-center">#</th>
-                      <th className="py-3 px-3 min-w-[160px]">اسم ولقب التلميذ(ة)</th>
-                      <th className="py-3 px-2 w-16 text-center">الفوج</th>
+              <div>
+                {/* شريط التبديل وإرشاد السحب في الشاشات الصغيرة */}
+                <div className="sm:hidden flex items-center justify-between p-2.5 bg-slate-100 border-b border-gray-200">
+                  <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-700">
+                    <span>العرض للهاتف:</span>
+                    <div className="inline-flex p-0.5 bg-white rounded-lg border border-slate-200 shadow-2xs">
+                      <button
+                        type="button"
+                        onClick={() => setEvalViewMode("table")}
+                        className={`px-2.5 py-1 rounded-md text-[11px] font-black transition ${
+                          evalViewMode === "table" ? "bg-emerald-600 text-white shadow-2xs" : "text-slate-600"
+                        }`}
+                      >
+                        جدول 📊
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEvalViewMode("cards")}
+                        className={`px-2.5 py-1 rounded-md text-[11px] font-black transition ${
+                          evalViewMode === "cards" ? "bg-emerald-600 text-white shadow-2xs" : "text-slate-600"
+                        }`}
+                      >
+                        بطاقات 📱
+                      </button>
+                    </div>
+                  </div>
+                  {evalViewMode === "table" && (
+                    <span className="text-[10px] bg-emerald-100 text-emerald-900 font-bold px-2 py-0.5 rounded-full">
+                      اسحب أفقياً ↔️
+                    </span>
+                  )}
+                </div>
+
+                {/* ── نمط البطاقات المخصصة للهاتف ── */}
+                {evalViewMode === "cards" && (
+                  <div className="sm:hidden p-2.5 space-y-2.5 bg-slate-50">
+                    {filteredStudents.map((st, idx) => {
+                      const rec = getRecordForStudent(st.studentName);
+                      const continuous = rec.continuousScore ?? 20;
+                      const test1 = rec.test1Score;
+                      const monitoring = test1 !== undefined ? (continuous + test1) / 2 : undefined;
+                      const exam = rec.examScore;
+                      const subjectAvg =
+                        monitoring !== undefined && exam !== undefined ? (monitoring + 2 * exam) / 3 : undefined;
+
+                      return (
+                        <div
+                          key={st.studentName}
+                          className="bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs space-y-2.5"
+                        >
+                          <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                            <div className="flex items-center gap-2">
+                              <span className="w-6 h-6 rounded-lg bg-slate-100 text-slate-600 font-mono font-bold text-xs flex items-center justify-center">
+                                {idx + 1}
+                              </span>
+                              <h4 className="font-black text-xs text-slate-900">{st.studentName}</h4>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] bg-slate-100 text-slate-700 font-bold px-2 py-0.5 rounded-md">
+                                {st.groupName || "فوج 1"}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setDetailStudentName(st.studentName)}
+                                className="p-1 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition"
+                                title="تفاصيل التقويم"
+                              >
+                                <Sliders className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-3 gap-2 text-center">
+                            <div className="bg-emerald-50/70 p-1.5 rounded-xl border border-emerald-100">
+                              <span className="text-[10px] text-emerald-900 font-bold block">ت. مستمر</span>
+                              <span className="font-mono font-black text-xs text-emerald-950">
+                                {continuous.toFixed(2)}
+                              </span>
+                            </div>
+
+                            <div className="bg-blue-50/70 p-1.5 rounded-xl border border-blue-200">
+                              <span className="text-[10px] text-blue-900 font-bold block">الفرض (20ن)</span>
+                              <input
+                                type="number"
+                                dir="ltr"
+                                step="0.25"
+                                min="0"
+                                max="20"
+                                placeholder="-"
+                                value={rec.test1Score !== undefined ? rec.test1Score : ""}
+                                onChange={(e) => {
+                                  const val = e.target.value === "" ? undefined : parseFloat(e.target.value);
+                                  updateStudentField(st.studentName, {
+                                    test1Score: val !== undefined ? Math.min(20, Math.max(0, val)) : undefined,
+                                  });
+                                }}
+                                className="w-full mt-0.5 py-1 text-center font-mono font-black text-xs bg-white border border-blue-300 rounded-lg text-blue-950"
+                              />
+                            </div>
+
+                            <div className="bg-amber-50/70 p-1.5 rounded-xl border border-amber-200">
+                              <span className="text-[10px] text-amber-900 font-bold block">الاختبار (20ن)</span>
+                              <input
+                                type="number"
+                                dir="ltr"
+                                step="0.25"
+                                min="0"
+                                max="20"
+                                placeholder="-"
+                                value={rec.examScore !== undefined ? rec.examScore : ""}
+                                onChange={(e) => {
+                                  const val = e.target.value === "" ? undefined : parseFloat(e.target.value);
+                                  updateStudentField(st.studentName, {
+                                    examScore: val !== undefined ? Math.min(20, Math.max(0, val)) : undefined,
+                                  });
+                                }}
+                                className="w-full mt-0.5 py-1 text-center font-mono font-black text-xs bg-white border border-amber-300 rounded-lg text-amber-950"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between text-xs bg-slate-50 p-2 rounded-xl border border-slate-200 font-bold">
+                            <div>
+                              <span className="text-slate-500 text-[10px]">م. المراقبة: </span>
+                              <span className="font-mono font-black text-slate-800">
+                                {monitoring !== undefined ? monitoring.toFixed(2) : "-"}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-slate-500 text-[10px]">معدل المادة: </span>
+                              <span
+                                className={`font-mono font-black px-2 py-0.5 rounded-md ${
+                                  subjectAvg !== undefined && subjectAvg >= 10
+                                    ? "bg-emerald-100 text-emerald-900"
+                                    : subjectAvg !== undefined
+                                    ? "bg-rose-100 text-rose-900"
+                                    : "text-slate-400"
+                                }`}
+                              >
+                                {subjectAvg !== undefined ? subjectAvg.toFixed(2) : "-"}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div>
+                            <input
+                              type="text"
+                              placeholder="ملاحظة الأستاذ للتلميذ..."
+                              value={rec.notes || ""}
+                              onChange={(e) => updateStudentField(st.studentName, { notes: e.target.value })}
+                              className="w-full py-1 px-2.5 text-xs bg-white border border-slate-200 rounded-xl focus:border-emerald-500 focus:outline-none"
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* ── نمط الجدول العريض مع تجميد عمود الاسم للأجهزة ── */}
+                <div className={`overflow-x-auto relative ${evalViewMode === "cards" ? "hidden sm:block" : "block"}`}>
+                  <table ref={tableRef} className="w-full text-right border-collapse text-xs min-w-[880px]">
+                    <thead>
+                      <tr className="bg-slate-50 text-slate-800 font-black border-b border-gray-200">
+                        <th className="py-3 px-2 w-10 text-center sticky right-0 bg-slate-100 z-20">#</th>
+                        <th className="py-3 px-3 min-w-[170px] sticky right-10 bg-slate-100 z-20 border-l border-gray-200 shadow-xs">
+                          اسم ولقب التلميذ(ة)
+                        </th>
+                        <th className="py-3 px-2 w-16 text-center">الفوج</th>
                       <th className="py-3 px-2 w-36 text-center bg-emerald-50 text-emerald-950 font-black border-l border-emerald-100">
                         <div className="flex flex-col items-center gap-0.5">
                           <div className="flex items-center gap-1">
@@ -1221,8 +1394,9 @@ export default function GradebookEvaluationPage() {
                   </tbody>
                 </table>
               </div>
-            )}
-          </div>
+            </div>
+          )}
+        </div>
 
         {/* ─── زر حفظ التغييرات العائم في أسفل الصفحة ─── */}
         {hasUnsavedChanges && (

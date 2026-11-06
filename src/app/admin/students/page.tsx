@@ -42,8 +42,8 @@ import {
 } from "@/lib/offlineStorage";
 import { StudentRosterItem, LessonsData, sortClasses } from "@/lib/types";
 
-const LOCAL_STORAGE_CLASSES_KEY = "last_active_classes";
-const LOCAL_STORAGE_STUDENTS_KEY = "math_teacher_students_cache";
+const getScopedClassesKey = (teacherId: string) => `jusoor_classes_${teacherId}`;
+const getScopedStudentsKey = (teacherId: string) => `jusoor_students_${teacherId}`;
 
 interface GridRow {
   id: string;
@@ -111,13 +111,14 @@ export default function StudentsManagementPage() {
     let activeParam = "";
     let cachedCls: string[] = [];
 
-    if (typeof window !== "undefined") {
+    const persisted = getPersistedTeacherSession();
+    if (persisted?.id && typeof window !== "undefined") {
       const urlParams = new URLSearchParams(window.location.search);
       activeParam = urlParams.get("activeClass") || "";
 
-      // قراءة فورية للأفواج المحفوظة
+      // قراءة فورية للأفواج المحفوظة لهذا الأستاذ
       try {
-        const storedClasses = localStorage.getItem(LOCAL_STORAGE_CLASSES_KEY);
+        const storedClasses = localStorage.getItem(getScopedClassesKey(persisted.id));
         if (storedClasses) {
           const parsed = JSON.parse(storedClasses);
           if (Array.isArray(parsed) && parsed.length > 0) {
@@ -130,9 +131,9 @@ export default function StudentsManagementPage() {
         console.warn("Error reading cached classes", e);
       }
 
-      // قراءة فورية لقائمة التلاميذ المحفوظة
+      // قراءة فورية لقائمة التلاميذ المحفوظة لهذا الأستاذ
       try {
-        const storedStudents = localStorage.getItem(LOCAL_STORAGE_STUDENTS_KEY);
+        const storedStudents = localStorage.getItem(getScopedStudentsKey(persisted.id));
         if (storedStudents) {
           const parsedStudents = JSON.parse(storedStudents);
           if (Array.isArray(parsedStudents)) {
@@ -171,7 +172,7 @@ export default function StudentsManagementPage() {
             cacheServerDataLocally(teacherId, lessonsData);
           }
           const active = lessonsData || (teacherId ? getTeacherOfflineData(teacherId) : null);
-          if (active) {
+          if (active && teacherId) {
             const teacherClasses = sortClasses(
               Array.isArray(active.customClasses) && active.customClasses.length > 0
                 ? active.customClasses
@@ -196,9 +197,9 @@ export default function StudentsManagementPage() {
 
             if (typeof window !== "undefined") {
               try {
-                localStorage.setItem(LOCAL_STORAGE_STUDENTS_KEY, JSON.stringify(loadedStudents));
+                localStorage.setItem(getScopedStudentsKey(teacherId), JSON.stringify(loadedStudents));
                 if (teacherClasses.length > 0) {
-                  localStorage.setItem(LOCAL_STORAGE_CLASSES_KEY, JSON.stringify(teacherClasses));
+                  localStorage.setItem(getScopedClassesKey(teacherId), JSON.stringify(teacherClasses));
                 }
               } catch (e) {
                 console.warn("Storage save error", e);
@@ -287,14 +288,13 @@ export default function StudentsManagementPage() {
   // حفظ البيانات وتحديث التخزين المحلي
   const persistChanges = async (newStudents: StudentRosterItem[], newClasses: string[]) => {
     setSaving(true);
-    if (typeof window !== "undefined") {
+    const session = getPersistedTeacherSession();
+    if (typeof window !== "undefined" && session?.id) {
       try {
-        localStorage.setItem(LOCAL_STORAGE_STUDENTS_KEY, JSON.stringify(newStudents));
-        localStorage.setItem(LOCAL_STORAGE_CLASSES_KEY, JSON.stringify(newClasses));
+        localStorage.setItem(getScopedStudentsKey(session.id), JSON.stringify(newStudents));
+        localStorage.setItem(getScopedClassesKey(session.id), JSON.stringify(newClasses));
       } catch {}
     }
-
-    const session = getPersistedTeacherSession();
     if (session?.id) {
       saveTeacherOfflineData(
         session.id,
@@ -2035,7 +2035,7 @@ export default function StudentsManagementPage() {
           teacherName={teacherSession?.full_name || "الأستاذ"}
           teacherCode={teacherSession?.teacher_code || "MTH-101"}
           teacherSlug={teacherSession?.slug || ""}
-          schoolName={teacherSession?.school_custom_name || "متوسطة باهي علي"}
+          schoolName={teacherSession?.school_custom_name || "المؤسسة التعليمية"}
           subjectName={teacherSession?.subject || "الرياضيات"}
         />
       </div>

@@ -50,12 +50,12 @@ function getLevelLabelFromClass(className: string): string {
  * مطابق تماماً لسجل التدوين الميداني في دفتر النصوص للأستاذ محمد عدايكة
  */
 export function generateCahierTextesHTML(options: CahierTextesPdfOptions): string {
-  const teacher = options.teacherName || "الأستاذ محمد عدايكة";
-  const qualification = options.qualification || "ماستر تحكم كهربائي";
+  const teacher = options.teacherName || "الأستاذ(ة)";
+  const qualification = options.qualification || "أستاذ التعليم المتوسط";
   const rank = options.rank || "أستاذ التعليم المتوسط";
-  const school = options.schoolName || "متوسطة المجاهد باهي علي — قمار";
+  const school = options.schoolName || "المؤسسة التعليمية";
   const inspector = options.inspectorName || "السيد مفتش التعليم المتوسط";
-  const district = options.districtName || "المقاطعة 04 — الوادي";
+  const district = options.districtName || "المقاطعة التفتيشية";
   const principal = options.principalName || "السيد مدير المؤسسة";
   const subject = options.subjectName || "الرياضيات";
   const wilaya = options.wilayaName || "الوادي";
@@ -160,7 +160,7 @@ export function generateCahierTextesHTML(options: CahierTextesPdfOptions): strin
 
           <!-- 4. الإمضاء -->
           <td class="col-signature">
-            <div class="sig-name">${item.signature || teacher.split(" ")[0] || "عدايكة"}</div>
+            <div class="sig-name">${item.signature || teacher.split(" ")[0] || "الأستاذ(ة)"}</div>
             <div class="sig-hand">✍</div>
           </td>
         </tr>
@@ -196,7 +196,7 @@ export function generateCahierTextesHTML(options: CahierTextesPdfOptions): strin
             </div>
           </td>
           <td class="col-signature">
-            <div class="sig-name">${item.signature || teacher.split(" ")[0] || "عدايكة"}</div>
+            <div class="sig-name">${item.signature || teacher.split(" ")[0] || "الأستاذ(ة)"}</div>
             <div class="sig-hand">✍</div>
           </td>
         </tr>
@@ -575,7 +575,7 @@ export function generateCahierTextesHTML(options: CahierTextesPdfOptions): strin
   <title>${
     options.docTitle ||
     options.fileName ||
-    `دفتر_نصوص_فوج_${cls}_الأستاذ_${(teacher || "عدايكة").trim().split(" ")[0]}_${(options.periodLabel || "كامل_الموسم").replace(/\s+/g, "_")}`
+    `دفتر_نصوص_فوج_${cls}_الأستاذ_${(teacher || "الأستاذ").trim().split(" ")[0]}_${(options.periodLabel || "كامل_الموسم").replace(/\s+/g, "_")}`
   }</title>
 </head>
 <body>
@@ -680,7 +680,7 @@ export function generateCahierTextesHTML(options: CahierTextesPdfOptions): strin
 export function printCahierTextesReport(options: CahierTextesPdfOptions): void {
   if (typeof window === "undefined") return;
 
-  const teacherFamily = (options.teacherName || "عدايكة").trim().split(" ")[0];
+  const teacherFamily = (options.teacherName || "الأستاذ").trim().split(" ")[0];
   const cls = options.className || "2م3";
   const periodSafe = (options.periodLabel || "كامل_الموسم").replace(/\s+/g, "_");
   const calculatedDocTitle =

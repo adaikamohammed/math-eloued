@@ -55,8 +55,8 @@ const SPECIAL_DAY_DESCRIPTIONS: Record<string, { label: string; icon: string }> 
  * مع تصفية كاملة للأيام الفارغة وضمان أعلى دقة وخطوط عربية متصلة Vector
  */
 export function generateLandscapeDiaryHTML(options: DiaryReportOptions): string {
-  const teacher = options.teacherName || "الأستاذ محمد عدايكة";
-  const school = options.schoolName || "متوسطة المجاهد باهي علي — قمار";
+  const teacher = options.teacherName || "الأستاذ(ة)";
+  const school = options.schoolName || "المؤسسة التعليمية";
   const inspector = options.inspectorName || "السيد مفتش التعليم المتوسط";
   const principal = options.principalName || "السيد مدير المؤسسة";
   const subject = options.subjectName || "الرياضيات";
@@ -591,10 +591,10 @@ export function generateLandscapeDiaryHTML(options: DiaryReportOptions): string 
     options.docTitle ||
     options.fileName ||
     (options.days.length === 1
-      ? `الدفتر_اليومي_الأستاذ_${(options.teacherName || "عدايكة").trim().split(" ")[0]}_ليوم_${options.days[0].dateStr}`
+      ? `الدفتر_اليومي_الأستاذ_${(options.teacherName || "الأستاذ").trim().split(" ")[0]}_ليوم_${options.days[0].dateStr}`
       : options.days.length > 1
-      ? `الدفتر_اليومي_الأستاذ_${(options.teacherName || "عدايكة").trim().split(" ")[0]}_من_${options.days[0].dateStr}_إلى_${options.days[options.days.length - 1].dateStr}`
-      : `الدفتر_اليومي_البيداغوجي_الأستاذ_${(options.teacherName || "عدايكة").trim().split(" ")[0]}`)
+      ? `الدفتر_اليومي_الأستاذ_${(options.teacherName || "الأستاذ").trim().split(" ")[0]}_من_${options.days[0].dateStr}_إلى_${options.days[options.days.length - 1].dateStr}`
+      : `الدفتر_اليومي_البيداغوجي_الأستاذ_${(options.teacherName || "الأستاذ").trim().split(" ")[0]}`)
   }</title>
 </head>
 <body>
@@ -645,7 +645,7 @@ export function generateLandscapeDiaryHTML(options: DiaryReportOptions): string 
 export function printLandscapeDiaryReport(options: DiaryReportOptions): void {
   if (typeof window === "undefined") return;
 
-  const teacherFamily = (options.teacherName || "عدايكة").trim().split(" ")[0];
+  const teacherFamily = (options.teacherName || "الأستاذ").trim().split(" ")[0];
   const calculatedDocTitle =
     options.docTitle ||
     options.fileName ||

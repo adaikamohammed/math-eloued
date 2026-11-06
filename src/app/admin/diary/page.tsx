@@ -293,9 +293,10 @@ function TeacherDiaryContent() {
 
   // جلب البيانات
   useEffect(() => {
-    if (typeof window !== "undefined") {
+    const persisted = getPersistedTeacherSession();
+    if (persisted?.id && typeof window !== "undefined") {
       try {
-        const storedClasses = localStorage.getItem("last_active_classes");
+        const storedClasses = localStorage.getItem(`jusoor_classes_${persisted.id}`);
         if (storedClasses) {
           const parsed = JSON.parse(storedClasses);
           if (Array.isArray(parsed) && parsed.length > 0) {
@@ -407,18 +408,132 @@ function TeacherDiaryContent() {
     }
   };
 
-  // ─── استجابة لمعاملات الرابط (URL Query Params) للتحضير الفوري الموجه من المخطط الأسبوعي ───
+  // التمرير السلس إلى الاستمارة
+  const scrollToForm = useCallback(() => {
+    setIsFormExpanded(true);
+    setTimeout(() => {
+      formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      titleInputRef.current?.focus();
+    }, 80);
+  }, []);
+
+  // الدخول في وضع تعديل حصة مسجلة
+  const handleStartEdit = useCallback(
+    (entry: DailyDiaryEntry) => {
+      setEditingEntry(entry);
+      setFormDate(entry.date);
+
+      if (customClasses.includes(entry.className)) {
+        setFormClass(entry.className);
+        setIsCustomClassInput(false);
+        setCustomClassName("");
+      } else {
+        setIsCustomClassInput(true);
+        setCustomClassName(entry.className);
+        setFormClass("__custom__");
+      }
+
+      const pTime = entry.periodTime || "08:00 - 09:00";
+      if (STANDARD_PERIODS.includes(pTime)) {
+        setFormPeriodTime(pTime);
+        setIsCustomTimeInput(false);
+        setCustomTimeValue("");
+      } else {
+        setIsCustomTimeInput(true);
+        setCustomTimeValue(pTime);
+        setFormPeriodTime("__custom__");
+      }
+
+      const fVal = entry.field || "أنشطة عددية";
+      if (COMMON_FIELDS.includes(fVal as any) || fVal === "أخرى / مراجعة") {
+        setFormField(fVal);
+        setIsCustomFieldInput(false);
+        setCustomFieldValue("");
+      } else {
+        setIsCustomFieldInput(true);
+        setCustomFieldValue(fVal);
+        setFormField("__custom__");
+      }
+
+      setFormNoteNumber(entry.lessonNoteNumber || "مذكرة رقم: 01");
+      setFormSessionType(entry.sessionType || "درس");
+      setFormSection(entry.section || "");
+      setFormLessonTitle(entry.lessonTitle);
+      setFormConcepts(entry.concepts || "");
+
+      if (entry.stages && entry.stages.length > 0) {
+        setFormStages(entry.stages);
+      } else {
+        const initial = getDefaultStages();
+        if (entry.objectives) initial[0].content = entry.objectives;
+        if (entry.activities) initial[1].content = entry.activities;
+        if (entry.homework) initial[2].content = entry.homework;
+        setFormStages(initial);
+      }
+
+      setFormNotes(entry.notes || "");
+      scrollToForm();
+    },
+    [customClasses, scrollToForm]
+  );
+
+  // ─── استجابة لمعاملات الرابط (URL Query Params) للتحضير الفوري الموجه أو التعديل المباشر ───
   useEffect(() => {
-    const pDate = searchParams?.get("date") || (typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("date") : null);
-    const pTime = searchParams?.get("time") || (typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("time") : null);
-    const pClass = searchParams?.get("class") || (typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("class") : null);
+    const urlParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+    const pEditId = searchParams?.get("editId") || urlParams?.get("editId");
+    const pDate = searchParams?.get("date") || urlParams?.get("date");
+    const pTime = searchParams?.get("time") || urlParams?.get("time");
+    const pClass = searchParams?.get("class") || urlParams?.get("class");
+    const isNew = searchParams?.get("new") === "true" || urlParams?.get("new") === "true";
 
-    if (!pDate && !pTime && !pClass) return;
+    if (!pEditId && !pDate && !pTime && !pClass) return;
 
-    const signature = `${pDate || ""}_${pTime || ""}_${pClass || ""}`;
+    // إذا لم تكتمل عملية جلب الحصص ولدينا معرّف أو نبحث عن حصة موجودة للتعديل، ننتظر اكتمال التحميل
+    if (loading && (pEditId || (!isNew && pDate && pTime))) {
+      return;
+    }
+
+    const signature = `${pEditId || ""}_${pDate || ""}_${pTime || ""}_${pClass || ""}_${isNew ? "new" : "auto"}_${entries.length}`;
     if (initialParamsHandled.current === signature) return;
     initialParamsHandled.current = signature;
 
+    // 1. فحص وجود حصة سابقة بالمعرف أو بالتاريخ والتوقيت لتعديلها مباشرة
+    let targetEntry: DailyDiaryEntry | undefined;
+    if (pEditId) {
+      targetEntry = entries.find((e) => e.id === pEditId);
+    } else if (!isNew && pDate && pTime) {
+      const decodedTime = decodeURIComponent(pTime).trim();
+      const decodedClass = pClass ? decodeURIComponent(pClass).trim() : null;
+
+      const normTime = (s: string) => s.replace(/\s+/g, "").replace(/[-–—]/g, "-");
+      const targetTimeNorm = normTime(decodedTime);
+      const targetTimeStart = targetTimeNorm.split("-")[0];
+
+      targetEntry = entries.find((e) => {
+        if (e.date !== pDate) return false;
+        if (decodedClass && e.className !== decodedClass) return false;
+        const entryTime = normTime(e.periodTime || "");
+        if (entryTime === targetTimeNorm) return true;
+        if (targetTimeStart && entryTime.startsWith(targetTimeStart)) return true;
+        return false;
+      });
+    }
+
+    if (targetEntry) {
+      handleStartEdit(targetEntry);
+      if (pDate) {
+        setDateFilterTab("custom");
+        setCustomFilterDate(pDate);
+      }
+      setMessage({
+        type: "ok",
+        text: `✏️ تم فتح حصة "${targetEntry.lessonTitle}" (${targetEntry.className} — ${targetEntry.periodTime || ""}) للتعديل المباشر 📒`,
+      });
+      setTimeout(() => setMessage(null), 6000);
+      return;
+    }
+
+    // 2. إذا لم توجد حصة مسجلة بهذا الموعد، نجهز استمارة جديدة بالبيانات الممررة
     if (pDate) {
       setFormDate(pDate);
       setDateFilterTab("custom");
@@ -465,7 +580,7 @@ function TeacherDiaryContent() {
       text: `🎯 تم تحديد موعد الحصة للتحضير الفوري: ${dayName} ${pDate || ""} (الساعة: ${pTime || ""})${pClass ? ` لفوج ${pClass}` : ""} — جاهزة للتدوين الآن!`,
     });
     setTimeout(() => setMessage(null), 6000);
-  }, [searchParams, entries]);
+  }, [searchParams, entries, loading, handleStartEdit]);
 
   // تفريغ وتجهيز الاستمارة لحصة جديدة مع التعبئة الذكية للتوقيت والميدان
   const handleResetForm = useCallback(
@@ -517,15 +632,6 @@ function TeacherDiaryContent() {
     [customClasses, entries, formClass, tomorrowStr]
   );
 
-  // التمرير السلس إلى الاستمارة
-  const scrollToForm = useCallback(() => {
-    setIsFormExpanded(true);
-    setTimeout(() => {
-      formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-      titleInputRef.current?.focus();
-    }, 80);
-  }, []);
-
   // فتح التحضير لتاريخ محدد مع احتساب التوقيت التلقائي
   const handlePrepareForDate = (dateToPrepare: string, clsToPrepare?: string) => {
     handleResetForm(dateToPrepare, clsToPrepare);
@@ -541,63 +647,6 @@ function TeacherDiaryContent() {
       setFormSection(prev.section);
       setFormNoteNumber(getNextNoteNumber(newCls, entries));
     }
-  };
-
-  // الدخول في وضع تعديل حصة مسجلة
-  const handleStartEdit = (entry: DailyDiaryEntry) => {
-    setEditingEntry(entry);
-    setFormDate(entry.date);
-
-    if (customClasses.includes(entry.className)) {
-      setFormClass(entry.className);
-      setIsCustomClassInput(false);
-      setCustomClassName("");
-    } else {
-      setIsCustomClassInput(true);
-      setCustomClassName(entry.className);
-      setFormClass("__custom__");
-    }
-
-    const pTime = entry.periodTime || "08:00 - 09:00";
-    if (STANDARD_PERIODS.includes(pTime)) {
-      setFormPeriodTime(pTime);
-      setIsCustomTimeInput(false);
-      setCustomTimeValue("");
-    } else {
-      setIsCustomTimeInput(true);
-      setCustomTimeValue(pTime);
-      setFormPeriodTime("__custom__");
-    }
-
-    const fVal = entry.field || "أنشطة عددية";
-    if (COMMON_FIELDS.includes(fVal as any) || fVal === "أخرى / مراجعة") {
-      setFormField(fVal);
-      setIsCustomFieldInput(false);
-      setCustomFieldValue("");
-    } else {
-      setIsCustomFieldInput(true);
-      setCustomFieldValue(fVal);
-      setFormField("__custom__");
-    }
-
-    setFormNoteNumber(entry.lessonNoteNumber || "مذكرة رقم: 01");
-    setFormSessionType(entry.sessionType || "درس");
-    setFormSection(entry.section || "");
-    setFormLessonTitle(entry.lessonTitle);
-    setFormConcepts(entry.concepts || "");
-
-    if (entry.stages && entry.stages.length > 0) {
-      setFormStages(entry.stages);
-    } else {
-      const initial = getDefaultStages();
-      if (entry.objectives) initial[0].content = entry.objectives;
-      if (entry.activities) initial[1].content = entry.activities;
-      if (entry.homework) initial[2].content = entry.homework;
-      setFormStages(initial);
-    }
-
-    setFormNotes(entry.notes || "");
-    scrollToForm();
   };
 
   // إضافة مرحلة مخصصة في سيرورة الحصة
@@ -1187,8 +1236,8 @@ function TeacherDiaryContent() {
   const todayLessons = useMemo(() => entries.filter((e) => e.date === todayStr), [entries, todayStr]);
 
   // بيانات الترويسة للطباعة الرسمية
-  const printTeacherName = timetableSettings?.teacherName || profile?.fullName || "الأستاذ محمد عدايكة";
-  const printSchoolName = timetableSettings?.schoolName || profile?.schoolCustomName || "متوسطة المجاهد باهي علي — قمار";
+  const printTeacherName = timetableSettings?.teacherName || profile?.fullName || "الأستاذ(ة)";
+  const printSchoolName = timetableSettings?.schoolName || profile?.schoolCustomName || "المؤسسة التعليمية";
   const printInspectorName = timetableSettings?.inspectorName || "السيد مفتش التعليم المتوسط";
   const printPrincipalName = timetableSettings?.principalName || "السيد مدير المؤسسة";
   const printSubject = timetableSettings?.subjectName || profile?.subject || "الرياضيات";

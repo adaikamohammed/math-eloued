@@ -46,10 +46,10 @@ import {
   sortClasses,
 } from "@/lib/types";
 
-// مفاتيح التخزين المحلي لضمان المزامنة الفورية بدون تأخير
-const LOCAL_STORAGE_CLASSES_KEYS = ["last_active_classes", "math_custom_classes"];
-const LOCAL_STORAGE_TIMETABLE_KEY = "math_teacher_timetable_cache";
-const LOCAL_STORAGE_STUDENTS_KEY = "math_teacher_students_cache";
+// مفاتيح التخزين المحلي المعزولة لكل أستاذ لضمان عدم تسريب البيانات بين الحسابات
+const getScopedTimetableKey = (teacherId: string) => `jusoor_timetable_${teacherId}`;
+const getScopedStudentsKey = (teacherId: string) => `jusoor_students_${teacherId}`;
+const getScopedClassesKey = (teacherId: string) => `jusoor_classes_${teacherId}`;
 
 // الأفواج الافتراضية للتعليم المتوسط (في حال لم يدخل الأستاذ أفواجه بعد)
 const DEFAULT_MIDDLE_SCHOOL_CLASSES = ["1م1", "1م2", "2م1", "4م3"];
@@ -269,52 +269,39 @@ export default function TeacherTimetablePage() {
     return generateTimeSlots(settings);
   }, [settings]);
 
-  // التحقق الأولي الفوري من الجلسة والتخزين المحلي (0ms)
+  // التحقق الأولي من الجلسة وتحميل بيانات التوقيت المعزولة تماماً للأستاذ
   useEffect(() => {
     setMounted(true);
 
-    if (typeof window !== "undefined") {
+    // إذا كانت هناك جلسة محفوظة للأستاذ الحالي في هذا المتصفح، نقرأ الكاش المعزول فقط
+    const persisted = getPersistedTeacherSession();
+    if (persisted?.id && typeof window !== "undefined") {
       try {
-        let loadedClasses: string[] = [];
-        for (const key of LOCAL_STORAGE_CLASSES_KEYS) {
-          const val = localStorage.getItem(key);
-          if (val) {
-            try {
-              const parsed = JSON.parse(val);
-              if (Array.isArray(parsed) && parsed.length > 0) {
-                loadedClasses = parsed;
-                break;
-              }
-            } catch {}
+        const storedClasses = localStorage.getItem(getScopedClassesKey(persisted.id));
+        if (storedClasses) {
+          const parsed = JSON.parse(storedClasses);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            const sorted = sortClasses(parsed);
+            setCustomClasses(sorted);
+            setSelectedClass(sorted[0]);
           }
         }
 
-        if (loadedClasses.length > 0) {
-          const sorted = sortClasses(loadedClasses);
-          setCustomClasses(sorted);
-          setSelectedClass(sorted[0]);
-        } else {
-          setCustomClasses(DEFAULT_MIDDLE_SCHOOL_CLASSES);
-          setSelectedClass(DEFAULT_MIDDLE_SCHOOL_CLASSES[0]);
-        }
-
-        const storedStudents = localStorage.getItem(LOCAL_STORAGE_STUDENTS_KEY);
+        const storedStudents = localStorage.getItem(getScopedStudentsKey(persisted.id));
         if (storedStudents) {
-          try {
-            const parsedS = JSON.parse(storedStudents);
-            if (Array.isArray(parsedS)) setStudentRoster(parsedS);
-          } catch {}
+          const parsedS = JSON.parse(storedStudents);
+          if (Array.isArray(parsedS)) setStudentRoster(parsedS);
         }
 
-        const storedTimetable = localStorage.getItem(LOCAL_STORAGE_TIMETABLE_KEY);
+        const storedTimetable = localStorage.getItem(getScopedTimetableKey(persisted.id));
         if (storedTimetable) {
           const parsed = JSON.parse(storedTimetable);
           if (parsed && Array.isArray(parsed.slots)) setSlots(parsed.slots);
           if (parsed && parsed.settings) {
             setSettings({ ...DEFAULT_SETTINGS, ...parsed.settings });
             setPrintFormData({
-              schoolName: parsed.settings.schoolName || "",
-              teacherName: parsed.settings.teacherName || "",
+              schoolName: parsed.settings.schoolName || persisted.school_custom_name || "",
+              teacherName: parsed.settings.teacherName || persisted.full_name || "",
               inspectorName: parsed.settings.inspectorName || "",
               principalName: parsed.settings.principalName || "",
               wilayaName: parsed.settings.wilayaName || "الوادي",
@@ -324,7 +311,7 @@ export default function TeacherTimetablePage() {
           if (parsed && parsed.image_path) setOfficialImagePath(parsed.image_path);
         }
       } catch (e) {
-        console.warn("Error reading local timetable cache", e);
+        console.warn("Error reading scoped timetable cache", e);
       }
     }
 
@@ -345,9 +332,11 @@ export default function TeacherTimetablePage() {
             cacheServerDataLocally(teacherId, data);
           }
           const active = data || (teacherId ? getTeacherOfflineData(teacherId) : null);
-          if (active) {
+          if (active && teacherId) {
             if (Array.isArray(active.studentRoster)) {
               setStudentRoster(active.studentRoster);
+            } else {
+              setStudentRoster([]);
             }
 
             let candidateClasses: string[] = [];
@@ -364,12 +353,13 @@ export default function TeacherTimetablePage() {
               setCustomClasses(sorted);
               setSelectedClass((prev) => (sorted.includes(prev) ? prev : sorted[0]));
               if (typeof window !== "undefined") {
-                LOCAL_STORAGE_CLASSES_KEYS.forEach((k) => {
-                  try {
-                    localStorage.setItem(k, JSON.stringify(sorted));
-                  } catch {}
-                });
+                try {
+                  localStorage.setItem(getScopedClassesKey(teacherId), JSON.stringify(sorted));
+                } catch {}
               }
+            } else {
+              setCustomClasses(DEFAULT_MIDDLE_SCHOOL_CLASSES);
+              setSelectedClass(DEFAULT_MIDDLE_SCHOOL_CLASSES[0]);
             }
 
             if (active.timetable && Array.isArray(active.timetable.slots)) {
@@ -379,8 +369,8 @@ export default function TeacherTimetablePage() {
                 const merged = { ...DEFAULT_SETTINGS, ...active.timetable.settings };
                 setSettings(merged);
                 setPrintFormData({
-                  schoolName: merged.schoolName || "",
-                  teacherName: merged.teacherName || "",
+                  schoolName: merged.schoolName || auth.profile?.school_custom_name || "",
+                  teacherName: merged.teacherName || auth.profile?.full_name || "",
                   inspectorName: merged.inspectorName || "",
                   principalName: merged.principalName || "",
                   wilayaName: merged.wilayaName || "الوادي",
@@ -390,10 +380,35 @@ export default function TeacherTimetablePage() {
 
               if (typeof window !== "undefined") {
                 try {
-                  localStorage.setItem(LOCAL_STORAGE_TIMETABLE_KEY, JSON.stringify(active.timetable));
+                  localStorage.setItem(getScopedTimetableKey(teacherId), JSON.stringify(active.timetable));
                 } catch {}
               }
+            } else {
+              // حساب جديد: تصفير جدول الحصص تماماً لمنع أي توقيت سابق!
+              setSlots([]);
+              setOfficialImagePath(null);
+              const freshSettings: TimetableSettings = {
+                ...DEFAULT_SETTINGS,
+                schoolName: auth.profile?.school_custom_name || "",
+                teacherName: auth.profile?.full_name || "",
+                subjectName: auth.profile?.subject || "الرياضيات",
+              };
+              setSettings(freshSettings);
+              setPrintFormData({
+                schoolName: freshSettings.schoolName || "",
+                teacherName: freshSettings.teacherName || "",
+                inspectorName: "",
+                principalName: "",
+                wilayaName: "الوادي",
+                subjectName: freshSettings.subjectName || "الرياضيات",
+              });
             }
+          } else {
+            // لا توجد بيانات في السيرفر أو وضع غير مسجل
+            setSlots([]);
+            setStudentRoster([]);
+            setCustomClasses(DEFAULT_MIDDLE_SCHOOL_CLASSES);
+            setSelectedClass(DEFAULT_MIDDLE_SCHOOL_CLASSES[0]);
           }
         })
         .catch(() => {
@@ -412,7 +427,11 @@ export default function TeacherTimetablePage() {
                 if (offline.timetable.settings) {
                   setSettings({ ...DEFAULT_SETTINGS, ...offline.timetable.settings });
                 }
+              } else {
+                setSlots([]);
               }
+            } else {
+              setSlots([]);
             }
           }
         })
@@ -454,18 +473,13 @@ export default function TeacherTimetablePage() {
       updated_at: new Date().toISOString(),
     };
 
-    if (typeof window !== "undefined") {
+    const session = getPersistedTeacherSession();
+    if (typeof window !== "undefined" && session?.id) {
       try {
-        localStorage.setItem(LOCAL_STORAGE_TIMETABLE_KEY, JSON.stringify(payload));
-        LOCAL_STORAGE_CLASSES_KEYS.forEach((k) => {
-          try {
-            localStorage.setItem(k, JSON.stringify(currentClasses));
-          } catch {}
-        });
+        localStorage.setItem(getScopedTimetableKey(session.id), JSON.stringify(payload));
+        localStorage.setItem(getScopedClassesKey(session.id), JSON.stringify(currentClasses));
       } catch {}
     }
-
-    const session = getPersistedTeacherSession();
     if (session?.id) {
       saveTeacherOfflineData(
         session.id,

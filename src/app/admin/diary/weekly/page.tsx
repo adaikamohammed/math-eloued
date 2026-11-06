@@ -31,11 +31,17 @@ import {
   TableProperties,
   Check,
   Download,
+  Pencil,
+  Trash2,
+  X,
+  ExternalLink,
+  Loader2,
+  Save,
 } from "lucide-react";
 import { LoginRequired } from "@/components/LoginRequired";
 import { useProfile } from "@/lib/useProfile";
-import { checkTeacherSession } from "@/lib/offlineAuth";
-import { getTeacherOfflineData, setupAutoSync } from "@/lib/offlineStorage";
+import { checkTeacherSession, getPersistedTeacherSession } from "@/lib/offlineAuth";
+import { getTeacherOfflineData, saveTeacherOfflineData, setupAutoSync } from "@/lib/offlineStorage";
 import {
   DailyDiaryEntry,
   SpecialDayRecord,
@@ -176,8 +182,25 @@ function formatArabicDate(dateStr: string): string {
   }
 }
 
+// استخراج زمن البداية بالدقائق لتفادي تكرار الحصص عند تقاطع الساعات
+function parseSlotMinutes(timeStr: string): number | null {
+  if (!timeStr) return null;
+  const match = timeStr.trim().replace(/h/i, ":").match(/(\d{1,2}):(\d{2})/);
+  if (match) return parseInt(match[1], 10) * 60 + parseInt(match[2], 10);
+  const hourOnly = timeStr.trim().match(/^(\d{1,2})/);
+  if (hourOnly) return parseInt(hourOnly[1], 10) * 60;
+  return null;
+}
+
+function getEntryStartMinutes(periodTime: string): number | null {
+  if (!periodTime) return null;
+  const parts = periodTime.trim().split(/[-–—]/);
+  return parseSlotMinutes(parts[0]);
+}
+
 /**
  * مطابقة الحصة المدونة في الدفتر اليومي مع خانة زمنية معينة
+ * مطابقة دقيقة تمنع تماماً تكرار الحصص في أكثر من خانة
  */
 function findEntryForSlot(
   dayEntries: DailyDiaryEntry[],
@@ -187,18 +210,22 @@ function findEntryForSlot(
 
   // 1. مطابقة دقيقة أولاً
   const exact = dayEntries.find((e) => {
-    const t = (e.periodTime || "").trim();
-    return t === slot.label || t.replace(/\s+/g, "") === slot.label.replace(/\s+/g, "");
+    const t = (e.periodTime || "").trim().replace(/\s+/g, "");
+    const s = slot.label.replace(/\s+/g, "");
+    return t === s;
   });
   if (exact) return exact;
 
-  // 2. مطابقة بساعة البداية
-  const startHour = slot.start.split(":")[0];
-  const byStartHour = dayEntries.find((e) => {
-    const t = (e.periodTime || "").trim();
-    return t.startsWith(startHour + ":") || t.startsWith(startHour + "h") || t.includes(slot.start);
-  });
-  if (byStartHour) return byStartHour;
+  // 2. مطابقة دقيقة بوقت بداية الحصة بالدقائق (لا يمكن لحصة 09:00-10:00 أن تطابق خانة 10:00-11:00)
+  const slotStartMin = parseSlotMinutes(slot.start);
+  if (slotStartMin !== null) {
+    const byStart = dayEntries.find((e) => {
+      const entryStartMin = getEntryStartMinutes(e.periodTime || "");
+      if (entryStartMin === null) return false;
+      return Math.abs(entryStartMin - slotStartMin) < 15;
+    });
+    if (byStart) return byStart;
+  }
 
   return undefined;
 }
@@ -237,6 +264,7 @@ function buildPrepareUrl(dateStr: string, slotLabel: string, scheduledClass?: st
   if (scheduledClass && scheduledClass !== "فراغ") {
     params.set("class", scheduledClass);
   }
+  params.set("new", "true");
   return `/admin/diary?${params.toString()}`;
 }
 
@@ -251,6 +279,111 @@ export default function WeeklyDiaryPage() {
   const [specialDays, setSpecialDays] = useState<SpecialDayRecord[]>([]);
   const [customClasses, setCustomClasses] = useState<string[]>([]);
   const [timetable, setTimetable] = useState<TeacherTimetable | null>(null);
+
+  // نافذة معاينة وتعديل الحصة السريعة
+  const [selectedEntry, setSelectedEntry] = useState<DailyDiaryEntry | null>(null);
+  const [isQuickEditMode, setIsQuickEditMode] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editSection, setEditSection] = useState("");
+  const [editHomework, setEditHomework] = useState("");
+  const [editNotes, setEditNotes] = useState("");
+  const [isSavingEntry, setIsSavingEntry] = useState(false);
+  const [feedbackMsg, setFeedbackMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+
+  // فتح نافذة المعاينة والتعديل
+  const handleOpenEntryModal = useCallback((entry: DailyDiaryEntry) => {
+    setSelectedEntry(entry);
+    setIsQuickEditMode(false);
+    setEditTitle(entry.lessonTitle || "");
+    setEditSection(entry.section || "");
+    setEditHomework(entry.homework || "");
+    setEditNotes(entry.notes || "");
+    setFeedbackMsg(null);
+  }, []);
+
+  // إغلاق النافذة
+  const handleCloseEntryModal = useCallback(() => {
+    setSelectedEntry(null);
+    setIsQuickEditMode(false);
+    setFeedbackMsg(null);
+  }, []);
+
+  // حفظ التعديل السريع للحصة مباشرة من المخطط الأسبوعي
+  const handleSaveQuickEdit = async () => {
+    if (!selectedEntry || !editTitle.trim()) return;
+    setIsSavingEntry(true);
+    setFeedbackMsg(null);
+
+    const updatedEntry: DailyDiaryEntry = {
+      ...selectedEntry,
+      lessonTitle: editTitle.trim(),
+      section: editSection.trim(),
+      homework: editHomework.trim(),
+      notes: editNotes.trim(),
+    };
+
+    const newEntries = entries.map((e) => (e.id === selectedEntry.id ? updatedEntry : e));
+    setEntries(newEntries);
+    setSelectedEntry(updatedEntry);
+
+    const session = getPersistedTeacherSession();
+    if (session?.id) {
+      saveTeacherOfflineData(session.id, { diaryEntries: newEntries }, true);
+    }
+
+    try {
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        throw new Error("offline");
+      }
+      const res = await fetch("/api/lessons", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ diaryEntries: newEntries }),
+      });
+      if (!res.ok) throw new Error("فشل الحفظ على السيرفر");
+      setFeedbackMsg({ type: "ok", text: "✅ تم حفظ تعديل الحصة بنجاح!" });
+      setTimeout(() => {
+        setIsQuickEditMode(false);
+        setFeedbackMsg(null);
+      }, 1500);
+    } catch {
+      setFeedbackMsg({ type: "ok", text: "⚡ تم الحفظ محلياً في جهازك وسيُزامن تلقائياً!" });
+      setTimeout(() => {
+        setIsQuickEditMode(false);
+        setFeedbackMsg(null);
+      }, 2000);
+    } finally {
+      setIsSavingEntry(false);
+    }
+  };
+
+  // حذف الحصة مباشرة من المخطط الأسبوعي
+  const handleDeleteEntry = async (entryId: string) => {
+    if (!window.confirm("هل أنت متأكد من رغبتك في حذف هذه الحصة من الدفتر اليومي؟")) return;
+    setIsSavingEntry(true);
+
+    const newEntries = entries.filter((e) => e.id !== entryId);
+    setEntries(newEntries);
+
+    const session = getPersistedTeacherSession();
+    if (session?.id) {
+      saveTeacherOfflineData(session.id, { diaryEntries: newEntries }, true);
+    }
+
+    try {
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        throw new Error("offline");
+      }
+      await fetch("/api/lessons", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ diaryEntries: newEntries }),
+      });
+    } catch {}
+
+    setIsSavingEntry(false);
+    handleCloseEntryModal();
+  };
 
   // التحكم بالأسبوع والتاريخ والوضع
   const [currentRefDate, setCurrentRefDate] = useState<Date>(() => new Date());
@@ -467,8 +600,8 @@ export default function WeeklyDiaryPage() {
   }, [weekEntriesByDate, weekInfo.days]);
 
   // بيانات الترويسة للطباعة
-  const printTeacherName = profile?.full_name || "الأستاذ محمد عدايكة";
-  const printSchoolName = profile?.school_custom_name || "متوسطة المجاهد باهي علي — قمار";
+  const printTeacherName = profile?.full_name || "الأستاذ(ة)";
+  const printSchoolName = profile?.school_custom_name || "المؤسسة التعليمية";
   const printSubject = profile?.subject || "الرياضيات";
   const printWilaya = "الوادي";
 
@@ -477,8 +610,8 @@ export default function WeeklyDiaryPage() {
     printWeeklyDiaryReport({
       teacherName: printTeacherName,
       schoolName: printSchoolName,
-      inspectorName: timetable?.settings?.inspectorName || "السيد عبد الرزاق عبيدي (مفتش التربية الوطنية)",
-      principalName: timetable?.settings?.principalName || "السيد عبد اللطيف عويني (مدير المؤسسة)",
+      inspectorName: timetable?.settings?.inspectorName || "السيد مفتش المادة",
+      principalName: timetable?.settings?.principalName || "السيد مدير المؤسسة",
       wilayaName: printWilaya,
       subjectName: printSubject,
       weekStartStr: weekInfo.sundayStr,
@@ -497,8 +630,8 @@ export default function WeeklyDiaryPage() {
     downloadWeeklyDiaryPDF({
       teacherName: printTeacherName,
       schoolName: printSchoolName,
-      inspectorName: timetable?.settings?.inspectorName || "السيد عبد الرزاق عبيدي (مفتش التربية الوطنية)",
-      principalName: timetable?.settings?.principalName || "السيد عبد اللطيف عويني (مدير المؤسسة)",
+      inspectorName: timetable?.settings?.inspectorName || "السيد مفتش المادة",
+      principalName: timetable?.settings?.principalName || "السيد مدير المؤسسة",
       wilayaName: printWilaya,
       subjectName: printSubject,
       weekStartStr: weekInfo.sundayStr,
@@ -973,23 +1106,35 @@ export default function WeeklyDiaryPage() {
                             >
                               {entry ? (
                                 <div
-                                  className={`p-2 rounded-xl border ${color?.bg} ${color?.border} shadow-2xs space-y-1 h-full flex flex-col justify-between print:p-1 print:border-black print:bg-white`}
+                                  onClick={() => handleOpenEntryModal(entry)}
+                                  className={`p-2 rounded-xl border ${color?.bg} ${color?.border} shadow-2xs space-y-1 h-full flex flex-col justify-between cursor-pointer hover:shadow-md hover:ring-2 hover:ring-emerald-500/40 transition group/slot relative print:p-1 print:border-black print:bg-white print:shadow-none print:ring-0`}
+                                  title="انقر لمعاينة أو تعديل هذه الحصة ✏️"
                                 >
                                   <div>
                                     <div className="flex items-center justify-between gap-1 mb-1">
                                       <span className={`text-[10px] font-black px-1.5 py-0.2 rounded ${color?.badge} print:border print:border-black print:text-black print:bg-gray-100`}>
                                         {entry.className}
                                       </span>
-                                      {entry.lessonNoteNumber && (
-                                        <span className="text-[9px] font-bold text-gray-700 bg-white/90 px-1 py-0.2 rounded border border-gray-300">
-                                          {entry.lessonNoteNumber}
-                                        </span>
-                                      )}
+                                      <div className="flex items-center gap-1">
+                                        {entry.lessonNoteNumber && (
+                                          <span className="text-[9px] font-bold text-gray-700 bg-white/90 px-1 py-0.2 rounded border border-gray-300">
+                                            {entry.lessonNoteNumber}
+                                          </span>
+                                        )}
+                                        <Link
+                                          href={`/admin/diary?editId=${entry.id}&date=${entry.date}`}
+                                          onClick={(e) => e.stopPropagation()}
+                                          className="opacity-0 group-hover/slot:opacity-100 p-0.5 rounded bg-white hover:bg-emerald-50 text-gray-600 hover:text-emerald-700 border border-gray-200 transition shadow-2xs print:hidden"
+                                          title="تعديل الحصة في الدفتر اليومي"
+                                        >
+                                          <Pencil className="w-3 h-3" />
+                                        </Link>
+                                      </div>
                                     </div>
 
                                     {/* عنوان المورد فقط */}
                                     <div className="text-right">
-                                      <h4 className="text-[11px] font-black text-gray-900 leading-tight print:text-black">
+                                      <h4 className="text-[11px] font-black text-gray-900 leading-tight group-hover/slot:text-emerald-800 transition print:text-black">
                                         {entry.lessonTitle}
                                       </h4>
                                       {entry.section && (
@@ -1076,23 +1221,35 @@ export default function WeeklyDiaryPage() {
                             >
                               {entry ? (
                                 <div
-                                  className={`p-2 rounded-xl border ${color?.bg} ${color?.border} shadow-2xs space-y-1 h-full flex flex-col justify-between print:p-1 print:border-black print:bg-white`}
+                                  onClick={() => handleOpenEntryModal(entry)}
+                                  className={`p-2 rounded-xl border ${color?.bg} ${color?.border} shadow-2xs space-y-1 h-full flex flex-col justify-between cursor-pointer hover:shadow-md hover:ring-2 hover:ring-emerald-500/40 transition group/slot relative print:p-1 print:border-black print:bg-white print:shadow-none print:ring-0`}
+                                  title="انقر لمعاينة أو تعديل هذه الحصة ✏️"
                                 >
                                   <div>
                                     <div className="flex items-center justify-between gap-1 mb-1">
                                       <span className={`text-[10px] font-black px-1.5 py-0.2 rounded ${color?.badge} print:border print:border-black print:text-black print:bg-gray-100`}>
                                         {entry.className}
                                       </span>
-                                      {entry.lessonNoteNumber && (
-                                        <span className="text-[9px] font-bold text-gray-700 bg-white/90 px-1 py-0.2 rounded border border-gray-300">
-                                          {entry.lessonNoteNumber}
-                                        </span>
-                                      )}
+                                      <div className="flex items-center gap-1">
+                                        {entry.lessonNoteNumber && (
+                                          <span className="text-[9px] font-bold text-gray-700 bg-white/90 px-1 py-0.2 rounded border border-gray-300">
+                                            {entry.lessonNoteNumber}
+                                          </span>
+                                        )}
+                                        <Link
+                                          href={`/admin/diary?editId=${entry.id}&date=${entry.date}`}
+                                          onClick={(e) => e.stopPropagation()}
+                                          className="opacity-0 group-hover/slot:opacity-100 p-0.5 rounded bg-white hover:bg-emerald-50 text-gray-600 hover:text-emerald-700 border border-gray-200 transition shadow-2xs print:hidden"
+                                          title="تعديل الحصة في الدفتر اليومي"
+                                        >
+                                          <Pencil className="w-3 h-3" />
+                                        </Link>
+                                      </div>
                                     </div>
 
                                     {/* عنوان المورد فقط */}
                                     <div className="text-right">
-                                      <h4 className="text-[11px] font-black text-gray-900 leading-tight print:text-black">
+                                      <h4 className="text-[11px] font-black text-gray-900 leading-tight group-hover/slot:text-emerald-800 transition print:text-black">
                                         {entry.lessonTitle}
                                       </h4>
                                       {entry.section && (
@@ -1221,20 +1378,34 @@ export default function WeeklyDiaryPage() {
                             className="p-1.5 border-l border-gray-300 last:border-l-0 align-top min-w-[140px] max-w-[190px] print:border-black print:p-1"
                           >
                             {entry ? (
-                              <div className={`p-2 rounded-xl border ${color?.bg} ${color?.border} shadow-2xs space-y-1 h-full flex flex-col justify-between print:p-1 print:border-black print:bg-white`}>
+                              <div
+                                onClick={() => handleOpenEntryModal(entry)}
+                                className={`p-2 rounded-xl border ${color?.bg} ${color?.border} shadow-2xs space-y-1 h-full flex flex-col justify-between cursor-pointer hover:shadow-md hover:ring-2 hover:ring-emerald-500/40 transition group/slot relative print:p-1 print:border-black print:bg-white print:shadow-none print:ring-0`}
+                                title="انقر لمعاينة أو تعديل هذه الحصة ✏️"
+                              >
                                 <div>
                                   <div className="flex items-center justify-between gap-1 mb-1">
                                     <span className={`text-[10px] font-black px-1.5 py-0.2 rounded ${color?.badge} print:border print:border-black print:text-black print:bg-gray-100`}>
                                       {entry.className}
                                     </span>
-                                    {entry.lessonNoteNumber && (
-                                      <span className="text-[9px] font-bold text-gray-700 bg-white/90 px-1 py-0.2 rounded border border-gray-300">
-                                        {entry.lessonNoteNumber}
-                                      </span>
-                                    )}
+                                    <div className="flex items-center gap-1">
+                                      {entry.lessonNoteNumber && (
+                                        <span className="text-[9px] font-bold text-gray-700 bg-white/90 px-1 py-0.2 rounded border border-gray-300">
+                                          {entry.lessonNoteNumber}
+                                        </span>
+                                      )}
+                                      <Link
+                                        href={`/admin/diary?editId=${entry.id}&date=${entry.date}`}
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="opacity-0 group-hover/slot:opacity-100 p-0.5 rounded bg-white hover:bg-emerald-50 text-gray-600 hover:text-emerald-700 border border-gray-200 transition shadow-2xs print:hidden"
+                                        title="تعديل الحصة في الدفتر اليومي"
+                                      >
+                                        <Pencil className="w-3 h-3" />
+                                      </Link>
+                                    </div>
                                   </div>
                                   <div className="text-right">
-                                    <h4 className="text-[11px] font-black text-gray-900 leading-tight print:text-black">
+                                    <h4 className="text-[11px] font-black text-gray-900 leading-tight group-hover/slot:text-emerald-800 transition print:text-black">
                                       {entry.lessonTitle}
                                     </h4>
                                     {entry.section && (
@@ -1351,20 +1522,34 @@ export default function WeeklyDiaryPage() {
                             className="p-1.5 border-l border-gray-300 last:border-l-0 align-top min-w-[140px] max-w-[190px] print:border-black print:p-1"
                           >
                             {entry ? (
-                              <div className={`p-2 rounded-xl border ${color?.bg} ${color?.border} shadow-2xs space-y-1 h-full flex flex-col justify-between print:p-1 print:border-black print:bg-white`}>
+                              <div
+                                onClick={() => handleOpenEntryModal(entry)}
+                                className={`p-2 rounded-xl border ${color?.bg} ${color?.border} shadow-2xs space-y-1 h-full flex flex-col justify-between cursor-pointer hover:shadow-md hover:ring-2 hover:ring-emerald-500/40 transition group/slot relative print:p-1 print:border-black print:bg-white print:shadow-none print:ring-0`}
+                                title="انقر لمعاينة أو تعديل هذه الحصة ✏️"
+                              >
                                 <div>
                                   <div className="flex items-center justify-between gap-1 mb-1">
                                     <span className={`text-[10px] font-black px-1.5 py-0.2 rounded ${color?.badge} print:border print:border-black print:text-black print:bg-gray-100`}>
                                       {entry.className}
                                     </span>
-                                    {entry.lessonNoteNumber && (
-                                      <span className="text-[9px] font-bold text-gray-700 bg-white/90 px-1 py-0.2 rounded border border-gray-300">
-                                        {entry.lessonNoteNumber}
-                                      </span>
-                                    )}
+                                    <div className="flex items-center gap-1">
+                                      {entry.lessonNoteNumber && (
+                                        <span className="text-[9px] font-bold text-gray-700 bg-white/90 px-1 py-0.2 rounded border border-gray-300">
+                                          {entry.lessonNoteNumber}
+                                        </span>
+                                      )}
+                                      <Link
+                                        href={`/admin/diary?editId=${entry.id}&date=${entry.date}`}
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="opacity-0 group-hover/slot:opacity-100 p-0.5 rounded bg-white hover:bg-emerald-50 text-gray-600 hover:text-emerald-700 border border-gray-200 transition shadow-2xs print:hidden"
+                                        title="تعديل الحصة في الدفتر اليومي"
+                                      >
+                                        <Pencil className="w-3 h-3" />
+                                      </Link>
+                                    </div>
                                   </div>
                                   <div className="text-right">
-                                    <h4 className="text-[11px] font-black text-gray-900 leading-tight print:text-black">
+                                    <h4 className="text-[11px] font-black text-gray-900 leading-tight group-hover/slot:text-emerald-800 transition print:text-black">
                                       {entry.lessonTitle}
                                     </h4>
                                     {entry.section && (
@@ -1485,17 +1670,29 @@ export default function WeeklyDiaryPage() {
                           return (
                             <div
                               key={slot.id}
-                              className={`p-2 rounded-xl border ${color?.bg} ${color?.border} space-y-1`}
+                              onClick={() => handleOpenEntryModal(entry)}
+                              className={`p-2 rounded-xl border ${color?.bg} ${color?.border} space-y-1 cursor-pointer hover:shadow-md hover:ring-2 hover:ring-emerald-500/40 transition group/slot relative`}
+                              title="انقر لمعاينة أو تعديل هذه الحصة ✏️"
                             >
                               <div className="flex items-center justify-between">
                                 <span className={`text-[10px] font-black px-1.5 py-0.2 rounded ${color?.badge}`}>
                                   {entry.className}
                                 </span>
-                                <span className="text-[10px] font-mono text-gray-500 font-bold">
-                                  {slot.label}
-                                </span>
+                                <div className="flex items-center gap-1">
+                                  <span className="text-[10px] font-mono text-gray-500 font-bold">
+                                    {slot.label}
+                                  </span>
+                                  <Link
+                                    href={`/admin/diary?editId=${entry.id}&date=${entry.date}`}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="opacity-0 group-hover/slot:opacity-100 p-0.5 rounded bg-white hover:bg-emerald-50 text-gray-600 hover:text-emerald-700 border border-gray-200 transition shadow-2xs"
+                                    title="تعديل الحصة في الدفتر اليومي"
+                                  >
+                                    <Pencil className="w-3 h-3" />
+                                  </Link>
+                                </div>
                               </div>
-                              <h4 className="text-[11px] font-black text-gray-900 leading-snug line-clamp-2">
+                              <h4 className="text-[11px] font-black text-gray-900 leading-snug line-clamp-2 group-hover/slot:text-emerald-800 transition">
                                 {entry.lessonTitle}
                               </h4>
                               {entry.section && (
@@ -1556,17 +1753,29 @@ export default function WeeklyDiaryPage() {
                             return (
                               <div
                                 key={slot.id}
-                                className={`p-2 rounded-xl border ${color?.bg} ${color?.border} space-y-1`}
+                                onClick={() => handleOpenEntryModal(entry)}
+                                className={`p-2 rounded-xl border ${color?.bg} ${color?.border} space-y-1 cursor-pointer hover:shadow-md hover:ring-2 hover:ring-emerald-500/40 transition group/slot relative`}
+                                title="انقر لمعاينة أو تعديل هذه الحصة ✏️"
                               >
                                 <div className="flex items-center justify-between">
                                   <span className={`text-[10px] font-black px-1.5 py-0.2 rounded ${color?.badge}`}>
                                     {entry.className}
                                   </span>
-                                  <span className="text-[10px] font-mono text-gray-500 font-bold">
-                                    {slot.label}
-                                  </span>
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-[10px] font-mono text-gray-500 font-bold">
+                                      {slot.label}
+                                    </span>
+                                    <Link
+                                      href={`/admin/diary?editId=${entry.id}&date=${entry.date}`}
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="opacity-0 group-hover/slot:opacity-100 p-0.5 rounded bg-white hover:bg-emerald-50 text-gray-600 hover:text-emerald-700 border border-gray-200 transition shadow-2xs"
+                                      title="تعديل الحصة في الدفتر اليومي"
+                                    >
+                                      <Pencil className="w-3 h-3" />
+                                    </Link>
+                                  </div>
                                 </div>
-                                <h4 className="text-[11px] font-black text-gray-900 leading-snug line-clamp-2">
+                                <h4 className="text-[11px] font-black text-gray-900 leading-snug line-clamp-2 group-hover/slot:text-emerald-800 transition">
                                   {entry.lessonTitle}
                                 </h4>
                                 {entry.section && (
@@ -1632,6 +1841,248 @@ export default function WeeklyDiaryPage() {
             </div>
           </div>
         </div>
+
+        {/* ─── نافذة المعاينة والتعديل المباشر للحصة (Modal) ─── */}
+        {selectedEntry && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200 print:hidden"
+            onClick={handleCloseEntryModal}
+          >
+            <div
+              className="bg-white rounded-3xl shadow-2xl border border-gray-200 w-full max-w-xl overflow-hidden animate-in zoom-in-95 duration-200"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* ترويسة النافذة */}
+              <div className="bg-gradient-to-r from-emerald-700 via-emerald-800 to-teal-800 text-white p-4 sm:p-5 flex items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="px-2.5 py-0.5 rounded-lg bg-white/20 backdrop-blur-md text-xs font-black text-white border border-white/30">
+                      {selectedEntry.className}
+                    </span>
+                    <span className="text-xs font-bold text-emerald-100 flex items-center gap-1">
+                      <CalendarDays className="w-3.5 h-3.5" />
+                      <span>{formatArabicDate(selectedEntry.date)}</span>
+                    </span>
+                    {selectedEntry.periodTime && (
+                      <span className="text-xs font-bold text-emerald-100 flex items-center gap-1 font-mono">
+                        <Clock className="w-3.5 h-3.5" />
+                        <span>{selectedEntry.periodTime}</span>
+                      </span>
+                    )}
+                  </div>
+                  <h3 className="text-base sm:text-lg font-black text-white leading-snug">
+                    {isQuickEditMode ? "تعديل بيانات الحصة ✏️" : selectedEntry.lessonTitle}
+                  </h3>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleCloseEntryModal}
+                  className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white transition cursor-pointer"
+                  title="إغلاق النافذة"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* رسالة التنبيه إن وجدت */}
+              {feedbackMsg && (
+                <div className={`p-3 text-xs font-bold flex items-center gap-2 ${feedbackMsg.type === "ok" ? "bg-emerald-50 text-emerald-900 border-b border-emerald-200" : "bg-red-50 text-red-900 border-b border-red-200"}`}>
+                  {feedbackMsg.type === "ok" ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <X className="w-4 h-4 text-red-600" />}
+                  <span>{feedbackMsg.text}</span>
+                </div>
+              )}
+
+              {/* جسم النافذة */}
+              <div className="p-5 max-h-[70vh] overflow-y-auto space-y-4">
+                {isQuickEditMode ? (
+                  /* وضع التعديل السريع الفوري */
+                  <div className="space-y-3.5 text-right">
+                    <div>
+                      <label className="block text-xs font-black text-gray-700 mb-1">
+                        عنوان المورد / الدرس <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={editTitle}
+                        onChange={(e) => setEditTitle(e.target.value)}
+                        placeholder="أدخل عنوان المورد..."
+                        className="w-full px-3 py-2 rounded-xl border border-gray-300 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 text-xs font-bold text-gray-900 outline-none transition"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-black text-gray-700 mb-1">
+                        المقطع التعلمي
+                      </label>
+                      <input
+                        type="text"
+                        value={editSection}
+                        onChange={(e) => setEditSection(e.target.value)}
+                        placeholder="مثال: المقطع 02: الأعداد النسبية..."
+                        className="w-full px-3 py-2 rounded-xl border border-gray-300 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 text-xs font-medium text-gray-900 outline-none transition"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-black text-gray-700 mb-1">
+                        الواجب المنزلي (إن وجد)
+                      </label>
+                      <textarea
+                        value={editHomework}
+                        onChange={(e) => setEditHomework(e.target.value)}
+                        placeholder="مثال: حل تمرين 14 ص 30 من الكتاب المدرسي..."
+                        rows={2}
+                        className="w-full px-3 py-2 rounded-xl border border-gray-300 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 text-xs font-medium text-gray-900 outline-none transition resize-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-black text-gray-700 mb-1">
+                        ملاحظات وتوجيهات
+                      </label>
+                      <textarea
+                        value={editNotes}
+                        onChange={(e) => setEditNotes(e.target.value)}
+                        placeholder="أي ملاحظات حول سيرورة الحصة..."
+                        rows={2}
+                        className="w-full px-3 py-2 rounded-xl border border-gray-300 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 text-xs font-medium text-gray-900 outline-none transition resize-none"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  /* وضع معاينة تفاصيل الحصة */
+                  <div className="space-y-4 text-right">
+                    {/* بطاقات البيانات الأساسية */}
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="p-2.5 rounded-xl bg-gray-50 border border-gray-200">
+                        <span className="text-[10px] text-gray-500 font-bold block mb-0.5">نوع الحصة</span>
+                        <span className="font-black text-gray-800">{selectedEntry.sessionType || "درس ومورد"}</span>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-gray-50 border border-gray-200">
+                        <span className="text-[10px] text-gray-500 font-bold block mb-0.5">الميدان</span>
+                        <span className="font-black text-gray-800">{selectedEntry.field || "أنشطة عددية"}</span>
+                      </div>
+                    </div>
+
+                    {selectedEntry.section && (
+                      <div className="p-2.5 rounded-xl bg-emerald-50/60 border border-emerald-200 text-xs">
+                        <span className="text-[10px] text-emerald-800 font-bold block mb-0.5">المقطع التعلمي:</span>
+                        <span className="font-black text-emerald-950">{selectedEntry.section}</span>
+                      </div>
+                    )}
+
+                    {/* سيرورة ومراحل الحصة (تمهيدي، وسيطي، نهائي) */}
+                    {selectedEntry.stages && selectedEntry.stages.length > 0 && (
+                      <div className="space-y-2">
+                        <h4 className="text-xs font-black text-gray-700 flex items-center gap-1.5">
+                          <Layers className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>سيرورة الحصة والمراحل البيداغوجية:</span>
+                        </h4>
+                        <div className="space-y-1.5">
+                          {selectedEntry.stages.map((stg, sIdx) => {
+                            if (!stg.content && !stg.label) return null;
+                            return (
+                              <div key={stg.id || sIdx} className="p-2.5 rounded-xl border border-gray-200 bg-gray-50/70 text-xs space-y-1">
+                                <span className="inline-block px-2 py-0.2 rounded font-black text-[10px] bg-slate-200 text-slate-800">
+                                  {stg.label || `المرحلة ${sIdx + 1}`}
+                                </span>
+                                <p className="text-gray-800 whitespace-pre-wrap leading-relaxed font-medium">
+                                  {stg.content || "—"}
+                                </p>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* الواجب المنزلي */}
+                    {selectedEntry.homework && (
+                      <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs space-y-1">
+                        <div className="flex items-center gap-1 font-black text-amber-900">
+                          <span>📝</span>
+                          <span>الواجب المنزلي:</span>
+                        </div>
+                        <p className="text-amber-950 font-medium whitespace-pre-wrap">{selectedEntry.homework}</p>
+                      </div>
+                    )}
+
+                    {/* ملاحظات */}
+                    {selectedEntry.notes && (
+                      <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-xs space-y-1">
+                        <div className="flex items-center gap-1 font-black text-blue-900">
+                          <span>📌</span>
+                          <span>ملاحظات إضافية:</span>
+                        </div>
+                        <p className="text-blue-950 font-medium whitespace-pre-wrap">{selectedEntry.notes}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* شريط الإجراءات السفلي */}
+              <div className="p-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between gap-2 flex-wrap">
+                {isQuickEditMode ? (
+                  <div className="flex items-center gap-2 w-full justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setIsQuickEditMode(false)}
+                      disabled={isSavingEntry}
+                      className="px-4 py-2 rounded-xl border border-gray-300 bg-white hover:bg-gray-100 text-xs font-bold text-gray-700 transition cursor-pointer"
+                    >
+                      إلغاء
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSaveQuickEdit}
+                      disabled={isSavingEntry || !editTitle.trim()}
+                      className="px-5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-black transition flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                    >
+                      {isSavingEntry ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                      <span>حفظ التعديل</span>
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteEntry(selectedEntry.id)}
+                        disabled={isSavingEntry}
+                        className="px-3 py-2 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                        title="حذف هذه الحصة نهائياً"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>حذف</span>
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => setIsQuickEditMode(true)}
+                        className="px-3.5 py-2 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-black transition flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                        <span>تعديل سريع هنا ⚡</span>
+                      </button>
+
+                      <Link
+                        href={`/admin/diary?editId=${selectedEntry.id}&date=${selectedEntry.date}`}
+                        className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-black transition flex items-center gap-1.5 shadow-sm cursor-pointer"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        <span>فتح في الدفتر المفصل 📋</span>
+                      </Link>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
       </div>
     </div>

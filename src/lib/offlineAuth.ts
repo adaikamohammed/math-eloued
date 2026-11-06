@@ -50,15 +50,54 @@ export function savePersistedTeacherSession(profile: TeacherSession): void {
 }
 
 /**
+ * مسح شامل لكافة البيانات المؤقتة والكاش غير المعزول من المتصفح لضمان خصوصية الحسابات
+ */
+export function clearAllTeacherBrowserCaches(newTeacherId?: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    // المفاتيح العامة التاريخية التي كانت تسبب اختلاط البيانات بين الأساتذة
+    const legacyKeys = [
+      "math_teacher_timetable_cache",
+      "math_teacher_students_cache",
+      "last_active_classes",
+      "math_custom_classes",
+      "last_active_cahier_class",
+      "math_teacher_notebooks_cache",
+      "math_teacher_nomenclature_cache",
+      "jusoor_gradebook_cache",
+      "teacher_feature_flags_cache",
+    ];
+    for (const k of legacyKeys) {
+      try {
+        localStorage.removeItem(k);
+      } catch {}
+    }
+
+    // إذا كان خروجاً كاملاً
+    if (!newTeacherId) {
+      localStorage.removeItem(CACHE_KEY_PROFILE);
+      localStorage.removeItem(CACHE_KEY_LOGGED_IN);
+      if (typeof sessionStorage !== "undefined") {
+        sessionStorage.clear();
+      }
+    }
+  } catch (e) {
+    console.warn("Failed to clear browser teacher caches:", e);
+  }
+}
+
+/**
  * مسح الجلسة نهائياً - يُستدعى حصراً عند نقر الأستاذ على "تسجيل الخروج" الصريح
  */
 export function clearPersistedTeacherSession(): void {
   if (typeof window === "undefined") return;
   try {
+    clearAllTeacherBrowserCaches();
     localStorage.removeItem(CACHE_KEY_PROFILE);
     localStorage.removeItem(CACHE_KEY_LOGGED_IN);
     if (typeof sessionStorage !== "undefined") {
       sessionStorage.removeItem("jusoor_shared_device");
+      sessionStorage.clear();
     }
   } catch (e) {
     console.warn("Failed to clear persisted session:", e);
@@ -93,6 +132,10 @@ export async function checkTeacherSession(): Promise<{
     if (res.ok) {
       const data = await res.json();
       if (data?.authenticated && data.profile) {
+        // حماية فورية: إذا كان الحساب الحالي مختلفاً عن الحساب السابق في المتصفح، نظف كاش الحساب القديم
+        if (persisted && persisted.id !== data.profile.id) {
+          clearAllTeacherBrowserCaches(data.profile.id);
+        }
         savePersistedTeacherSession(data.profile);
         return { authenticated: true, profile: data.profile, isOffline: false };
       }
@@ -126,6 +169,7 @@ export async function checkTeacherSession(): Promise<{
  * تنفيذ تسجيل الخروج الآمن ومسح كافة الكوكيز والبيانات المؤقتة
  */
 export async function logoutTeacher(): Promise<void> {
+  clearAllTeacherBrowserCaches();
   clearPersistedTeacherSession();
   try {
     await fetch("/api/auth", { method: "DELETE" });

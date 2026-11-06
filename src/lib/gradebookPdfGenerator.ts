@@ -40,8 +40,8 @@ function getLevelLabel(className: string): string {
  * مطابق تماماً لسجل التنقيط والمتابعة البيداغوجية المعتمد رسمياً في رتبة أستاذ التعليم المتوسط للأستاذ محمد عدايكة
  */
 export function generateGradebookHTML(options: GradebookPdfOptions): string {
-  const teacher = options.teacherName || "الأستاذ محمد عدايكة";
-  const school = options.schoolName || "متوسطة المجاهد باهي علي — قمار";
+  const teacher = options.teacherName || "الأستاذ(ة)";
+  const school = options.schoolName || "المؤسسة التعليمية";
   const inspector = options.inspectorName || "السيد مفتش التعليم المتوسط";
   const principal = options.principalName || "السيد مدير المؤسسة";
   const wilaya = options.wilayaName || "الوادي";

@@ -61,7 +61,10 @@ export default async function TeacherPublicSpace({ params, searchParams }: Teach
 
   const isLockedToLevel = lockedLevel !== null && lockedLevel >= 1 && lockedLevel <= 4;
 
-  const profile = await findPublicTeacher(parsedSlug.baseCode || slug);
+  let profile = await findPublicTeacher(slug);
+  if (!profile && parsedSlug.baseCode && parsedSlug.baseCode !== slug) {
+    profile = await findPublicTeacher(parsedSlug.baseCode);
+  }
   if (!profile) {
     notFound();
   }
@@ -483,7 +486,7 @@ export default async function TeacherPublicSpace({ params, searchParams }: Teach
         {/* ─── 3. بطاقة الربط والمشاركة ورمز QR ─── */}
         <section className="bg-white rounded-3xl p-4 sm:p-6 border border-slate-200/90 shadow-2xs">
           <TeacherQR
-            path={`/t/${profile.slug || profile.id}${isLockedToLevel ? `?code=${activeCode}` : ""}`}
+            path={`/t/${profile.slug || profile.teacher_code || profile.id}${isLockedToLevel ? `?code=${activeCode}` : ""}`}
             teacherName={profile.full_name || "الأستاذ"}
             code={activeCode}
             schoolName={profile.school_custom_name || ""}

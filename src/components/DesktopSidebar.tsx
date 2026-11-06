@@ -36,6 +36,7 @@ import {
 import { useLayout } from "@/context/LayoutContext";
 import { supabase } from "@/lib/supabase";
 import { clearInspectionCache } from "@/app/inspector/shared";
+import { clearAllTeacherBrowserCaches, logoutTeacher } from "@/lib/offlineAuth";
 import { TeacherFeatureFlags } from "@/lib/types";
 
 interface NavItem {
@@ -578,9 +579,10 @@ export function DesktopSidebar() {
               type="button"
               onClick={async () => {
                 try {
-                  localStorage.removeItem("teacher_feature_flags_cache");
+                  clearAllTeacherBrowserCaches();
                   clearInspectionCache();
                   sessionStorage.clear();
+                  await logoutTeacher();
                 } catch {}
                 await supabase.auth.signOut();
                 window.location.href = "/";

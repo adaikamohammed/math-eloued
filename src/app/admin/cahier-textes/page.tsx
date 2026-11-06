@@ -245,19 +245,20 @@ export default function CahierDeTextesPage() {
   const [formNotes, setFormNotes] = useState("");
 
   // بيانات الترويسة والبطاقة الرسمية
-  const teacherFullName = timetableSettings?.teacherName || profile?.fullName || "الأستاذ محمد عدايكة";
-  const teacherFamilyName = teacherFullName.trim().split(" ")[0] || "عدايكة";
-  const printSchoolName = timetableSettings?.schoolName || profile?.schoolCustomName || "متوسطة المجاهد باهي علي — قمار";
-  const printInspectorName = timetableSettings?.inspectorName || "السيد عبد الرزاق عبيدي (مفتش التربية الوطنية)";
-  const printPrincipalName = timetableSettings?.principalName || "السيد عبد اللطيف عويني (مدير المؤسسة)";
+  const teacherFullName = timetableSettings?.teacherName || profile?.fullName || "الأستاذ(ة)";
+  const teacherFamilyName = teacherFullName.trim().split(" ")[0] || "";
+  const printSchoolName = timetableSettings?.schoolName || profile?.schoolCustomName || "المؤسسة التعليمية";
+  const printInspectorName = timetableSettings?.inspectorName || "السيد مفتش المادة";
+  const printPrincipalName = timetableSettings?.principalName || "السيد مدير المؤسسة";
   const printWilaya = timetableSettings?.wilayaName || "الوادي";
   const printSubject = timetableSettings?.subjectName || profile?.subject || "الرياضيات";
 
   // جلب البيانات
   useEffect(() => {
-    if (typeof window !== "undefined") {
+    const persisted = getPersistedTeacherSession();
+    if (typeof window !== "undefined" && persisted?.id) {
       try {
-        const storedClass = localStorage.getItem("last_active_cahier_class");
+        const storedClass = localStorage.getItem(`jusoor_last_active_cahier_class_${persisted.id}`);
         if (storedClass) setActiveClass(storedClass);
       } catch {}
     }
@@ -341,9 +342,10 @@ export default function CahierDeTextesPage() {
   // تغيير الفوج النشط
   const handleSelectClass = (cls: string) => {
     setActiveClass(cls);
-    if (typeof window !== "undefined") {
+    const session = getPersistedTeacherSession();
+    if (typeof window !== "undefined" && session?.id) {
       try {
-        localStorage.setItem("last_active_cahier_class", cls);
+        localStorage.setItem(`jusoor_last_active_cahier_class_${session.id}`, cls);
       } catch {}
     }
   };
@@ -1210,7 +1212,7 @@ export default function CahierDeTextesPage() {
                       type="text"
                       value={formSignature}
                       onChange={(e) => setFormSignature(e.target.value)}
-                      placeholder="عدايكة ✍"
+                      placeholder="الأستاذ ✍"
                       className="w-full px-3 py-2 rounded-xl bg-white border border-gray-200 text-xs font-bold text-gray-900 focus:outline-none focus:border-[#107a57]"
                     />
                   </div>

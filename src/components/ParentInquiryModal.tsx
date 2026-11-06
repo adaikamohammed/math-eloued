@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useState, useEffect } from "react";
 import {
@@ -224,7 +224,7 @@ export function ParentInquiryModal({
                 </label>
                 <input
                   type="text"
-                  placeholder="مثال: عدايكة زكريا"
+                  placeholder="مثال: أحمد بن علي"
                   value={parentName}
                   onChange={(e) => setParentName(e.target.value)}
                   className="w-full py-2.5 px-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white text-xs font-bold transition focus:border-emerald-500 focus:outline-hidden"
@@ -238,7 +238,7 @@ export function ParentInquiryModal({
                 </label>
                 <input
                   type="text"
-                  placeholder="مثال: ريان عدايكة"
+                  placeholder="مثال: ياسمين بن علي"
                   value={studentName}
                   onChange={(e) => setStudentName(e.target.value)}
                   className="w-full py-2.5 px-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white text-xs font-bold transition focus:border-emerald-500 focus:outline-hidden"

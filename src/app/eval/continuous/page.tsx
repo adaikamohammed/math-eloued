@@ -41,6 +41,10 @@ export interface BonusSession {
   date?: string; // تاريخ الحصة (مثلاً: 01/11، أو الأحد)
 }
 
+const getScopedGradebookKey = (teacherId: string) => `jusoor_gradebook_${teacherId}`;
+const getScopedColsKey = (teacherId: string, cls: string) => `jusoor_eval_cols_${teacherId}_${cls}`;
+const getScopedSessionsKey = (teacherId: string, cls: string, trim: number) => `jusoor_eval_sessions_${teacherId}_${cls}_T${trim}`;
+
 // الأعمدة الافتراضية الرسمية (مجموعها 20 نقطة)
 const DEFAULT_COLUMNS: ContinuousColumn[] = [
   { id: "col_behavior", title: "مشاركة وانضباط", maxScore: 4, category: "behavior" },
@@ -147,16 +151,19 @@ export default function ContinuousEvalMobilePage() {
 
   // جلب الأعمدة المحفوظة للفوج من التخزين المحلي
   useEffect(() => {
-    try {
-      const savedCols = localStorage.getItem(`jusoor_eval_cols_${selectedClass}`);
-      if (savedCols) {
-        const parsed = JSON.parse(savedCols);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setColumns(parsed);
-          return;
+    const session = getPersistedTeacherSession();
+    if (session?.id) {
+      try {
+        const savedCols = localStorage.getItem(getScopedColsKey(session.id, selectedClass));
+        if (savedCols) {
+          const parsed = JSON.parse(savedCols);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setColumns(parsed);
+            return;
+          }
         }
-      }
-    } catch {}
+      } catch {}
+    }
     // استخدام الأعمدة الافتراضية إذا لم توجد تخصيصات
     setColumns(DEFAULT_COLUMNS);
   }, [selectedClass]);
@@ -164,23 +171,29 @@ export default function ContinuousEvalMobilePage() {
   // حفظ الأعمدة عند تعديلها
   const saveColumnsConfig = useCallback((newCols: ContinuousColumn[]) => {
     setColumns(newCols);
-    try {
-      localStorage.setItem(`jusoor_eval_cols_${selectedClass}`, JSON.stringify(newCols));
-    } catch {}
+    const session = getPersistedTeacherSession();
+    if (session?.id) {
+      try {
+        localStorage.setItem(getScopedColsKey(session.id, selectedClass), JSON.stringify(newCols));
+      } catch {}
+    }
   }, [selectedClass]);
 
   // جلب حصص النقاط الإضافية المحفوظة للفوج والفصل
   useEffect(() => {
-    try {
-      const savedSess = localStorage.getItem(`jusoor_eval_sessions_${selectedClass}_T${selectedTrimester}`);
-      if (savedSess) {
-        const parsed = JSON.parse(savedSess);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setBonusSessions(parsed);
-          return;
+    const session = getPersistedTeacherSession();
+    if (session?.id) {
+      try {
+        const savedSess = localStorage.getItem(getScopedSessionsKey(session.id, selectedClass, selectedTrimester));
+        if (savedSess) {
+          const parsed = JSON.parse(savedSess);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setBonusSessions(parsed);
+            return;
+          }
         }
-      }
-    } catch {}
+      } catch {}
+    }
     let todayStr = "حصة";
     try {
       todayStr = new Intl.DateTimeFormat("ar-DZ", { month: "numeric", day: "numeric" }).format(new Date());
@@ -192,34 +205,40 @@ export default function ContinuousEvalMobilePage() {
   const saveBonusSessions = useCallback(
     (newSessions: BonusSession[]) => {
       setBonusSessions(newSessions);
-      try {
-        localStorage.setItem(
-          `jusoor_eval_sessions_${selectedClass}_T${selectedTrimester}`,
-          JSON.stringify(newSessions)
-        );
-      } catch {}
+      const session = getPersistedTeacherSession();
+      if (session?.id) {
+        try {
+          localStorage.setItem(
+            getScopedSessionsKey(session.id, selectedClass, selectedTrimester),
+            JSON.stringify(newSessions)
+          );
+        } catch {}
+      }
     },
     [selectedClass, selectedTrimester]
   );
 
   // جلب البيانات الأولية من الكاش ثم السيرفر
   useEffect(() => {
-    try {
-      const cached = localStorage.getItem("jusoor_gradebook_cache");
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (parsed.classes && parsed.classes.length > 0) {
-          setCustomClasses(parsed.classes);
-          setSelectedClass((prev) => prev || parsed.classes[0]);
+    const session = getPersistedTeacherSession();
+    if (session?.id) {
+      try {
+        const cached = localStorage.getItem(getScopedGradebookKey(session.id));
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed.classes && parsed.classes.length > 0) {
+            setCustomClasses(parsed.classes);
+            setSelectedClass((prev) => prev || parsed.classes[0]);
+          }
+          if (parsed.roster && Array.isArray(parsed.roster)) {
+            setStudentRoster(parsed.roster);
+          }
+          if (parsed.records && typeof parsed.records === "object") {
+            setRecords(parsed.records);
+          }
         }
-        if (parsed.roster && Array.isArray(parsed.roster)) {
-          setStudentRoster(parsed.roster);
-        }
-        if (parsed.records && typeof parsed.records === "object") {
-          setRecords(parsed.records);
-        }
-      }
-    } catch {}
+      } catch {}
+    }
 
     fetch("/api/lessons")
       .then((res) => (res.ok ? res.json() : null))
@@ -352,17 +371,20 @@ export default function ContinuousEvalMobilePage() {
         clearTimeout(saveTimeoutRef.current);
       }
 
-      // تحديث الكاش المحلي فوراً 0ms
-      try {
-        localStorage.setItem(
-          "jusoor_gradebook_cache",
-          JSON.stringify({
-            classes: customClasses,
-            roster: studentRoster,
-            records: newRecords,
-          })
-        );
-      } catch {}
+      // تحديث الكاش المحلي المعزول للأستاذ
+      const session = getPersistedTeacherSession();
+      if (session?.id) {
+        try {
+          localStorage.setItem(
+            getScopedGradebookKey(session.id),
+            JSON.stringify({
+              classes: customClasses,
+              roster: studentRoster,
+              records: newRecords,
+            })
+          );
+        } catch {}
+      }
 
       saveTimeoutRef.current = setTimeout(async () => {
         const recordsArray = Object.values(newRecords);

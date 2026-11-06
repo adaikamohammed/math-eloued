@@ -491,7 +491,7 @@ export function cleanPedagogicalTitle(rawTitle: string): string {
  */
 export function inferCahierTextesFromDiary(
   diary: DailyDiaryEntry,
-  teacherFamilyName = "عدايكة"
+  teacherFamilyName = "الأستاذ"
 ): CahierTextesEntry {
   const title = (diary.lessonTitle || (diary as any).resourceTitle || (diary as any).title || "").trim();
   const rawType = (diary.sessionType || "").trim();

@@ -60,8 +60,8 @@ function cleanResourceTitleForWeekly(title: string): string {
  * توليد كود HTML مستقل للمخطط الأسبوعي بمقاس A4 Landscape
  */
 export function generateWeeklyDiaryHTML(options: WeeklyDiaryPdfOptions): string {
-  const teacher = options.teacherName || "الأستاذ محمد عدايكة";
-  const school = options.schoolName || "متوسطة المجاهد باهي علي — قمار";
+  const teacher = options.teacherName || "الأستاذ(ة)";
+  const school = options.schoolName || "المؤسسة التعليمية";
   const inspector = options.inspectorName || "السيد مفتش التربية الوطنية";
   const principal = options.principalName || "السيد مدير المؤسسة";
   const subject = options.subjectName || "الرياضيات";
@@ -73,19 +73,38 @@ export function generateWeeklyDiaryHTML(options: WeeklyDiaryPdfOptions): string 
   const afternoonSlots = options.afternoonSlots.length > 0 ? options.afternoonSlots : ["13:30 - 14:30", "14:30 - 15:30", "15:30 - 16:30"];
   const allTimeSlots = [...morningSlots, ...afternoonSlots];
 
-  // Helper لإيجاد الحصة المطابقة ليوم وتوقيت محدد
+  const parseSlotMinutes = (timeStr: string): number | null => {
+    if (!timeStr) return null;
+    const match = timeStr.trim().replace(/h/i, ":").match(/(\d{1,2}):(\d{2})/);
+    if (match) return parseInt(match[1], 10) * 60 + parseInt(match[2], 10);
+    const hourOnly = timeStr.trim().match(/^(\d{1,2})/);
+    if (hourOnly) return parseInt(hourOnly[1], 10) * 60;
+    return null;
+  };
+
+  // Helper لإيجاد الحصة المطابقة ليوم وتوقيت محدد دون تكرار
   const findLesson = (dateStr: string, slotTime: string): DailyDiaryEntry | undefined => {
     const list = options.dayLessonsMap[dateStr] || [];
     const norm = (s: string) => s.replace(/\s+/g, "").replace(/[-–—]/g, "-");
     const targetNorm = norm(slotTime);
     const [targetStart] = targetNorm.split("-");
 
-    return list.find((entry) => {
-      const p = norm(entry.periodTime || "");
-      if (p === targetNorm) return true;
-      if (targetStart && p.startsWith(targetStart)) return true;
-      return false;
-    });
+    // 1. مطابقة دقيقة أولاً
+    const exact = list.find((e) => norm(e.periodTime || "") === targetNorm);
+    if (exact) return exact;
+
+    // 2. مطابقة دقيقة بوقت بداية الحصة بالدقائق لتفادي تداخل خانات الساعات
+    const slotStartMin = parseSlotMinutes(targetStart);
+    if (slotStartMin !== null) {
+      return list.find((e) => {
+        const entryParts = (e.periodTime || "").split(/[-–—]/);
+        const entryStartMin = parseSlotMinutes(entryParts[0]);
+        if (entryStartMin === null) return false;
+        return Math.abs(entryStartMin - slotStartMin) < 15;
+      });
+    }
+
+    return undefined;
   };
 
   let tableHtml = "";
@@ -461,7 +480,7 @@ export function generateWeeklyDiaryHTML(options: WeeklyDiaryPdfOptions): string 
       color: #0f172a;
     }
   </style>
-  <title>${options.docTitle || `المخطط_الأسبوعي_الدفتر_اليومي_من_${options.weekStartStr}_إلى_${options.weekEndStr}_الأستاذ_${(options.teacherName || "عدايكة").trim().split(" ")[0]}`}</title>
+  <title>${options.docTitle || `المخطط_الأسبوعي_الدفتر_اليومي_من_${options.weekStartStr}_إلى_${options.weekEndStr}_الأستاذ_${(options.teacherName || "الأستاذ").trim().split(" ")[0]}`}</title>
 </head>
 <body>
   <div class="page-container">
@@ -511,7 +530,7 @@ export function generateWeeklyDiaryHTML(options: WeeklyDiaryPdfOptions): string 
 export function printWeeklyDiaryReport(options: WeeklyDiaryPdfOptions): void {
   if (typeof window === "undefined") return;
 
-  const teacherFamily = (options.teacherName || "عدايكة").trim().split(" ")[0];
+  const teacherFamily = (options.teacherName || "الأستاذ").trim().split(" ")[0];
   const calculatedTitle =
     options.docTitle ||
     options.fileName ||

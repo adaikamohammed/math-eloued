@@ -50,8 +50,8 @@ import {
 } from "@/lib/types";
 import { compressIfImage, validateUpload } from "@/lib/compress";
 
-const LOCAL_STORAGE_NOTEBOOKS_KEY = "teacher_custom_notebooks";
-const LOCAL_STORAGE_NOMENCLATURE_KEY = "teacher_board_nomenclature";
+const getScopedNotebooksKey = (teacherId: string) => `teacher_custom_notebooks_${teacherId}`;
+const getScopedNomenclatureKey = (teacherId: string) => `teacher_board_nomenclature_${teacherId}`;
 
 // الكراريس الافتراضية للتعليم
 const DEFAULT_NOTEBOOKS: CustomNotebook[] = [
@@ -139,16 +139,17 @@ export default function AdminBoardPage() {
   useEffect(() => {
     setMounted(true);
 
-    if (typeof window !== "undefined") {
+    const persisted = getPersistedTeacherSession();
+    if (persisted?.id && typeof window !== "undefined") {
       try {
-        const savedNotebooks = localStorage.getItem(LOCAL_STORAGE_NOTEBOOKS_KEY);
+        const savedNotebooks = localStorage.getItem(getScopedNotebooksKey(persisted.id));
         if (savedNotebooks) {
           const parsed = JSON.parse(savedNotebooks);
           if (Array.isArray(parsed) && parsed.length > 0) {
             setNotebooks(parsed);
           }
         }
-        const savedNomenclature = localStorage.getItem(LOCAL_STORAGE_NOMENCLATURE_KEY);
+        const savedNomenclature = localStorage.getItem(getScopedNomenclatureKey(persisted.id));
         if (savedNomenclature) {
           const parsed = JSON.parse(savedNomenclature);
           if (parsed?.fieldLabel) {
@@ -197,13 +198,17 @@ export default function AdminBoardPage() {
 
       if (Array.isArray(data.customNotebooks) && data.customNotebooks.length > 0) {
         setNotebooks(data.customNotebooks);
-        localStorage.setItem(LOCAL_STORAGE_NOTEBOOKS_KEY, JSON.stringify(data.customNotebooks));
+        if (session?.id) {
+          localStorage.setItem(getScopedNotebooksKey(session.id), JSON.stringify(data.customNotebooks));
+        }
       }
 
       if (data.boardNomenclature?.fieldLabel) {
         setNomenclature(data.boardNomenclature);
         setTempNomenclature(data.boardNomenclature);
-        localStorage.setItem(LOCAL_STORAGE_NOMENCLATURE_KEY, JSON.stringify(data.boardNomenclature));
+        if (session?.id) {
+          localStorage.setItem(getScopedNomenclatureKey(session.id), JSON.stringify(data.boardNomenclature));
+        }
       }
     } catch {
       const session = getPersistedTeacherSession();
@@ -244,8 +249,11 @@ export default function AdminBoardPage() {
   // حفظ الكراريس
   const persistNotebooks = async (newList: CustomNotebook[]) => {
     setNotebooks(newList);
+    const session = getPersistedTeacherSession();
     try {
-      localStorage.setItem(LOCAL_STORAGE_NOTEBOOKS_KEY, JSON.stringify(newList));
+      if (session?.id) {
+        localStorage.setItem(getScopedNotebooksKey(session.id), JSON.stringify(newList));
+      }
       await fetch("/api/lessons", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -268,8 +276,11 @@ export default function AdminBoardPage() {
     setShowNomenclatureEditor(false);
     showToast("ok", "تم تحديث تسميات الحقول بنجاح ✨");
 
+    const session = getPersistedTeacherSession();
     try {
-      localStorage.setItem(LOCAL_STORAGE_NOMENCLATURE_KEY, JSON.stringify(updated));
+      if (session?.id) {
+        localStorage.setItem(getScopedNomenclatureKey(session.id), JSON.stringify(updated));
+      }
       await fetch("/api/lessons", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -573,8 +584,9 @@ export default function AdminBoardPage() {
   // نسخ رابط مشاركة الأولياء
   const handleCopyParentShareLink = () => {
     if (typeof window === "undefined") return;
-    const url = profile?.slug
-      ? `${window.location.origin}/t/${profile.slug}`
+    const teacherKey = profile?.slug || profile?.teacher_code;
+    const url = teacherKey
+      ? `${window.location.origin}/t/${teacherKey}`
       : `${window.location.origin}/`;
     navigator.clipboard.writeText(url);
     setCopiedLink(true);
@@ -682,9 +694,9 @@ export default function AdminBoardPage() {
               <span>{copiedLink ? "تم النسخ بنجاح!" : "نسخ رابط الأولياء"}</span>
             </button>
 
-            {profile?.slug && (
+            {(profile?.slug || profile?.teacher_code) && (
               <Link
-                href={`/t/${profile.slug}`}
+                href={`/t/${profile.slug || profile.teacher_code}`}
                 target="_blank"
                 className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-[#e8e8e0] bg-white hover:bg-gray-50 text-gray-700 text-xs font-bold transition shadow-2xs"
               >
@@ -1616,9 +1628,9 @@ export default function AdminBoardPage() {
                         </button>
                       </div>
 
-                      {profile?.slug && (
+                      {(profile?.slug || profile?.teacher_code) && (
                         <Link
-                          href={`/t/${profile.slug}`}
+                          href={`/t/${profile.slug || profile.teacher_code}`}
                           target="_blank"
                           className="text-xs font-bold text-[#107a57] hover:underline flex items-center gap-1"
                         >
