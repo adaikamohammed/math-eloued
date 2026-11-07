@@ -294,6 +294,9 @@ function Dashboard({
   const [isListeningTitle, setIsListeningTitle] = useState(false);
   const [isListeningContent, setIsListeningContent] = useState(false);
   const [isRecordingAudio, setIsRecordingAudio] = useState(false);
+  const [isStartingVoiceRecording, setIsStartingVoiceRecording] = useState(false);
+  const [voiceRecordError, setVoiceRecordError] = useState<string | null>(null);
+  const [voiceToTextError, setVoiceToTextError] = useState<string | null>(null);
   const [audioRecordDuration, setAudioRecordDuration] = useState(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioStreamRef = useRef<MediaStream | null>(null);
@@ -618,14 +621,15 @@ function Dashboard({
   // 1. التدوين الصوتي السريع (تحويل الصوت إلى نص)
   const toggleVoiceToText = (targetField: "title" | "content") => {
     if (typeof window === "undefined") return;
+    setVoiceToTextError(null);
+
     const SpeechRecognition =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
-      showToast(
-        "error",
-        "المتصفح الحالي لا يدعم تحويل الصوت إلى نص مباشرة. ننصح باستخدام Google Chrome أو Edge على الحاسوب أو أندرويد."
-      );
+      const err = "المتصفح الحالي لا يدعم تحويل الصوت لنص مباشرة. ننصح باستخدام Google Chrome أو Edge، أو استخدام زر تسجيل/رفع الملاحظة الصوتية المباشرة بالأسفل.";
+      setVoiceToTextError(err);
+      showToast("error", err);
       return;
     }
 
@@ -669,6 +673,10 @@ function Dashboard({
         setIsListeningTitle(false);
       }
 
+      recognition.onstart = () => {
+        setVoiceToTextError(null);
+      };
+
       recognition.onresult = (event: any) => {
         let transcript = "";
         for (let i = 0; i < event.results.length; i++) {
@@ -688,13 +696,17 @@ function Dashboard({
       recognition.onerror = (event: any) => {
         console.warn("Speech recognition error:", event.error);
         if (event.error === "not-allowed" || event.error === "service-not-allowed") {
-          showToast("error", "تم حظر إذن الميكروفون. يرجى تفعيل إذن الميكروفون من إعدادات المتصفح.");
+          const msg = "تم حظر إذن الميكروفون للتعرف الصوتي! اضغط على أيقونة القفل 🔒 أعلى المتصفح واسمح بالميكروفون.";
+          setVoiceToTextError(msg);
+          showToast("error", msg);
           setIsListeningTitle(false);
           setIsListeningContent(false);
         } else if (event.error === "no-speech") {
-          // لم يلتقط كلاماً، لا نظهر خطأ مزعج
+          // لم يلتقط كلاماً بعد
         } else if (event.error === "network") {
-          showToast("error", "خدمة التعرف على الصوت تتطلب اتصالاً بالإنترنت.");
+          const msg = "خدمة التعرف على الصوت تتطلب اتصالاً فعالاً بالإنترنت.";
+          setVoiceToTextError(msg);
+          showToast("error", msg);
           setIsListeningTitle(false);
           setIsListeningContent(false);
         }
@@ -709,18 +721,25 @@ function Dashboard({
       showToast("success", "🎙️ جاري الاستماع.. تحدث الآن وسيكتب صوتك تلقائياً!");
     } catch (err: any) {
       console.error("SpeechRecognition start error:", err);
-      showToast("error", "تعذر بدء التعرف على الصوت: " + (err?.message || "خطأ غير معروف"));
+      const msg = "تعذر بدء التعرف على الصوت: " + (err?.message || "خطأ غير معروف");
+      setVoiceToTextError(msg);
+      showToast("error", msg);
       setIsListeningTitle(false);
       setIsListeningContent(false);
     }
   };
 
-  // 2. تسجيل ملاحظة صوتية مباشرة بصوت الأستاذ (MediaRecorder)
+  // 2. تسجيل ملاحظة صوتية مباشرة بصوت الأستاذ (MediaRecorder مع بدائل كاملة)
   const startVoiceRecording = async () => {
     if (typeof window === "undefined") return;
+    setVoiceRecordError(null);
+    setIsStartingVoiceRecording(true);
 
     if (!navigator?.mediaDevices?.getUserMedia) {
-      showToast("error", "تسجيل الصوت غير مدعوم في هذا المتصفح. تأكد من فتح الموقع برابط آمن HTTPS.");
+      setIsStartingVoiceRecording(false);
+      const msg = "تسجيل الصوت المباشر غير مدعوم في هذا المتصفح أو التطبيق (مثل متصفح واتساب). استخدم زر 'أو اختر / سجّل مقطعاً عبر مسجل هاتفك' بالأسفل للعمل فوراً.";
+      setVoiceRecordError(msg);
+      showToast("error", msg);
       return;
     }
 
@@ -769,7 +788,13 @@ function Dashboard({
         }
       };
 
-      recorder.start(250);
+      try {
+        recorder.start(500);
+      } catch {
+        recorder.start();
+      }
+
+      setIsStartingVoiceRecording(false);
       setIsRecordingAudio(true);
       setAudioRecordDuration(0);
 
@@ -782,14 +807,18 @@ function Dashboard({
 
       showToast("success", "🎙️ بدأ التسجيل الصوتي الآن.. تحدث لتسجيل ملاحظتك!");
     } catch (err: any) {
+      setIsStartingVoiceRecording(false);
       console.error("Microphone access error:", err);
+      let errorMsg = "";
       if (err?.name === "NotAllowedError" || err?.name === "PermissionDeniedError") {
-        showToast("error", "تم رفض إذن الميكروفون. يرجى تفعيل إذن الميكروفون من إعدادات المتصفح.");
+        errorMsg = "تم رفض إذن الميكروفون في المتصفح! اضغط على أيقونة القفل 🔒 أعلى شريط العنوان وفعّل الميكروفون، أو استخدم زر تسجيل/رفع ملف صوتي أدناه.";
       } else if (err?.name === "NotFoundError" || err?.name === "DevicesNotFoundError") {
-        showToast("error", "لم يتم العثور على ميكروفون في جهازك.");
+        errorMsg = "لم يتم العثور على ميكروفون في جهازك. يمكنك استخدام زر رفع أو تسجيل ملف صوتي من الهاتف.";
       } else {
-        showToast("error", "تعذر تشغيل الميكروفون: " + (err?.message || "يرجى التحقق من الأذونات"));
+        errorMsg = "تعذر تشغيل الميكروفون: " + (err?.message || "يرجى التحقق من الأذونات") + " (يمكنك استخدام زر رفع/تسجيل صوتي من الهاتف)";
       }
+      setVoiceRecordError(errorMsg);
+      showToast("error", errorMsg);
     }
   };
 
@@ -806,6 +835,7 @@ function Dashboard({
       recordingIntervalRef.current = null;
     }
     setIsRecordingAudio(false);
+    setIsStartingVoiceRecording(false);
     setAnnAudioDuration(audioRecordDuration);
     showToast("success", "✓ تم حفظ الملاحظة الصوتية وجاهزة للإرفاق!");
   };
@@ -826,9 +856,42 @@ function Dashboard({
     }
     audioChunksRef.current = [];
     setIsRecordingAudio(false);
+    setIsStartingVoiceRecording(false);
     setAnnAudio(null);
     setAnnAudioDuration(0);
     showToast("success", "تم إلغاء التسجيل");
+  };
+
+  // 3. رفع أو تسجيل ملف صوتي خارجي من الهاتف/الحاسوب (يعمل على كل المتصفحات 100%)
+  const handleAnnouncementAudioUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("audio/") && !file.name.match(/\.(mp3|wav|m4a|aac|ogg|webm|opus|amr)$/i)) {
+      showToast("error", "يرجى اختيار ملف صوتي صالح (MP3, M4A, WAV, OGG, AAC)");
+      return;
+    }
+
+    if (file.size > 15 * 1024 * 1024) {
+      showToast("error", "حجم الملف الصوتي كبير جداً (الحد الأقصى 15 ميجابايت)");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onloadend = () => {
+      setAnnAudio(reader.result as string);
+      try {
+        const tempAudio = new Audio(reader.result as string);
+        tempAudio.onloadedmetadata = () => {
+          if (tempAudio.duration && !isNaN(tempAudio.duration)) {
+            setAnnAudioDuration(Math.round(tempAudio.duration));
+          }
+        };
+      } catch {}
+      setVoiceRecordError(null);
+      showToast("success", "✓ تم إرفاق الملاحظة الصوتية بنجاح!");
+    };
   };
 
   // 3. رفع صورة للإعلان وضغطها
@@ -1661,13 +1724,13 @@ function Dashboard({
     <div className="pt-3 pb-16 space-y-4 fade-up">
       <style>{inputCss}</style>
 
-      {/* شريط الإشعارات الطافي */}
+      {/* شريط الإشعارات الطافي العام */}
       {toastMsg && (
         <div
-          className={`fixed top-4 left-4 right-4 z-50 max-w-md mx-auto p-3.5 rounded-2xl shadow-lg flex items-center gap-2.5 text-xs font-bold transition-all border ${
+          className={`fixed top-4 left-4 right-4 z-[9999] max-w-md mx-auto p-4 rounded-2xl shadow-2xl flex items-center gap-3 text-xs font-bold transition-all border pointer-events-auto ${
             toastMsg.type === "success"
-              ? "bg-emerald-600 text-white border-emerald-500 shadow-emerald-600/30"
-              : "bg-red-600 text-white border-red-500 shadow-red-600/30"
+              ? "bg-emerald-700 text-white border-emerald-500 shadow-emerald-700/40 ring-2 ring-emerald-400/30"
+              : "bg-red-700 text-white border-red-500 shadow-red-700/40 ring-2 ring-red-400/30"
           }`}
         >
           {toastMsg.type === "success" ? (
@@ -4277,6 +4340,21 @@ function Dashboard({
                     </button>
                   </div>
                 )}
+                {voiceToTextError && (
+                  <div className="p-2 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-[11px] font-bold flex items-start justify-between gap-1.5 mb-1.5">
+                    <div className="flex items-start gap-1.5">
+                      <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                      <span className="leading-snug">{voiceToTextError}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setVoiceToTextError(null)}
+                      className="text-slate-400 hover:text-slate-600 shrink-0"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
                 <input
                   type="text"
                   placeholder="مثال: تنبيه غياب الأستاذ يوم الأحد / تم رفع حلول الواجب 3 / إحضار الأدوات الهندسية غداً"
@@ -4369,6 +4447,39 @@ function Dashboard({
                   )}
                 </div>
 
+                {/* تنبيه واضح ومباشر في حال واجه المتصفح مشكلة إذن ميكروفون */}
+                {voiceRecordError && (
+                  <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-xs font-bold space-y-2">
+                    <div className="flex items-start gap-1.5">
+                      <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                      <span className="leading-relaxed">{voiceRecordError}</span>
+                    </div>
+                    <div className="flex items-center gap-2 pt-1 border-t border-amber-200/60">
+                      <label
+                        htmlFor="ann-audio-file-upload-error"
+                        className="inline-flex items-center gap-1 px-3 py-1 bg-teal-700 text-white rounded-lg text-[11px] font-black hover:bg-teal-800 transition cursor-pointer"
+                      >
+                        <Upload className="w-3.5 h-3.5" />
+                        <span>📁 اختر / سجّل بالهاتف الآن</span>
+                      </label>
+                      <input
+                        id="ann-audio-file-upload-error"
+                        type="file"
+                        accept="audio/*"
+                        className="hidden"
+                        onChange={handleAnnouncementAudioUpload}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setVoiceRecordError(null)}
+                        className="text-[11px] text-slate-500 hover:text-slate-700 cursor-pointer"
+                      >
+                        إغلاق التنبيه ✕
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {isRecordingAudio ? (
                   <div className="flex items-center justify-between p-3 rounded-xl bg-red-50 border border-red-200">
                     <div className="flex items-center gap-2">
@@ -4396,7 +4507,7 @@ function Dashboard({
                     </div>
                   </div>
                 ) : annAudio ? (
-                  <div className="p-2.5 rounded-xl bg-white border border-teal-200 space-y-1">
+                  <div className="p-2.5 rounded-xl bg-white border border-teal-200 space-y-1.5">
                     <div className="flex items-center justify-between text-[11px] text-teal-900 font-black">
                       <span>✓ تم تسجيل الملاحظة الصوتية جاهزة للمشاركة</span>
                       {annAudioDuration > 0 && <span>({annAudioDuration} ثانية)</span>}
@@ -4404,14 +4515,43 @@ function Dashboard({
                     <audio src={annAudio} controls className="w-full h-8" />
                   </div>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={startVoiceRecording}
-                    className="w-full py-2.5 px-3 rounded-xl bg-white border border-teal-300 text-teal-900 text-xs font-black hover:bg-teal-100/60 flex items-center justify-center gap-2 transition cursor-pointer shadow-2xs"
-                  >
-                    <Mic className="w-4 h-4 text-teal-700" />
-                    <span>اضغط لبدء تسجيل ملاحظة صوتية بصوتك 🎙️</span>
-                  </button>
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      disabled={isStartingVoiceRecording}
+                      onClick={startVoiceRecording}
+                      className={`w-full py-2.5 px-3 rounded-xl border text-xs font-black flex items-center justify-center gap-2 transition cursor-pointer shadow-2xs ${
+                        isStartingVoiceRecording
+                          ? "bg-amber-50 border-amber-300 text-amber-900 animate-pulse"
+                          : "bg-white border-teal-300 text-teal-900 hover:bg-teal-100/60"
+                      }`}
+                    >
+                      <Mic className={`w-4 h-4 ${isStartingVoiceRecording ? "text-amber-600 animate-bounce" : "text-teal-700"}`} />
+                      <span>
+                        {isStartingVoiceRecording
+                          ? "⏳ جاري الاتصال بالميكروفون وطلب إذن المتصفح..."
+                          : "اضغط لبدء تسجيل ملاحظة صوتية مباشرة بصوتك 🎙️"}
+                      </span>
+                    </button>
+
+                    {/* خيار بديل مضمون 100%: رفع تسجيل صوتي أو استخدام مسجل الهاتف الأصلي */}
+                    <div className="flex items-center justify-center pt-0.5">
+                      <label
+                        htmlFor="ann-audio-file-upload-main"
+                        className="text-[11px] font-bold text-teal-700 hover:text-teal-900 hover:underline flex items-center gap-1 cursor-pointer bg-white/70 px-3 py-1 rounded-lg border border-teal-200/70"
+                      >
+                        <Upload className="w-3.5 h-3.5 text-teal-600" />
+                        <span>أو اختر / سجّل مقطعاً عبر مسجل هاتفك (MP3/M4A/WAV) 📎</span>
+                      </label>
+                      <input
+                        id="ann-audio-file-upload-main"
+                        type="file"
+                        accept="audio/*"
+                        className="hidden"
+                        onChange={handleAnnouncementAudioUpload}
+                      />
+                    </div>
+                  </div>
                 )}
               </div>
 
