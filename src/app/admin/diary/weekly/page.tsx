@@ -1111,10 +1111,10 @@ export default function WeeklyDiaryPage() {
             <button
               onClick={handleDownloadPDF}
               type="button"
-              className="px-4 py-1.5 rounded-xl border border-gray-300 bg-white hover:bg-gray-50 text-xs font-black text-gray-800 transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
+              className="px-4 py-1.5 rounded-xl border border-emerald-600 bg-emerald-700 hover:bg-emerald-800 text-xs font-black text-white transition shadow-sm flex items-center gap-1.5 cursor-pointer active:scale-95"
               title="حفظ وتصدير المخطط الأسبوعي كملف PDF أفقي رسمي (A4 Landscape)"
             >
-              <Download className="w-3.5 h-3.5 text-gray-600" />
+              <Download className="w-3.5 h-3.5" />
               <span>حفظ PDF أفقياً 📄</span>
             </button>
           </div>

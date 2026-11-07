@@ -15,6 +15,7 @@ import {
   Sliders,
   RotateCcw,
   Printer,
+  Download,
   X,
   Check,
   Trash2,
@@ -31,6 +32,8 @@ import {
 } from "lucide-react";
 import { LoginRequired } from "@/components/LoginRequired";
 import { checkTeacherSession, getPersistedTeacherSession } from "@/lib/offlineAuth";
+import { useProfile } from "@/lib/useProfile";
+import { downloadTimetableLandscapePDF } from "@/lib/pdfReportGenerator";
 import {
   getTeacherOfflineData,
   saveTeacherOfflineData,
@@ -202,6 +205,7 @@ function generateTimeSlots(settings: TimetableSettings): {
 }
 
 export default function TeacherTimetablePage() {
+  const { profile } = useProfile();
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -781,7 +785,39 @@ export default function TeacherTimetablePage() {
     persistTimetable(slots, settings);
   };
 
-  // تأكيد بيانات الطباعة وبدء طباعة الصفحة الأفقية
+  // حفظ وتصدير جدول التوقيت الأسبوعي كملف PDF أفقي رسمي (A4 Landscape)
+  const handleDownloadLandscapePDF = () => {
+    const printTeacherName = printFormData.teacherName || settings.teacherName || profile?.full_name || "الأستاذ(ة)";
+    const printSchoolName = printFormData.schoolName || settings.schoolName || profile?.school_custom_name || "المتوسطة التعليمية";
+    const printSubject = printFormData.subjectName || settings.subjectName || profile?.subject || "الرياضيات";
+    const printWilaya = printFormData.wilayaName || settings.wilayaName || "الوادي";
+
+    downloadTimetableLandscapePDF({
+      teacherName: printTeacherName,
+      schoolName: printSchoolName,
+      inspectorName: printFormData.inspectorName || settings.inspectorName,
+      principalName: printFormData.principalName || settings.principalName,
+      wilayaName: printWilaya,
+      subjectName: printSubject,
+      academicYear: "2025 / 2026 م",
+      slots: slots.map((s) => ({
+        day: s.day,
+        startTime: s.start,
+        endTime: s.end,
+        className: s.className,
+        subject: printSubject,
+        room: s.room,
+        sessionType: s.sessionType,
+        weekType: s.weekRotation,
+      })),
+      settings,
+      customClasses,
+      classHoursSummary,
+      classColorsMap: settings.classColors,
+    });
+  };
+
+  // تأكيد بيانات الطباعة وتصدير جدول التوقيت كملف PDF أفقي رسمي
   const handleConfirmPrint = () => {
     const updated = {
       ...settings,
@@ -791,10 +827,7 @@ export default function TeacherTimetablePage() {
     persistTimetable(slots, updated);
     setIsPrintModalOpen(false);
 
-    // إطلاق الطباعة بعد تحديث الواجهة
-    setTimeout(() => {
-      window.print();
-    }, 250);
+    handleDownloadLandscapePDF();
   };
 
   // البحث عن الحصة في الشبكة
@@ -942,13 +975,15 @@ export default function TeacherTimetablePage() {
               <span>مواقيت الحصص والاستراحة</span>
             </button>
 
-            {/* زر الطباعة الرسمية A4 */}
+            {/* زر حفظ PDF أفقي */}
             <button
-              onClick={() => setIsPrintModalOpen(true)}
-              className="px-4 py-1.5 rounded-xl border border-emerald-600 bg-emerald-700 text-xs font-black text-white hover:bg-emerald-800 transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+              onClick={handleDownloadLandscapePDF}
+              type="button"
+              className="px-4 py-1.5 rounded-xl border border-emerald-600 bg-emerald-700 hover:bg-emerald-800 text-xs font-black text-white transition shadow-sm flex items-center gap-1.5 cursor-pointer active:scale-95"
+              title="حفظ وتصدير جدول التوقيت كملف PDF أفقي رسمي (A4 Landscape)"
             >
-              <Printer className="w-3.5 h-3.5" />
-              <span>طباعة A4 أفقية رسمية</span>
+              <Download className="w-3.5 h-3.5" />
+              <span>حفظ PDF أفقياً 📄</span>
             </button>
 
             <Link
@@ -2391,8 +2426,8 @@ export default function TeacherTimetablePage() {
                   onClick={handleConfirmPrint}
                   className="btn-primary text-xs px-6 py-2.5 flex items-center gap-2 cursor-pointer shadow-md font-black"
                 >
-                  <Printer className="w-4 h-4" />
-                  <span>بدء الطباعة الرسمية الآن (A4 أفقي)</span>
+                  <Download className="w-4 h-4" />
+                  <span>حفظ وتصدير كـ PDF أفقياً 📄</span>
                 </button>
               </div>
             </div>

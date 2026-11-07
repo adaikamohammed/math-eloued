@@ -16,6 +16,7 @@ import {
   HelpCircle,
   X,
   Sparkles,
+  Download,
 } from "lucide-react";
 import {
   OfficialGradeRecord,
@@ -25,6 +26,8 @@ import {
 } from "@/lib/types";
 import { checkTeacherSession, getPersistedTeacherSession } from "@/lib/offlineAuth";
 import { saveTeacherOfflineData, setupAutoSync } from "@/lib/offlineStorage";
+import { useProfile } from "@/lib/useProfile";
+import { downloadContinuousLandscapePDF } from "@/lib/pdfReportGenerator";
 
 // تعريف بنية العمود المرن في التقويم المستمر
 export interface ContinuousColumn {
@@ -99,6 +102,7 @@ export function normalizeArabicText(text: string): string {
 }
 
 export default function ContinuousEvalMobilePage() {
+  const { profile } = useProfile();
   // حالة تثبيت المكون (تمنع تماماً أي خطأ Hydration بين السيرفر والمتصفح)
   const [mounted, setMounted] = useState(false);
 
@@ -710,6 +714,44 @@ export default function ContinuousEvalMobilePage() {
     };
   }, [classStudents, getRecord]);
 
+  // حفظ وتصدير سجل التقويم المستمر كملف PDF أفقي رسمي (A4 Landscape)
+  const handleDownloadLandscapePDF = () => {
+    const printTeacherName = profile?.full_name || "الأستاذ(ة)";
+    const printSchoolName = profile?.school_custom_name || "المتوسطة التعليمية";
+    const printSubject = profile?.subject || "الرياضيات";
+    const printWilaya = "الوادي";
+
+    downloadContinuousLandscapePDF({
+      teacherName: printTeacherName,
+      schoolName: printSchoolName,
+      subjectName: printSubject,
+      wilayaName: printWilaya,
+      className: selectedClass,
+      trimester: selectedTrimester,
+      academicYear: "2025 / 2026 م",
+      columns: columns.map((c) => ({
+        id: c.id,
+        title: c.title,
+        maxScore: c.maxScore,
+        category: c.category,
+      })),
+      bonusSessions: bonusSessions.map((b) => ({
+        id: b.id,
+        title: b.title,
+        date: b.date,
+      })),
+      students: classStudents.map((s) => ({
+        id: s.id,
+        studentName: s.studentName,
+        gender: s.gender,
+        groupName: s.groupName,
+        isRepeater: s.isRepeater,
+      })),
+      records,
+      classStats,
+    });
+  };
+
   if (!mounted) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4" dir="rtl">
@@ -778,6 +820,17 @@ export default function ContinuousEvalMobilePage() {
             >
               <Sliders className="w-3.5 h-3.5 text-amber-300" />
               <span>تخصيص الأعمدة ({columns.length})</span>
+            </button>
+
+            {/* زر حفظ PDF أفقي */}
+            <button
+              onClick={handleDownloadLandscapePDF}
+              type="button"
+              className="py-2 px-3.5 rounded-xl border border-emerald-600 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-black flex items-center gap-1.5 shadow-sm transition active:scale-95 cursor-pointer"
+              title="حفظ وتصدير سجل التقويم المستمر كملف PDF أفقي رسمي (A4 Landscape)"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>حفظ PDF أفقياً 📄</span>
             </button>
 
             <Link

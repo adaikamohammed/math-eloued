@@ -29,11 +29,14 @@ import {
   ChevronUp,
   ChevronDown,
   QrCode,
+  Download,
 } from "lucide-react";
 import { LoginRequired } from "@/components/LoginRequired";
 import { PageExplainer } from "@/components/PageExplainer";
 import { StudentQrCardsModal } from "@/components/StudentQrCardsModal";
 import { checkTeacherSession, getPersistedTeacherSession } from "@/lib/offlineAuth";
+import { useProfile } from "@/lib/useProfile";
+import { downloadStudentsLandscapePDF } from "@/lib/pdfReportGenerator";
 import {
   getTeacherOfflineData,
   saveTeacherOfflineData,
@@ -66,6 +69,7 @@ const createEmptyRow = (customId?: string, defaultGroup: "فوج 1" | "فوج 2"
 });
 
 export default function StudentsManagementPage() {
+  const { profile } = useProfile();
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -912,6 +916,38 @@ export default function StudentsManagementPage() {
   const isAllCurrentSelected =
     currentVisibleIds.length > 0 && currentVisibleIds.every((id) => selectedIds.has(id));
 
+  // حفظ وتصدير قائمة وتفويج التلاميذ كملف PDF أفقي رسمي (A4 Landscape)
+  const handleDownloadLandscapePDF = () => {
+    const printTeacherName = profile?.full_name || "الأستاذ(ة)";
+    const printSchoolName = profile?.school_custom_name || "المتوسطة التعليمية";
+    const printSubject = profile?.subject || "الرياضيات";
+    const printWilaya = "الوادي";
+
+    // تصفية التلاميذ حسب الفوج النشط (أو جميع الأقسام)
+    const targetStudents =
+      selectedClass === "all"
+        ? students
+        : students.filter((s) => s.className === selectedClass);
+
+    downloadStudentsLandscapePDF({
+      teacherName: printTeacherName,
+      schoolName: printSchoolName,
+      subjectName: printSubject,
+      wilayaName: printWilaya,
+      className: selectedClass === "all" ? "جميع الأفواج" : selectedClass,
+      students: targetStudents,
+      stats: {
+        total: activeClassStudents.length,
+        male: maleCount,
+        female: femaleCount,
+        group1: group1Count,
+        group2: group2Count,
+        repeaters: repeaterCount,
+        newStudents: newStudentsCount,
+      },
+    });
+  };
+
   return (
     <div className="min-h-screen bg-[#fafaf7] py-5 sm:py-8 px-3 sm:px-6 font-sans" dir="rtl">
       <div className="max-w-6xl mx-auto space-y-5">
@@ -935,11 +971,13 @@ export default function StudentsManagementPage() {
               <span>بطاقات QR للتلاميذ 🪪</span>
             </button>
             <button
-              onClick={() => window.print()}
-              className="px-3 py-1.5 rounded-xl border border-[#e8e8e0] bg-white text-xs font-bold text-gray-700 hover:bg-gray-50 transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
+              onClick={handleDownloadLandscapePDF}
+              type="button"
+              className="px-3.5 py-1.5 rounded-xl border border-emerald-600 bg-emerald-700 hover:bg-emerald-800 text-xs font-black text-white transition shadow-sm flex items-center gap-1.5 cursor-pointer active:scale-95"
+              title="حفظ قائمة وتفويج التلاميذ كملف PDF أفقي رسمي (A4 Landscape)"
             >
-              <Printer className="w-3.5 h-3.5 text-gray-500" />
-              <span>طباعة القائمة</span>
+              <Download className="w-3.5 h-3.5" />
+              <span>حفظ PDF أفقياً 📄</span>
             </button>
             <button
               onClick={() => setIsClassModalOpen(true)}
