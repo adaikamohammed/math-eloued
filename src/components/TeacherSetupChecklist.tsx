@@ -41,7 +41,7 @@ export function TeacherSetupChecklist({
   onOpenAddLesson,
 }: Props) {
   const [isDismissed, setIsDismissed] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -178,6 +178,7 @@ export function TeacherSetupChecklist({
           type="button"
           onClick={() => {
             setIsDismissed(false);
+            setIsCollapsed(false);
             if (typeof window !== "undefined") {
               localStorage.removeItem(`dismissed_checklist_${teacherId}`);
             }
@@ -187,6 +188,39 @@ export function TeacherSetupChecklist({
           <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
           <span>إظهار خطة تجهيز الحساب ({completedCount}/{tasks.length})</span>
         </button>
+      </div>
+    );
+  }
+
+  if (isCollapsed) {
+    return (
+      <div className="flex items-center justify-between p-2.5 px-3.5 rounded-2xl bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border border-emerald-200/90 shadow-2xs">
+        <div className="flex items-center gap-2">
+          <span className="p-1 rounded-lg bg-emerald-600 text-white shadow-2xs">
+            <Sparkles className="w-3.5 h-3.5" />
+          </span>
+          <span className="text-xs font-black text-emerald-950">
+            خطة تجهيز فضائك التعليمي ({completedCount}/{tasks.length} مكتملة)
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setIsCollapsed(false)}
+            className="text-[11px] font-black text-emerald-800 bg-white hover:bg-emerald-100 border border-emerald-300 px-2.5 py-1 rounded-lg transition cursor-pointer flex items-center gap-1 shadow-2xs"
+          >
+            <span>استعراض المهام</span>
+            <ChevronDown className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={handleDismiss}
+            className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-white transition cursor-pointer"
+            title="إخفاء"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
     );
   }

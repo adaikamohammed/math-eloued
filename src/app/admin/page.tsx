@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useMemo } from "react";
+import { useCallback, useEffect, useState, useMemo, useRef } from "react";
 import imageCompression from "browser-image-compression";
 import Link from "next/link";
 import { LoginRequired } from "@/components/LoginRequired";
@@ -295,9 +295,12 @@ function Dashboard({
   const [isListeningContent, setIsListeningContent] = useState(false);
   const [isRecordingAudio, setIsRecordingAudio] = useState(false);
   const [audioRecordDuration, setAudioRecordDuration] = useState(0);
-  const [mediaRecorderRef, setMediaRecorderRef] = useState<MediaRecorder | null>(null);
-  const [audioStreamRef, setAudioStreamRef] = useState<MediaStream | null>(null);
-  const [recordingIntervalRef, setRecordingIntervalRef] = useState<any>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioStreamRef = useRef<MediaStream | null>(null);
+  const recordingIntervalRef = useRef<any>(null);
+  const speechRecognitionRef = useRef<any>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const baseSpeechTextRef = useRef<string>("");
   const [editingAnnouncement, setEditingAnnouncement] = useState<Announcement | null>(null);
   const [deletingAnnouncement, setDeletingAnnouncement] = useState<Announcement | null>(null);
 
@@ -621,31 +624,42 @@ function Dashboard({
     if (!SpeechRecognition) {
       showToast(
         "error",
-        "ميزة تحويل الصوت إلى نص غير مدعومة في هذا المتصفح. ننصح باستخدام Google Chrome أو Microsoft Edge"
+        "المتصفح الحالي لا يدعم تحويل الصوت إلى نص مباشرة. ننصح باستخدام Google Chrome أو Edge على الحاسوب أو أندرويد."
       );
       return;
     }
 
-    const isListening = targetField === "title" ? isListeningTitle : isListeningContent;
+    const isCurrentlyListening = targetField === "title" ? isListeningTitle : isListeningContent;
 
-    if (isListening) {
-      const activeRec = (window as any).__activeSpeechRec;
-      if (activeRec) {
+    if (isCurrentlyListening) {
+      if (speechRecognitionRef.current) {
         try {
-          activeRec.stop();
+          speechRecognitionRef.current.stop();
         } catch {}
       }
       setIsListeningTitle(false);
       setIsListeningContent(false);
+      showToast("success", "✓ تم إيقاف التدوين الصوتي وحفظ النص");
       return;
+    }
+
+    // إيقاف أي استماع نشط مسبقاً
+    if (speechRecognitionRef.current) {
+      try {
+        speechRecognitionRef.current.stop();
+      } catch {}
     }
 
     try {
       const recognition = new SpeechRecognition();
-      (window as any).__activeSpeechRec = recognition;
-      recognition.lang = "ar-DZ";
+      speechRecognitionRef.current = recognition;
+      recognition.lang = "ar-SA";
       recognition.continuous = true;
       recognition.interimResults = true;
+      recognition.maxAlternatives = 1;
+
+      const initialText = (targetField === "title" ? annTitle : annContent).trim();
+      baseSpeechTextRef.current = initialText;
 
       if (targetField === "title") {
         setIsListeningTitle(true);
@@ -657,108 +671,164 @@ function Dashboard({
 
       recognition.onresult = (event: any) => {
         let transcript = "";
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          if (event.results[i].isFinal) {
-            transcript += event.results[i][0].transcript + " ";
-          }
+        for (let i = 0; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript + " ";
         }
         transcript = transcript.trim();
-        if (transcript) {
-          if (targetField === "title") {
-            setAnnTitle((prev) => (prev ? `${prev} ${transcript}` : transcript));
-          } else {
-            setAnnContent((prev) => (prev ? `${prev} ${transcript}` : transcript));
-          }
+        const base = baseSpeechTextRef.current;
+        const resultText = base ? `${base} ${transcript}` : transcript;
+
+        if (targetField === "title") {
+          setAnnTitle(resultText);
+        } else {
+          setAnnContent(resultText);
         }
       };
 
       recognition.onerror = (event: any) => {
-        if (targetField === "title") setIsListeningTitle(false);
-        else setIsListeningContent(false);
-        if (event.error !== "no-speech") {
-          showToast("error", "تعذر الاستماع للصوت، تأكد من صلاحية الميكروفون");
+        console.warn("Speech recognition error:", event.error);
+        if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+          showToast("error", "تم حظر إذن الميكروفون. يرجى تفعيل إذن الميكروفون من إعدادات المتصفح.");
+          setIsListeningTitle(false);
+          setIsListeningContent(false);
+        } else if (event.error === "no-speech") {
+          // لم يلتقط كلاماً، لا نظهر خطأ مزعج
+        } else if (event.error === "network") {
+          showToast("error", "خدمة التعرف على الصوت تتطلب اتصالاً بالإنترنت.");
+          setIsListeningTitle(false);
+          setIsListeningContent(false);
         }
       };
 
       recognition.onend = () => {
-        if (targetField === "title") setIsListeningTitle(false);
-        else setIsListeningContent(false);
+        setIsListeningTitle(false);
+        setIsListeningContent(false);
       };
 
       recognition.start();
-      showToast("success", "🎙️ تحدث الآن وسيكتب صوتك تلقائياً...");
-    } catch {
-      showToast("error", "تعذر تشغيل الميكروفون للتدوين الصوتي");
-      if (targetField === "title") setIsListeningTitle(false);
-      else setIsListeningContent(false);
+      showToast("success", "🎙️ جاري الاستماع.. تحدث الآن وسيكتب صوتك تلقائياً!");
+    } catch (err: any) {
+      console.error("SpeechRecognition start error:", err);
+      showToast("error", "تعذر بدء التعرف على الصوت: " + (err?.message || "خطأ غير معروف"));
+      setIsListeningTitle(false);
+      setIsListeningContent(false);
     }
   };
 
   // 2. تسجيل ملاحظة صوتية مباشرة بصوت الأستاذ (MediaRecorder)
   const startVoiceRecording = async () => {
+    if (typeof window === "undefined") return;
+
+    if (!navigator?.mediaDevices?.getUserMedia) {
+      showToast("error", "تسجيل الصوت غير مدعوم في هذا المتصفح. تأكد من فتح الموقع برابط آمن HTTPS.");
+      return;
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
-      const chunks: Blob[] = [];
+      audioStreamRef.current = stream;
+      audioChunksRef.current = [];
+
+      let mimeType = "";
+      if (typeof MediaRecorder !== "undefined" && typeof MediaRecorder.isTypeSupported === "function") {
+        if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
+          mimeType = "audio/webm;codecs=opus";
+        } else if (MediaRecorder.isTypeSupported("audio/webm")) {
+          mimeType = "audio/webm";
+        } else if (MediaRecorder.isTypeSupported("audio/mp4")) {
+          mimeType = "audio/mp4";
+        } else if (MediaRecorder.isTypeSupported("audio/aac")) {
+          mimeType = "audio/aac";
+        } else if (MediaRecorder.isTypeSupported("audio/ogg")) {
+          mimeType = "audio/ogg";
+        }
+      }
+
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
 
       recorder.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0) chunks.push(e.data);
+        if (e.data && e.data.size > 0) {
+          audioChunksRef.current.push(e.data);
+        }
       };
 
       recorder.onstop = () => {
-        const audioBlob = new Blob(chunks, { type: "audio/webm;codecs=opus" });
-        const reader = new FileReader();
-        reader.readAsDataURL(audioBlob);
-        reader.onloadend = () => {
-          setAnnAudio(reader.result as string);
-        };
-        stream.getTracks().forEach((track) => track.stop());
+        const finalType = mimeType || recorder.mimeType || "audio/webm";
+        const audioBlob = new Blob(audioChunksRef.current, { type: finalType });
+        if (audioBlob.size > 0) {
+          const reader = new FileReader();
+          reader.readAsDataURL(audioBlob);
+          reader.onloadend = () => {
+            setAnnAudio(reader.result as string);
+          };
+        }
+        if (audioStreamRef.current) {
+          audioStreamRef.current.getTracks().forEach((track) => track.stop());
+          audioStreamRef.current = null;
+        }
       };
 
-      recorder.start();
-      setMediaRecorderRef(recorder);
-      setAudioStreamRef(stream);
+      recorder.start(250);
       setIsRecordingAudio(true);
       setAudioRecordDuration(0);
 
-      const interval = setInterval(() => {
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current);
+      }
+      recordingIntervalRef.current = setInterval(() => {
         setAudioRecordDuration((prev) => prev + 1);
       }, 1000);
-      setRecordingIntervalRef(interval);
-      showToast("success", "🎙️ بدأ تسجيل الملاحظة الصوتية...");
-    } catch {
-      showToast("error", "يرجى السماح بصلاحية الميكروفون لتسجيل الصوت");
+
+      showToast("success", "🎙️ بدأ التسجيل الصوتي الآن.. تحدث لتسجيل ملاحظتك!");
+    } catch (err: any) {
+      console.error("Microphone access error:", err);
+      if (err?.name === "NotAllowedError" || err?.name === "PermissionDeniedError") {
+        showToast("error", "تم رفض إذن الميكروفون. يرجى تفعيل إذن الميكروفون من إعدادات المتصفح.");
+      } else if (err?.name === "NotFoundError" || err?.name === "DevicesNotFoundError") {
+        showToast("error", "لم يتم العثور على ميكروفون في جهازك.");
+      } else {
+        showToast("error", "تعذر تشغيل الميكروفون: " + (err?.message || "يرجى التحقق من الأذونات"));
+      }
     }
   };
 
   const stopVoiceRecording = () => {
-    if (mediaRecorderRef && mediaRecorderRef.state !== "inactive") {
-      mediaRecorderRef.stop();
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      try {
+        mediaRecorderRef.current.stop();
+      } catch (err) {
+        console.warn("Error stopping recorder:", err);
+      }
     }
-    if (audioStreamRef) {
-      audioStreamRef.getTracks().forEach((t) => t.stop());
-    }
-    if (recordingIntervalRef) {
-      clearInterval(recordingIntervalRef);
+    if (recordingIntervalRef.current) {
+      clearInterval(recordingIntervalRef.current);
+      recordingIntervalRef.current = null;
     }
     setIsRecordingAudio(false);
     setAnnAudioDuration(audioRecordDuration);
-    showToast("success", "✓ تم حفظ الملاحظة الصوتية بنجاح");
+    showToast("success", "✓ تم حفظ الملاحظة الصوتية وجاهزة للإرفاق!");
   };
 
   const cancelVoiceRecording = () => {
-    if (mediaRecorderRef && mediaRecorderRef.state !== "inactive") {
-      mediaRecorderRef.stop();
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      try {
+        mediaRecorderRef.current.stop();
+      } catch {}
     }
-    if (audioStreamRef) {
-      audioStreamRef.getTracks().forEach((t) => t.stop());
+    if (audioStreamRef.current) {
+      audioStreamRef.current.getTracks().forEach((t) => t.stop());
+      audioStreamRef.current = null;
     }
-    if (recordingIntervalRef) {
-      clearInterval(recordingIntervalRef);
+    if (recordingIntervalRef.current) {
+      clearInterval(recordingIntervalRef.current);
+      recordingIntervalRef.current = null;
     }
+    audioChunksRef.current = [];
     setIsRecordingAudio(false);
     setAnnAudio(null);
     setAnnAudioDuration(0);
+    showToast("success", "تم إلغاء التسجيل");
   };
 
   // 3. رفع صورة للإعلان وضغطها
@@ -808,10 +878,9 @@ function Dashboard({
       stopVoiceRecording();
     }
     if (isListeningTitle || isListeningContent) {
-      const activeRec = (window as any).__activeSpeechRec;
-      if (activeRec) {
+      if (speechRecognitionRef.current) {
         try {
-          activeRec.stop();
+          speechRecognitionRef.current.stop();
         } catch {}
       }
       setIsListeningTitle(false);
@@ -1715,41 +1784,6 @@ function Dashboard({
           <PedagogyAlerts teacherId={profile.id} />
         </div>
 
-        {/* بطاقة التوجيه الفوري للخطوة 2 عندما يكون الأستاذ قد حدد الأفواج ولكن لم يضف أي تلميذ بعد */}
-        {levelsTaught.length > 0 && teacherClasses.length > 0 && studentsCount === 0 && (
-          <div className="bg-gradient-to-r from-emerald-800 via-teal-800 to-emerald-900 text-white rounded-2xl p-4 sm:p-5 shadow-lg border border-emerald-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-xs flex items-center justify-center shrink-0 mt-0.5">
-                <Users className="w-5 h-5 text-amber-300" />
-              </div>
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] bg-amber-400 text-emerald-950 font-black px-2 py-0.5 rounded-full">
-                    خطوتك الأساسية الحالية ✨
-                  </span>
-                  <span className="text-xs font-bold text-emerald-200">الخطوة ② من 6: إضافة وتوثيق التلاميذ</span>
-                </div>
-                <h3 className="text-sm sm:text-base font-black text-white">
-                  إضافة وتوثيق تلاميذ أفواجك التربوية ({teacherClasses.join("، ")})
-                </h3>
-                <p className="text-xs text-emerald-100/90 leading-relaxed max-w-2xl">
-                  لقد حددت أفواجك بنجاح! الآن حان وقت إضافة أسماء تلاميذك لتتمكن من رصد كراس القسم، تدوين الملاحظات، وطباعة القوائم الأبجدية بنقرة واحدة (يمكنك لصق قائمة القسم كاملة دفعة واحدة من إكسل مباشرة!).
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
-              <Link
-                href="/admin/students?from=dashboard"
-                className="w-full sm:w-auto text-center px-4 py-2.5 rounded-xl bg-white text-emerald-950 hover:bg-emerald-50 font-black text-xs transition shadow-md flex items-center justify-center gap-2 cursor-pointer active:scale-95"
-              >
-                <Users className="w-4 h-4 text-emerald-700" />
-                <span>إضافة التلاميذ الآن 👥</span>
-                <ArrowLeft className="w-3.5 h-3.5" />
-              </Link>
-            </div>
-          </div>
-        )}
-
         {/* شريط خطة التجهيز خطوة بخطوة */}
         <TeacherSetupChecklist
           teacherId={profile.id}
@@ -1876,151 +1910,237 @@ function Dashboard({
         </div>
       </div>
 
-      {/* ── التبويب الرئيسي للمتابعة والعمل ── */}
-      <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar bg-white p-2 rounded-2xl border border-slate-100 shadow-2xs">
+      {/* ── شبكة التبويبات والأقسام الرئيسية (أيقونات مربعة سهلة الاستخدام في الهواتف) ── */}
+      <div className="grid grid-cols-4 sm:grid-cols-4 md:grid-cols-8 gap-2 bg-white p-2.5 rounded-3xl border border-slate-200/90 shadow-2xs">
+        {/* 1. لوحة التحكم */}
         <button
           type="button"
           onClick={() => setMainTab("overview")}
-          className={`py-2 px-3.5 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 shrink-0 cursor-pointer ${
+          className={`relative p-2.5 rounded-2xl flex flex-col items-center justify-center text-center transition-all cursor-pointer ${
             mainTab === "overview"
-              ? "bg-[#107a57] text-white shadow-xs"
-              : "text-slate-600 hover:bg-slate-50"
+              ? "bg-[#107a57] text-white shadow-md ring-2 ring-[#107a57]/40 scale-[1.02]"
+              : "bg-slate-50/80 hover:bg-slate-100 text-slate-700 border border-slate-100"
           }`}
         >
-          <Sliders className="w-4 h-4" />
-          <span>لوحة التحكم الرئيسية 📊</span>
+          <div className={`w-8 h-8 rounded-xl flex items-center justify-center mb-1 ${
+            mainTab === "overview" ? "bg-white/20 text-white" : "bg-emerald-100 text-[#107a57]"
+          }`}>
+            <Sliders className="w-4 h-4" />
+          </div>
+          <span className="text-[10px] sm:text-[11px] font-black leading-tight">
+            الرئيسية
+          </span>
         </button>
 
+        {/* 2. كراس الدروس والسبورة */}
         <Link
           href="/admin/board"
-          className="py-2 px-3.5 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 shrink-0 cursor-pointer bg-emerald-50 text-emerald-900 hover:bg-emerald-100 border border-emerald-300 shadow-2xs"
+          className="relative p-2.5 rounded-2xl flex flex-col items-center justify-center text-center transition-all cursor-pointer bg-emerald-50/90 hover:bg-emerald-100 text-emerald-950 border border-emerald-200/90 shadow-2xs"
           title="توثيق ورفع صور سبورة القسم والواجبات"
         >
-          <BookOpen className="w-4 h-4 text-emerald-700" />
-          <span>كراس الدروس والسبورة 📷 ↗</span>
+          <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center mb-1 shadow-2xs">
+            <BookOpen className="w-4 h-4" />
+          </div>
+          <span className="text-[10px] sm:text-[11px] font-black leading-tight">
+            كراس الدروس
+          </span>
+          <span className="text-[8px] font-bold text-emerald-700">📷 سبورة</span>
         </Link>
 
+        {/* 3. تقييم الحصة */}
         <button
           type="button"
           onClick={() => setMainTab("evaluations")}
-          className={`py-2 px-3.5 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 shrink-0 cursor-pointer ${
+          className={`relative p-2.5 rounded-2xl flex flex-col items-center justify-center text-center transition-all cursor-pointer ${
             mainTab === "evaluations"
-              ? "bg-emerald-700 text-white shadow-xs"
-              : "text-slate-600 hover:bg-slate-50"
+              ? "bg-teal-700 text-white shadow-md ring-2 ring-teal-500 scale-[1.02]"
+              : "bg-slate-50/80 hover:bg-slate-100 text-slate-700 border border-slate-100"
           }`}
         >
-          <ClipboardCheck className="w-4 h-4" />
-          <span>تقييم الحصة</span>
+          <div className={`w-8 h-8 rounded-xl flex items-center justify-center mb-1 ${
+            mainTab === "evaluations" ? "bg-white/20 text-white" : "bg-teal-100 text-teal-800"
+          }`}>
+            <ClipboardCheck className="w-4 h-4" />
+          </div>
+          <span className="text-[10px] sm:text-[11px] font-black leading-tight">
+            تقييم الحصة
+          </span>
           {evaluationsList.length > 0 && (
-            <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${mainTab === "evaluations" ? "bg-white/20 text-white" : "bg-emerald-100 text-emerald-800"}`}>
+            <span className={`absolute top-1 left-1 px-1.5 py-0.2 rounded-full text-[9px] font-mono font-black ${
+              mainTab === "evaluations" ? "bg-white text-teal-900" : "bg-teal-600 text-white shadow-2xs"
+            }`}>
               {evaluationsList.length}
             </span>
           )}
         </button>
 
+        {/* 4. أولياء أود استقبالهم */}
         <button
           type="button"
           onClick={() => setMainTab("summons")}
-          className={`py-2 px-3.5 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 shrink-0 cursor-pointer ${
+          className={`relative p-2.5 rounded-2xl flex flex-col items-center justify-center text-center transition-all cursor-pointer ${
             mainTab === "summons"
-              ? "bg-sky-600 text-white shadow-xs"
-              : "text-slate-600 hover:bg-slate-50"
+              ? "bg-sky-600 text-white shadow-md ring-2 ring-sky-400 scale-[1.02]"
+              : "bg-slate-50/80 hover:bg-slate-100 text-slate-700 border border-slate-100"
           }`}
         >
-          <Users className="w-4 h-4" />
-          <span>أولياء أود استقبالهم</span>
+          <div className={`w-8 h-8 rounded-xl flex items-center justify-center mb-1 ${
+            mainTab === "summons" ? "bg-white/20 text-white" : "bg-sky-100 text-sky-800"
+          }`}>
+            <Users className="w-4 h-4" />
+          </div>
+          <span className="text-[10px] sm:text-[11px] font-black leading-tight">
+            استقبال أولياء
+          </span>
           {summonsList.length > 0 && (
-            <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${mainTab === "summons" ? "bg-white/20 text-white" : "bg-sky-100 text-sky-800"}`}>
+            <span className={`absolute top-1 left-1 px-1.5 py-0.2 rounded-full text-[9px] font-mono font-black ${
+              mainTab === "summons" ? "bg-white text-sky-900" : "bg-sky-600 text-white shadow-2xs"
+            }`}>
               {summonsList.length}
             </span>
           )}
         </button>
 
+        {/* 5. لوحة الشرف */}
         <button
           type="button"
           onClick={() => setMainTab("honors")}
-          className={`py-2 px-3.5 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 shrink-0 cursor-pointer ${
+          className={`relative p-2.5 rounded-2xl flex flex-col items-center justify-center text-center transition-all cursor-pointer ${
             mainTab === "honors"
-              ? "bg-amber-500 text-white shadow-xs"
-              : "text-slate-600 hover:bg-slate-50"
+              ? "bg-amber-500 text-white shadow-md ring-2 ring-amber-400 scale-[1.02]"
+              : "bg-slate-50/80 hover:bg-slate-100 text-slate-700 border border-slate-100"
           }`}
         >
-          <Trophy className="w-4 h-4" />
-          <span>لوحة الشرف</span>
+          <div className={`w-8 h-8 rounded-xl flex items-center justify-center mb-1 ${
+            mainTab === "honors" ? "bg-white/20 text-white" : "bg-amber-100 text-amber-800"
+          }`}>
+            <Trophy className="w-4 h-4" />
+          </div>
+          <span className="text-[10px] sm:text-[11px] font-black leading-tight">
+            لوحة الشرف
+          </span>
           {honorsList.length > 0 && (
-            <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${mainTab === "honors" ? "bg-white/20 text-white" : "bg-amber-100 text-amber-800"}`}>
+            <span className={`absolute top-1 left-1 px-1.5 py-0.2 rounded-full text-[9px] font-mono font-black ${
+              mainTab === "honors" ? "bg-white text-amber-900" : "bg-amber-600 text-white shadow-2xs"
+            }`}>
               {honorsList.length}
             </span>
           )}
         </button>
 
+        {/* 6. الإعلانات والتنبيهات */}
         <button
           type="button"
           onClick={() => setMainTab("announcements")}
-          className={`py-2 px-3.5 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 shrink-0 cursor-pointer ${
+          className={`relative p-2.5 rounded-2xl flex flex-col items-center justify-center text-center transition-all cursor-pointer ${
             mainTab === "announcements"
-              ? "bg-teal-600 text-white shadow-xs"
-              : "text-slate-600 hover:bg-slate-50"
+              ? "bg-teal-600 text-white shadow-md ring-2 ring-teal-400 scale-[1.02]"
+              : "bg-slate-50/80 hover:bg-slate-100 text-slate-700 border border-slate-100"
           }`}
         >
-          <Megaphone className="w-4 h-4" />
-          <span>الإعلانات</span>
+          <div className={`w-8 h-8 rounded-xl flex items-center justify-center mb-1 ${
+            mainTab === "announcements" ? "bg-white/20 text-white" : "bg-teal-100 text-teal-800"
+          }`}>
+            <Megaphone className="w-4 h-4" />
+          </div>
+          <span className="text-[10px] sm:text-[11px] font-black leading-tight">
+            الإعلانات
+          </span>
           {announcementsList.length > 0 && (
-            <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${mainTab === "announcements" ? "bg-white/20 text-white" : "bg-teal-100 text-teal-800"}`}>
+            <span className={`absolute top-1 left-1 px-1.5 py-0.2 rounded-full text-[9px] font-mono font-black ${
+              mainTab === "announcements" ? "bg-white text-teal-900" : "bg-teal-600 text-white shadow-2xs"
+            }`}>
               {announcementsList.length}
             </span>
           )}
         </button>
 
+        {/* 7. الرسائل والاستفسارات */}
         <button
           type="button"
           onClick={() => setMainTab("messages")}
-          className={`relative py-2 px-3.5 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 shrink-0 cursor-pointer ${
+          className={`relative p-2.5 rounded-2xl flex flex-col items-center justify-center text-center transition-all cursor-pointer ${
             mainTab === "messages"
-              ? "bg-purple-700 text-white shadow-xs"
-              : "text-slate-600 hover:bg-slate-50"
+              ? "bg-purple-700 text-white shadow-md ring-2 ring-purple-500 scale-[1.02]"
+              : "bg-slate-50/80 hover:bg-slate-100 text-slate-700 border border-slate-100"
           }`}
         >
-          <MessageSquare className="w-4 h-4" />
-          <span>الرسائل والاستفسارات</span>
+          <div className={`w-8 h-8 rounded-xl flex items-center justify-center mb-1 ${
+            mainTab === "messages" ? "bg-white/20 text-white" : "bg-purple-100 text-purple-800"
+          }`}>
+            <MessageSquare className="w-4 h-4" />
+          </div>
+          <span className="text-[10px] sm:text-[11px] font-black leading-tight">
+            الرسائل
+          </span>
           {(unreadMessagesCount + unreadInquiriesCount) > 0 ? (
-            <span className="bg-rose-500 text-white text-[10px] font-mono px-1.5 py-0.2 rounded-full font-black animate-pulse">
+            <span className="absolute top-1 left-1 bg-rose-500 text-white text-[9px] font-mono px-1.5 py-0.2 rounded-full font-black animate-pulse shadow-xs">
               {unreadMessagesCount + unreadInquiriesCount}
             </span>
           ) : (messagesList.length + inquiriesList.length) > 0 ? (
-            <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${mainTab === "messages" ? "bg-white/20 text-white" : "bg-purple-100 text-purple-800"}`}>
+            <span className={`absolute top-1 left-1 px-1.5 py-0.2 rounded-full text-[9px] font-mono font-black ${
+              mainTab === "messages" ? "bg-white text-purple-900" : "bg-purple-600 text-white"
+            }`}>
               {messagesList.length + inquiriesList.length}
             </span>
           ) : null}
         </button>
 
+        {/* 8. الخصومات (خاص) */}
         <button
           type="button"
           onClick={() => setMainTab("penalties")}
-          className={`py-2 px-3.5 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 shrink-0 cursor-pointer ${
+          className={`relative p-2.5 rounded-2xl flex flex-col items-center justify-center text-center transition-all cursor-pointer ${
             mainTab === "penalties"
-              ? "bg-slate-800 text-white shadow-xs"
-              : "text-slate-600 hover:bg-slate-50"
+              ? "bg-slate-800 text-white shadow-md ring-2 ring-slate-600 scale-[1.02]"
+              : "bg-slate-50/80 hover:bg-slate-100 text-slate-700 border border-slate-100"
           }`}
         >
-          <Lock className="w-3.5 h-3.5 text-amber-500" />
-          <span>سجل الخصومات (خاص 🔒)</span>
+          <div className={`w-8 h-8 rounded-xl flex items-center justify-center mb-1 ${
+            mainTab === "penalties" ? "bg-white/20 text-white" : "bg-slate-200 text-slate-800"
+          }`}>
+            <Lock className="w-4 h-4 text-amber-500" />
+          </div>
+          <span className="text-[10px] sm:text-[11px] font-black leading-tight">
+            الخصومات
+          </span>
           {penaltiesList.length > 0 && (
-            <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${mainTab === "penalties" ? "bg-white/20 text-white" : "bg-slate-200 text-slate-800"}`}>
+            <span className={`absolute top-1 left-1 px-1.5 py-0.2 rounded-full text-[9px] font-mono font-black ${
+              mainTab === "penalties" ? "bg-white text-slate-900" : "bg-slate-700 text-white"
+            }`}>
               {penaltiesList.length}
             </span>
           )}
         </button>
-
-        <Link
-          href="/contact"
-          className="py-2 px-3.5 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 shrink-0 cursor-pointer text-[#107a57] bg-[#e6f4ee] hover:bg-[#d5eee2] border border-[#107a57]/20"
-          title="مراسلة مدير المنصة والمشرف العام بهويتك أو بسرية تامة من مجهول"
-        >
-          <Crown className="w-3.5 h-3.5 text-[#107a57]" />
-          <span>مراسلة إدارة المنصة 🏛️</span>
-        </Link>
       </div>
+
+      {/* شريط الإشارة إلى القسم الفرعي المفتوح مع زر العودة السريعة */}
+      {mainTab !== "overview" && (
+        <div className="flex items-center justify-between bg-teal-50/80 border border-teal-200/90 p-2.5 px-4 rounded-2xl shadow-2xs">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-teal-950">أنت الآن في:</span>
+            <span className="text-xs font-black text-teal-800 bg-white px-2.5 py-0.5 rounded-full border border-teal-200 shadow-2xs">
+              {mainTab === "evaluations" && "📋 دفتر تقييم الحصة"}
+              {mainTab === "summons" && "👥 أولياء أود استقبالهم"}
+              {mainTab === "honors" && "🏆 لوحة الشرف وتكريم النوابغ"}
+              {mainTab === "announcements" && "📢 لوحة الإعلانات والتنبيهات"}
+              {mainTab === "messages" && "💬 الرسائل واستفسارات الأولياء"}
+              {mainTab === "penalties" && "🔒 سجل الخصومات الداخلي"}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setMainTab("overview");
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+            className="text-xs font-black text-teal-800 hover:text-teal-950 bg-white hover:bg-teal-100 border border-teal-300 px-3 py-1 rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-2xs active:scale-95"
+          >
+            <ArrowRight className="w-3.5 h-3.5" />
+            <span>العودة للرئيسية 📊</span>
+          </button>
+        </div>
+      )}
 
       {/* ==================== 0. تبويب لوحة التحكم والإحصائيات الرئيسية ==================== */}
       {mainTab === "overview" ? (
@@ -4142,12 +4262,27 @@ function Dashboard({
                     <span>{isListeningTitle ? "جاري الاستماع... اضغط للإيقاف" : "تدوين صوتي 🎙️"}</span>
                   </button>
                 </div>
+                {isListeningTitle && (
+                  <div className="p-2 rounded-xl bg-red-50 border border-red-200 flex items-center justify-between text-[11px] font-bold text-red-700 animate-pulse mb-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-red-600 animate-ping" />
+                      <span>🎙️ جاري الاستماع للعنوان.. تحدث بصوتك وسيكتب هنا</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => toggleVoiceToText("title")}
+                      className="text-[10px] font-black bg-red-600 text-white px-2 py-0.5 rounded cursor-pointer"
+                    >
+                      إيقاف وحفظ ✓
+                    </button>
+                  </div>
+                )}
                 <input
                   type="text"
                   placeholder="مثال: تنبيه غياب الأستاذ يوم الأحد / تم رفع حلول الواجب 3 / إحضار الأدوات الهندسية غداً"
                   value={annTitle}
                   onChange={(e) => setAnnTitle(e.target.value)}
-                  className="input text-xs font-bold"
+                  className={`input text-xs font-bold transition ${isListeningTitle ? "border-red-400 ring-2 ring-red-400/30 bg-red-50/20" : ""}`}
                   required
                 />
               </div>
@@ -4186,12 +4321,29 @@ function Dashboard({
                     <span>{isListeningContent ? "جاري الاستماع... اضغط للإيقاف" : "إملاء صوتي للنص 🎙️"}</span>
                   </button>
                 </div>
+                {isListeningContent && (
+                  <div className="p-2 rounded-xl bg-red-50 border border-red-200 flex items-center justify-between text-[11px] font-bold text-red-700 animate-pulse mb-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-red-600 animate-ping" />
+                      <span>🎙️ جاري استماع وكتابة نص الإعلان.. تحدث وسيكتب مباشرة</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => toggleVoiceToText("content")}
+                      className="text-[10px] font-black bg-red-600 text-white px-2 py-0.5 rounded cursor-pointer"
+                    >
+                      إيقاف وحفظ ✓
+                    </button>
+                  </div>
+                )}
                 <textarea
                   rows={4}
                   placeholder="اكتب هنا التفاصيل الكاملة للإعلان أو الملاحظة، أو اضغط زر الإملاء الصوتي للتحدث مباشرة..."
                   value={annContent}
                   onChange={(e) => setAnnContent(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 p-3 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition leading-relaxed"
+                  className={`w-full rounded-xl border p-3 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition leading-relaxed ${
+                    isListeningContent ? "border-red-400 ring-2 ring-red-400/30 bg-red-50/20" : "border-slate-200"
+                  }`}
                   required
                 />
               </div>
