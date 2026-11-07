@@ -12,6 +12,8 @@ import { TeacherSetupChecklist } from "@/components/TeacherSetupChecklist";
 import { OfficialExamScheduleCard } from "@/components/OfficialExamScheduleCard";
 import { BOARD_IMAGE_OPTIONS } from "@/lib/compress";
 import {
+  Camera,
+  Smartphone,
   Plus,
   Trash2,
   Upload,
@@ -177,8 +179,8 @@ function Dashboard({
   );
   const levelsTaught = levelsTaughtState.filter((lv): lv is 1 | 2 | 3 | 4 => [1, 2, 3, 4].includes(lv));
   const [mainTab, setMainTab] = useState<
-    "lessons" | "summons" | "honors" | "evaluations" | "penalties" | "announcements" | "messages"
-  >("lessons");
+    "overview" | "lessons" | "summons" | "honors" | "evaluations" | "penalties" | "announcements" | "messages"
+  >("overview");
   const [level, setLevel] = useState<1 | 2 | 3 | 4>(levelsTaught[0] ?? 1);
   const [hasTimetable, setHasTimetable] = useState(false);
   const [hasDiary, setHasDiary] = useState(false);
@@ -1651,16 +1653,25 @@ function Dashboard({
       <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar bg-white p-2 rounded-2xl border border-slate-100 shadow-2xs">
         <button
           type="button"
-          onClick={() => setMainTab("lessons")}
+          onClick={() => setMainTab("overview")}
           className={`py-2 px-3.5 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 shrink-0 cursor-pointer ${
-            mainTab === "lessons"
-              ? "bg-emerald-600 text-white shadow-xs"
+            mainTab === "overview"
+              ? "bg-[#107a57] text-white shadow-xs"
               : "text-slate-600 hover:bg-slate-50"
           }`}
         >
-          <BookOpen className="w-4 h-4" />
-          <span>الدروس والواجبات</span>
+          <Sliders className="w-4 h-4" />
+          <span>لوحة التحكم الرئيسية 📊</span>
         </button>
+
+        <Link
+          href="/admin/board"
+          className="py-2 px-3.5 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 shrink-0 cursor-pointer bg-emerald-50 text-emerald-900 hover:bg-emerald-100 border border-emerald-300 shadow-2xs"
+          title="توثيق ورفع صور سبورة القسم والواجبات"
+        >
+          <BookOpen className="w-4 h-4 text-emerald-700" />
+          <span>كراس الدروس والسبورة 📷 ↗</span>
+        </Link>
 
         <button
           type="button"
@@ -1784,523 +1795,247 @@ function Dashboard({
         </Link>
       </div>
 
-      {/* ==================== 1. تبويب الدروس والكراريس ==================== */}
-      {mainTab === "lessons" ? (
+      {/* ==================== 0. تبويب لوحة التحكم والإحصائيات الرئيسية ==================== */}
+      {mainTab === "overview" ? (
         <div className="space-y-4">
-          {/* إرشاد وتوضيح حول رفع حلول الواجبات وصور السبورة */}
-          <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-blue-50 border border-blue-200/90 rounded-2xl p-3.5 flex items-start gap-3 shadow-2xs">
-            <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 font-black text-sm mt-0.5 shadow-2xs">
-              💡
-            </div>
-            <div className="flex-1 min-w-0 text-xs">
-              <div className="font-black text-blue-950 mb-0.5">
-                أين أرفع حلول الواجبات المنزلية وصور السبورة؟
+          {/* بطاقة كراس الدروس والسبورة الرئيسية البارزة */}
+          <div className="bg-gradient-to-r from-emerald-700 via-[#107a57] to-teal-800 rounded-3xl p-4 sm:p-6 text-white shadow-md relative overflow-hidden">
+            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="space-y-1.5 max-w-xl">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 text-white text-[11px] font-black backdrop-blur-xs">
+                  <BookOpen className="w-3.5 h-3.5" />
+                  <span>كراس الدروس والسبورة الرقمية</span>
+                </div>
+                <h2 className="text-lg sm:text-xl font-black">
+                  رفع وتوثيق صور السبورة والواجبات بلمسة واحدة
+                </h2>
+                <p className="text-xs text-emerald-100 leading-relaxed">
+                  فضاء مخصص ومستقل لتوثيق سبورة القسم والملخصات والواجبات. يعتمد تلقائياً على ما حضّرته في الدفتر اليومي دون الحاجة لإعادة كتابة عنوان المورد.
+                </p>
+                <div className="flex items-center gap-3 pt-1 text-xs text-white/90 font-mono flex-wrap">
+                  <span>📘 {allLessons.length} درساً موثقاً</span>
+                  {allLessons[0]?.title && (
+                    <span className="truncate max-w-xs opacity-90">
+                      • آخر مورد: {allLessons[0].title}
+                    </span>
+                  )}
+                </div>
               </div>
-              <p className="text-blue-800 text-[11px] leading-relaxed">
-                اضغط على أي درس في القائمة أدناه لفتحه، وستجد قسماً مخصصاً باللون الأزرق بعنوان <strong>"الحل النموذجي للواجب المنزلي"</strong> لرفع صور حل الواجب بعد تصحيحه في القسم. أو اضغط مباشرة على زر <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 font-black border border-blue-300">📝 رفع حل الواجب</span> الظاهر في رأس كل بطاقة درس!
-              </p>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                <Link
+                  href="/admin/board"
+                  className="px-5 py-3 rounded-2xl bg-white text-emerald-950 hover:bg-emerald-50 font-black text-xs shadow-lg transition active:scale-95 flex items-center gap-2"
+                >
+                  <Camera className="w-4 h-4 text-emerald-700" />
+                  <span>فتح كراس الدروس وتوثيق الحصة 📷 ←</span>
+                </Link>
+                {(profile.slug || profile.teacher_code) && (
+                  <Link
+                    href={`/t/${profile.slug || profile.teacher_code}`}
+                    target="_blank"
+                    className="px-3.5 py-3 rounded-2xl bg-black/20 hover:bg-black/30 text-white font-bold text-xs backdrop-blur-xs transition flex items-center gap-1.5"
+                  >
+                    <Eye className="w-4 h-4" />
+                    <span>معاينة الولي</span>
+                    <ExternalLink className="w-3 h-3 text-white/80" />
+                  </Link>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* اختيار المستوى */}
-          {levelsTaught.length === 0 ? (
-            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 flex items-center justify-between gap-2 shadow-2xs">
-              <span className="text-xs text-amber-900 font-bold">لم تقم بتحديد المستويات المسندة بعد.</span>
-              <button
-                type="button"
-                onClick={() => setOnboardingOpen(true)}
-                className="text-xs font-black text-emerald-800 bg-white hover:bg-emerald-50 border border-emerald-300 px-3 py-1.5 rounded-xl shadow-2xs transition cursor-pointer"
-              >
-                ✨ تحديد المستويات والأفواج
-              </button>
-            </div>
-          ) : (
-            <div
-              className="grid gap-2 bg-white p-1.5 rounded-2xl border border-slate-100 shadow-2xs"
-              style={{ gridTemplateColumns: `repeat(${Math.min(levelsTaught.length, 4)}, minmax(0, 1fr))` }}
+          {/* شبكة الوصول السريع لكافة مهام وأدوات الأستاذ */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+            {/* كراس الدروس والسبورة */}
+            <Link
+              href="/admin/board"
+              className="p-3.5 bg-white rounded-2xl border border-slate-100 shadow-2xs hover:shadow-sm hover:border-emerald-300 transition group flex flex-col justify-between gap-3 text-right"
             >
-              {levelsTaught.map((lv) => (
-                <button
-                  key={lv}
-                  onClick={() => {
-                    setLevel(lv);
-                    setOpenId(null);
-                  }}
-                  className={`py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
-                    level === lv ? "bg-slate-800 text-white shadow-sm" : "text-slate-600 hover:bg-slate-50"
-                  }`}
-                >
-                  <span>{LEVELS[lv].label}</span>
-                  <span
-                    className={`text-[10px] px-2 py-0.5 rounded-md font-extrabold ${
-                      level === lv ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
-                    }`}
-                  >
-                    {LEVELS[lv].short}
+              <div className="w-9 h-9 rounded-xl bg-emerald-50 text-[#107a57] flex items-center justify-center group-hover:scale-105 transition-transform">
+                <BookOpen className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="block text-xs font-black text-gray-900 group-hover:text-emerald-700 transition">
+                  كراس الدروس
+                </span>
+                <span className="block text-[10px] text-gray-400 font-medium">
+                  {allLessons.length} درساً منشوراً
+                </span>
+              </div>
+            </Link>
+
+            {/* الدفتر اليومي */}
+            <Link
+              href="/admin/diary"
+              className="p-3.5 bg-white rounded-2xl border border-slate-100 shadow-2xs hover:shadow-sm hover:border-emerald-300 transition group flex flex-col justify-between gap-3 text-right"
+            >
+              <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <ClipboardList className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="block text-xs font-black text-gray-900 group-hover:text-emerald-700 transition">
+                  الدفتر اليومي
+                </span>
+                <span className="block text-[10px] text-gray-400 font-medium">
+                  التحضير والمخطط
+                </span>
+              </div>
+            </Link>
+
+            {/* دفتر التقويم الصفي */}
+            <Link
+              href="/eval/continuous"
+              className="p-3.5 bg-white rounded-2xl border border-slate-100 shadow-2xs hover:shadow-sm hover:border-emerald-300 transition group flex flex-col justify-between gap-3 text-right"
+            >
+              <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <Smartphone className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="block text-xs font-black text-gray-900 group-hover:text-emerald-700 transition">
+                  التقويم الصفي
+                </span>
+                <span className="block text-[10px] text-gray-400 font-medium">
+                  رصد مباشر بالهاتف
+                </span>
+              </div>
+            </Link>
+
+            {/* سجل التنقيط والمعدلات */}
+            <Link
+              href="/eval"
+              className="p-3.5 bg-white rounded-2xl border border-slate-100 shadow-2xs hover:shadow-sm hover:border-emerald-300 transition group flex flex-col justify-between gap-3 text-right"
+            >
+              <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <Scale className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="block text-xs font-black text-gray-900 group-hover:text-emerald-700 transition">
+                  سجل التنقيط
+                </span>
+                <span className="block text-[10px] text-gray-400 font-medium">
+                  المعدلات والكشوفات
+                </span>
+              </div>
+            </Link>
+
+            {/* إدارة الأفواج والتلاميذ */}
+            <Link
+              href="/admin/students"
+              className="p-3.5 bg-white rounded-2xl border border-slate-100 shadow-2xs hover:shadow-sm hover:border-emerald-300 transition group flex flex-col justify-between gap-3 text-right"
+            >
+              <div className="w-9 h-9 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <Users className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="block text-xs font-black text-gray-900 group-hover:text-emerald-700 transition">
+                  الأفواج والتلاميذ
+                </span>
+                <span className="block text-[10px] text-gray-400 font-medium">
+                  {studentsCount || studentRoster.length} تلميذاً
+                </span>
+              </div>
+            </Link>
+
+            {/* التوقيت الأسبوعي */}
+            <Link
+              href="/admin/timetable"
+              className="p-3.5 bg-white rounded-2xl border border-slate-100 shadow-2xs hover:shadow-sm hover:border-emerald-300 transition group flex flex-col justify-between gap-3 text-right"
+            >
+              <div className="w-9 h-9 rounded-xl bg-rose-50 text-rose-700 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <Calendar className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="block text-xs font-black text-gray-900 group-hover:text-emerald-700 transition">
+                  التوقيت الأسبوعي
+                </span>
+                <span className="block text-[10px] text-gray-400 font-medium">
+                  جدول الحصص
+                </span>
+              </div>
+            </Link>
+          </div>
+
+          {/* التنبيهات البيداغوجية والرزنامة الرسمية */}
+          <PedagogyAlerts teacherId={profile.id} />
+          <OfficialExamScheduleCard teacherId={profile.id} />
+
+          {/* معاينة سريعة لآخر الدروس الموثقة */}
+          {allLessons.length > 0 && (
+            <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-100 shadow-2xs space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-7 h-7 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center text-xs font-black">
+                    📘
                   </span>
-                </button>
-              ))}
+                  <h3 className="text-xs sm:text-sm font-black text-gray-900">
+                    أحدث الدروس المنشورة في كراس الدروس:
+                  </h3>
+                </div>
+                <Link
+                  href="/admin/board"
+                  className="text-xs font-black text-emerald-700 hover:text-emerald-800 transition flex items-center gap-1"
+                >
+                  <span>عرض الكل وتوثيق حصص جديدة</span>
+                  <span>←</span>
+                </Link>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {allLessons.slice(0, 3).map((lesson) => (
+                  <div
+                    key={lesson.id}
+                    className="p-3 rounded-2xl border border-slate-100 bg-[#fafaf7] hover:bg-white hover:border-emerald-200 transition shadow-2xs flex flex-col justify-between gap-2"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between text-[10px] font-bold text-gray-500 mb-1">
+                        <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-black">
+                          {lesson.level} متوسط
+                        </span>
+                        <span>{lesson.images?.length || 0} صور سبورة</span>
+                      </div>
+                      <div className="text-xs font-black text-gray-900 line-clamp-1">
+                        {lesson.title}
+                      </div>
+                      <div className="text-[10px] text-gray-500 line-clamp-1 mt-0.5">
+                        {lesson.field || lesson.section || "درس بيداغوجي"}
+                      </div>
+                    </div>
+
+                    <Link
+                      href="/admin/board"
+                      className="text-[11px] font-black text-emerald-700 hover:underline pt-1 flex items-center gap-1"
+                    >
+                      <span>تعديل في كراس الدروس</span>
+                      <span>←</span>
+                    </Link>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
-
-          {/* اختيار القسم (كراس الدروس، الأعمال الموجهة، سلاسل التمارين، الملخصات) */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-white p-1.5 rounded-2xl border border-slate-100 shadow-2xs">
-            <button
-              onClick={() => {
-                setNotebookTab("lessons");
-                setOpenId(null);
-              }}
-              className={`py-2 px-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
-                notebookTab === "lessons"
-                  ? "bg-emerald-700 text-white shadow-sm ring-1 ring-emerald-700"
-                  : "text-slate-600 hover:bg-slate-50"
-              }`}
-            >
-              <span>📘</span>
-              <span>كراس الدروس (192ص)</span>
-            </button>
-            <button
-              onClick={() => {
-                setNotebookTab("directed_work");
-                setOpenId(null);
-              }}
-              className={`py-2 px-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
-                notebookTab === "directed_work"
-                  ? "bg-sky-700 text-white shadow-sm ring-1 ring-sky-700"
-                  : "text-slate-600 hover:bg-slate-50"
-              }`}
-            >
-              <span>📗</span>
-              <span>الأعمال الموجهة (96ص)</span>
-            </button>
-            <button
-              onClick={() => {
-                setNotebookTab("worksheets");
-                setOpenId(null);
-              }}
-              className={`py-2 px-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
-                notebookTab === "worksheets"
-                  ? "bg-indigo-700 text-white shadow-sm ring-1 ring-indigo-700"
-                  : "text-slate-600 hover:bg-slate-50"
-              }`}
-            >
-              <span>📑</span>
-              <span>سلاسل التمارين</span>
-            </button>
-            <button
-              onClick={() => {
-                setNotebookTab("summaries");
-                setOpenId(null);
-              }}
-              className={`py-2 px-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
-                notebookTab === "summaries"
-                  ? "bg-amber-700 text-white shadow-sm ring-1 ring-amber-700"
-                  : "text-slate-600 hover:bg-slate-50"
-              }`}
-            >
-              <span>📌</span>
-              <span>الملخصات والمطويات</span>
-            </button>
+        </div>
+      ) : mainTab === "lessons" ? (
+        <div className="p-8 bg-white rounded-3xl border border-emerald-200 text-center space-y-4 shadow-sm max-w-xl mx-auto my-6">
+          <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center mx-auto text-2xl shadow-2xs">
+            📘
           </div>
-
-          <div className="space-y-4 lg:space-y-0 lg:grid lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-4 lg:items-start">
-          {/* نموذج إضافة مورد أو حصة أو سلسلة أو ملخص */}
-          <form onSubmit={addItem} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm space-y-3.5 lg:sticky lg:top-4">
-            <div className="flex items-center justify-between pb-1 border-b border-slate-100">
-              <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
-                <span>
-                  {notebookTab === "lessons"
-                    ? "➕ إضافة مورد جديد لـ"
-                    : notebookTab === "directed_work"
-                    ? "➕ إضافة حصة أعمال موجهة لـ"
-                    : notebookTab === "worksheets"
-                    ? "➕ إضافة سلسلة تمارين جديدة لـ"
-                    : "➕ إضافة ملخص / مطوية جديدة لـ"}
-                </span>
-                <span className="text-emerald-700 font-extrabold">{LEVELS[level].short}</span>
-              </span>
-              <button
-                type="button"
-                onClick={loadLessons}
-                className="text-[11px] text-slate-400 hover:text-emerald-600 flex items-center gap-1"
-                title="تحديث"
-              >
-                <RefreshCw className="w-3 h-3" /> تحديث
-              </button>
-            </div>
-
-            {notebookTab === "lessons" ? (
-              <div className="space-y-3">
-                {/* الميدان */}
-                <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">📐 الميدان:</label>
-                  <div className="flex gap-1.5 mb-1.5 overflow-x-auto no-scrollbar pb-0.5">
-                    {COMMON_FIELDS.map((f) => (
-                      <button
-                        key={f}
-                        type="button"
-                        onClick={() => setField(f)}
-                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition shrink-0 ${
-                          field === f
-                            ? "bg-emerald-50 text-emerald-800 border-emerald-300"
-                            : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
-                        }`}
-                      >
-                        {f}
-                      </button>
-                    ))}
-                  </div>
-                  <input
-                    className="input text-xs font-semibold"
-                    placeholder="مثال: أنشطة عددية"
-                    value={field}
-                    onChange={(e) => setField(e.target.value)}
-                    required
-                  />
-                </div>
-
-                {/* المقطع المعرفي */}
-                <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">📑 المقطع المعرفي:</label>
-                  {knownSections.length > 0 && (
-                    <div className="flex gap-1.5 mb-1.5 overflow-x-auto no-scrollbar pb-0.5">
-                      {knownSections.map((s) => (
-                        <button
-                          key={s}
-                          type="button"
-                          onClick={() => setSection(s)}
-                          className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition shrink-0 ${
-                            section === s
-                              ? "bg-emerald-50 text-emerald-800 border-emerald-300"
-                              : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
-                          }`}
-                        >
-                          {s}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  <input
-                    className="input text-xs font-semibold"
-                    placeholder="مثال: المقطع 1 : الأعداد الطبيعية والأعداد العشرية"
-                    value={section}
-                    onChange={(e) => setSection(e.target.value)}
-                    required
-                  />
-                </div>
-
-                {/* رقم المورد وعنوانه */}
-                <div className="grid grid-cols-4 gap-2">
-                  <div className="col-span-1">
-                    <label className="text-xs font-bold text-slate-600 block mb-1">رقم المورد:</label>
-                    <input
-                      className="input text-center text-sm font-extrabold text-emerald-700 bg-emerald-50/40 border-emerald-200"
-                      inputMode="numeric"
-                      placeholder={String(nextNumber)}
-                      value={number}
-                      onChange={(e) => setNumber(e.target.value)}
-                    />
-                  </div>
-                  <div className="col-span-3">
-                    <label className="text-xs font-bold text-slate-600 block mb-1">عنوان المورد المعرفي:</label>
-                    <input
-                      className="input text-xs font-semibold"
-                      placeholder="مثال: قراءة وكتابة عدد طبيعي"
-                      value={title}
-                      onChange={(e) => setTitle(e.target.value)}
-                      required
-                    />
-                  </div>
-                </div>
-
-                {/* ملاحظات وتوجيهات الأستاذ */}
-                <div>
-                  <label className="text-xs font-bold text-slate-600 block mb-1 flex items-center gap-1">
-                    <StickyNote className="w-3.5 h-3.5 text-amber-600" />
-                    <span>ملاحظات وتوجيهات الأستاذ لهذا الدرس (اختياري):</span>
-                  </label>
-                  <textarea
-                    className="input text-xs min-h-[50px] resize-y"
-                    placeholder="مثال: كراس منظم، التركيز على جدول المراتب..."
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                  />
-                </div>
-
-                {/* خانة الواجب المنزلي البارزة */}
-                <div className="bg-blue-50/70 p-3 rounded-xl border border-blue-200/80 space-y-1.5">
-                  <label className="text-xs font-black text-blue-900 block flex items-center gap-1.5">
-                    <FileText className="w-4 h-4 text-blue-600" />
-                    <span>📝 نص وتفاصيل الواجب المنزلي (تحديد التمارين والصفحات بكراس المحاولات):</span>
-                  </label>
-                  <textarea
-                    className="input text-xs min-h-[55px] resize-y bg-white border-blue-200 font-medium"
-                    placeholder="مثال: حل التمرين 12 و 13 صفحة 20 من الكتاب المدرسي على كراس المحاولات..."
-                    value={lessonHomeworkNotes}
-                    onChange={(e) => setLessonHomeworkNotes(e.target.value)}
-                  />
-                  <p className="text-[10px] text-blue-700 font-semibold">
-                    💡 ملاحظة: بعد إضافة المورد ستتمكن فوراً من رفع صور الحل النموذجي له بنقرة واحدة!
-                  </p>
-                </div>
-              </div>
-            ) : notebookTab === "directed_work" ? (
-              /* حقول كراس الأعمال الموجهة */
-              <div className="space-y-3">
-                <div className="grid grid-cols-4 gap-2">
-                  <div className="col-span-1">
-                    <label className="text-xs font-bold text-slate-600 block mb-1">رقم الحصة:</label>
-                    <input
-                      className="input text-center text-sm font-extrabold text-sky-700 bg-sky-50/40 border-sky-200"
-                      inputMode="numeric"
-                      placeholder={String(nextNumber)}
-                      value={number}
-                      onChange={(e) => setNumber(e.target.value)}
-                    />
-                  </div>
-                  <div className="col-span-3">
-                    <label className="text-xs font-bold text-slate-600 block mb-1">عنوان الحصة / التطبيق:</label>
-                    <input
-                      className="input text-xs font-semibold"
-                      placeholder="مثال: حل وضعيات تطبيقية حول الأعداد العشرية"
-                      value={title}
-                      onChange={(e) => setTitle(e.target.value)}
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-slate-600 block mb-1 flex items-center gap-1">
-                    <StickyNote className="w-3.5 h-3.5 text-amber-600" />
-                    <span>ملاحظات وتوجيهات الأستاذ للتلاميذ (اختياري):</span>
-                  </label>
-                  <textarea
-                    className="input text-xs min-h-[60px] resize-y"
-                    placeholder="مثال: إحضار كراس الأعمال الموجهة 96 صفحة، العمل الفردي أولاً..."
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                  />
-                </div>
-              </div>
-            ) : notebookTab === "worksheets" ? (
-              /* حقول سلاسل التمارين */
-              <div className="space-y-3">
-                <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">📑 المقطع المعرفي التابع له:</label>
-                  <input
-                    className="input text-xs font-semibold"
-                    placeholder="مثال: المقطع 1 : الأعداد الطبيعية والأعداد العشرية"
-                    value={section}
-                    onChange={(e) => setSection(e.target.value)}
-                  />
-                </div>
-
-                <div className="grid grid-cols-4 gap-2">
-                  <div className="col-span-1">
-                    <label className="text-xs font-bold text-slate-600 block mb-1">رقم السلسلة:</label>
-                    <input
-                      className="input text-center text-sm font-extrabold text-indigo-700 bg-indigo-50/40 border-indigo-200"
-                      inputMode="numeric"
-                      placeholder={String(nextNumber)}
-                      value={number}
-                      onChange={(e) => setNumber(e.target.value)}
-                    />
-                  </div>
-                  <div className="col-span-3">
-                    <label className="text-xs font-bold text-slate-600 block mb-1">عنوان سلسلة التمارين:</label>
-                    <input
-                      className="input text-xs font-semibold"
-                      placeholder="مثال: سلسلة تمارين شاملة للمقطع 1 مع وضعيات إدماجية"
-                      value={title}
-                      onChange={(e) => setTitle(e.target.value)}
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-slate-600 block mb-1 flex items-center gap-1">
-                    <StickyNote className="w-3.5 h-3.5 text-amber-600" />
-                    <span>ملاحظات وتوجيهات حل السلسلة (اختياري):</span>
-                  </label>
-                  <textarea
-                    className="input text-xs min-h-[60px] resize-y"
-                    placeholder="مثال: واجب منزلي ورقي يتم استلامه يوم الأحد المقبل..."
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                  />
-                </div>
-              </div>
-            ) : (
-              /* حقول الملخصات والمطويات */
-              <div className="space-y-3">
-                <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">📑 المقطع أو المجال:</label>
-                  <input
-                    className="input text-xs font-semibold"
-                    placeholder="مثال: المقطع 1 : الأعداد الطبيعية والأعداد العشرية"
-                    value={section}
-                    onChange={(e) => setSection(e.target.value)}
-                  />
-                </div>
-
-                <div className="grid grid-cols-4 gap-2">
-                  <div className="col-span-1">
-                    <label className="text-xs font-bold text-slate-600 block mb-1">رقم الملخص:</label>
-                    <input
-                      className="input text-center text-sm font-extrabold text-amber-700 bg-amber-50/40 border-amber-200"
-                      inputMode="numeric"
-                      placeholder={String(nextNumber)}
-                      value={number}
-                      onChange={(e) => setNumber(e.target.value)}
-                    />
-                  </div>
-                  <div className="col-span-3">
-                    <label className="text-xs font-bold text-slate-600 block mb-1">عنوان الملخص أو المطوية:</label>
-                    <input
-                      className="input text-xs font-semibold"
-                      placeholder="مثال: مطوية مراجعة وقوانين العمليات الحسابية والكسور"
-                      value={title}
-                      onChange={(e) => setTitle(e.target.value)}
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-slate-600 block mb-1 flex items-center gap-1">
-                    <StickyNote className="w-3.5 h-3.5 text-amber-600" />
-                    <span>ملاحظات وتوجيهات المراجعة (اختياري):</span>
-                  </label>
-                  <textarea
-                    className="input text-xs min-h-[60px] resize-y"
-                    placeholder="مثال: ملخص سريع ومكثف لمراجعة اختبار الفصل الأول..."
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                  />
-                </div>
-              </div>
-            )}
-
-            <button disabled={isSubmitting} className="btn-primary w-full py-3 text-sm">
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>جاري الحفظ...</span>
-                </>
-              ) : (
-                <>
-                  <Plus className="w-4 h-4" />
-                  <span>
-                    {notebookTab === "lessons"
-                      ? "إضافة المورد والبدء برفع الصور"
-                      : notebookTab === "directed_work"
-                      ? "إضافة حصة الأعمال الموجهة والبدء برفع الصور"
-                      : notebookTab === "worksheets"
-                      ? "إضافة سلسلة التمارين والبدء برفع الصور"
-                      : "إضافة الملخص / المطوية والبدء برفع الصور"}
-                  </span>
-                </>
-              )}
-            </button>
-          </form>
-
-          {/* قائمة الدروس والأعمال الموجهة */}
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-bold text-slate-600 px-1">
-              <span className="font-extrabold text-slate-800">
-                {notebookTab === "lessons"
-                  ? `محتويات كراس الدروس (${currentItems.length} موارد):`
-                  : notebookTab === "directed_work"
-                  ? `حصص الأعمال الموجهة (${currentItems.length} حصص):`
-                  : notebookTab === "worksheets"
-                  ? `سلاسل التمارين والواجبات (${currentItems.length} سلاسل):`
-                  : `الملخصات والمطويات (${currentItems.length} ملخصات):`}
-              </span>
-              <div className="flex items-center gap-2">
-                {notebookTab === "lessons" && (
-                  <button
-                    type="button"
-                    onClick={() => setFilterMissingHw(!filterMissingHw)}
-                    className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition flex items-center gap-1 border ${
-                      filterMissingHw
-                        ? "bg-amber-100 text-amber-900 border-amber-300 shadow-2xs font-black"
-                        : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
-                    }`}
-                  >
-                    <span>{filterMissingHw ? "⚠️ تصفية: ينقصها حل الواجب (مفعل)" : "🔍 تصفية: ينقصها حل الواجب"}</span>
-                  </button>
-                )}
-                <span className="text-[11px] text-slate-400 font-normal">{LEVELS[level].short}</span>
-              </div>
-            </div>
-
-            {loading ? (
-              <div className="text-center py-10 text-slate-400 text-xs bg-white rounded-2xl border border-slate-100">
-                <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2 text-emerald-600" />
-                جاري جلب القائمة...
-              </div>
-            ) : currentItems.length === 0 ? (
-              <div className="text-center text-xs text-slate-400 py-10 bg-white rounded-2xl border border-dashed border-slate-200 px-4">
-                لا توجد عناصر مضافة بعد في هذا الكراس. أضف عنصراً جديداً أعلاه!
-              </div>
-            ) : notebookTab === "lessons" ? (
-              <div className="space-y-4">
-                {groupedLessons.map((grp) => (
-                  <div key={grp.field} className="space-y-2.5">
-                    <div className="bg-emerald-800 text-white px-3 py-1.5 rounded-xl text-xs font-extrabold flex items-center gap-1.5">
-                      <span>📐 الميدان:</span>
-                      <span>{grp.field}</span>
-                    </div>
-
-                    {grp.sections.map((sec) => (
-                      <div key={sec.section} className="space-y-2 pr-2 border-r-2 border-emerald-200">
-                        <div className="text-xs font-extrabold text-slate-700 flex items-center gap-1.5 pt-1">
-                          <span>📑</span>
-                          <span>{sec.section}</span>
-                        </div>
-
-                        <div className="space-y-2">
-                          {sec.items.map((item) => (
-                            <LessonCard
-                              key={item.id}
-                              lesson={item}
-                              open={openId === item.id}
-                              onToggle={() => setOpenId(openId === item.id ? null : item.id)}
-                              onLessonUpdated={(updated) => {
-                                setAllLessons((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
-                              }}
-                              onEdit={() => setEditingLesson(item)}
-                              onDelete={() => setDeletingLesson(item)}
-                              showToast={showToast}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="space-y-2.5">
-                {currentItems.map((item) => (
-                  <LessonCard
-                    key={item.id}
-                    lesson={item}
-                    open={openId === item.id}
-                    onToggle={() => setOpenId(openId === item.id ? null : item.id)}
-                    onLessonUpdated={(updated) => {
-                      setAllLessons((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
-                    }}
-                    onEdit={() => setEditingLesson(item)}
-                    onDelete={() => setDeletingLesson(item)}
-                    showToast={showToast}
-                  />
-                ))}
-              </div>
-            )}
+          <div className="space-y-1">
+            <h3 className="text-base font-black text-gray-900">
+              تم تخصيص صفحة مستقلة لكراس الدروس والسبورة الرقمية
+            </h3>
+            <p className="text-xs text-gray-500 max-w-md mx-auto leading-relaxed">
+              لتسهيل العمل ومنع التشتيت، تم فصل الدروس في صفحة كراس الدروس والسبورة، حيث يمكنك استيراد عناوين الدروس تلقائياً من الدفتر اليومي دون كتابة، ورفع الصور وترتيبها بدقة.
+            </p>
           </div>
+          <div className="pt-2 flex items-center justify-center gap-2">
+            <Link
+              href="/admin/board"
+              className="px-6 py-3 rounded-2xl bg-[#107a57] hover:bg-[#0c5c41] text-white text-xs font-black shadow-md transition active:scale-95 flex items-center gap-2"
+            >
+              <Camera className="w-4 h-4" />
+              <span>الانتقال لصفحة كراس الدروس والسبورة 📷 ←</span>
+            </Link>
           </div>
         </div>
       ) : mainTab === "summons" ? (

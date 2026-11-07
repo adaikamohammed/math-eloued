@@ -30,6 +30,11 @@ import {
   ChevronUp,
   Image as ImageIcon,
   Share2,
+  ArrowUp,
+  ArrowDown,
+  Layers,
+  CalendarDays,
+  FileText,
 } from "lucide-react";
 import { LoginRequired } from "@/components/LoginRequired";
 import { PageExplainer } from "@/components/PageExplainer";
@@ -47,6 +52,7 @@ import {
   LessonsData,
   CustomNotebook,
   BoardNomenclature,
+  DailyDiaryEntry,
 } from "@/lib/types";
 import { compressIfImage, validateUpload } from "@/lib/compress";
 
@@ -120,6 +126,16 @@ export default function AdminBoardPage() {
   const [formHomeworkNotes, setFormHomeworkNotes] = useState("");
   const [formHomeworkDueAt, setFormHomeworkDueAt] = useState("");
 
+  // حصص الدفتر اليومي للاستيراد السريع دون كتابة
+  const [diaryEntries, setDiaryEntries] = useState<DailyDiaryEntry[]>([]);
+  const [entrySource, setEntrySource] = useState<"diary" | "manual">("diary");
+  const [selectedDiaryId, setSelectedDiaryId] = useState<string | null>(null);
+  const [diaryDateFilter, setDiaryDateFilter] = useState<string>(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  });
+  const [selectedDiaryClass, setSelectedDiaryClass] = useState<string>("all");
+
   // إدارة الصور مع معاينة فورية فائقة السرعة
   const [preparedFiles, setPreparedFiles] = useState<PreparedFile[]>([]);
   const [compressing, setCompressing] = useState(false);
@@ -190,6 +206,9 @@ export default function AdminBoardPage() {
       if (!res.ok) throw new Error("تعذر جلب الدروس");
       const data: LessonsData = await res.json();
       setLessons(data.lessons || []);
+      if (Array.isArray(data.diaryEntries)) {
+        setDiaryEntries(data.diaryEntries);
+      }
 
       const session = getPersistedTeacherSession();
       if (session?.id) {
@@ -216,6 +235,7 @@ export default function AdminBoardPage() {
         const offline = getTeacherOfflineData(session.id);
         if (offline) {
           setLessons(offline.lessons || []);
+          if (Array.isArray(offline.diaryEntries)) setDiaryEntries(offline.diaryEntries);
           if (Array.isArray(offline.customNotebooks)) setNotebooks(offline.customNotebooks);
           if (offline.boardNomenclature) {
             setNomenclature(offline.boardNomenclature);
@@ -391,6 +411,60 @@ export default function AdminBoardPage() {
       return prev.filter((_, i) => i !== idx);
     });
   };
+
+  // تقديم أو تأخير ترتيب الصور لتكون منظمة بدقة على السبورة
+  const movePreparedFile = (fromIndex: number, toIndex: number) => {
+    if (toIndex < 0 || toIndex >= preparedFiles.length) return;
+    setPreparedFiles((prev) => {
+      const copy = [...prev];
+      const [item] = copy.splice(fromIndex, 1);
+      copy.splice(toIndex, 0, item);
+      return copy;
+    });
+  };
+
+  // اختيار حصة مباشرة من الدفتر اليومي لملء العنوان والمورد تلقائياً
+  const selectDiaryEntry = (entry: DailyDiaryEntry) => {
+    setSelectedDiaryId(entry.id);
+    const matchLvl = entry.className?.match(/([1-4])/);
+    const lvl = matchLvl ? Number(matchLvl[1]) : formLevel;
+    if ([1, 2, 3, 4].includes(lvl)) {
+      setFormLevel(lvl);
+    }
+    setFormField(entry.field || "");
+    if (entry.section) {
+      const sMatch = entry.section.match(/(?:المقطع|الوحدة|المركبة|المحور)\s*(\d+)\s*[:\-–]?\s*(.*)/i);
+      if (sMatch) {
+        setFormSectionNumber(sMatch[1]);
+        setFormSectionTitle(sMatch[2] || entry.section);
+      } else {
+        setFormSectionTitle(entry.section);
+      }
+    } else {
+      setFormSectionTitle("");
+    }
+    setFormTitle(entry.lessonTitle || "");
+    if (entry.homework) {
+      setFormHomeworkNotes(entry.homework);
+    }
+    showToast("ok", `⚡ تم استيراد الحصة من الدفتر: [${entry.className}] "${entry.lessonTitle}" - التقط صور السبورة الآن!`);
+  };
+
+  const diaryClasses = useMemo(() => {
+    const s = new Set<string>();
+    diaryEntries.forEach((e) => {
+      if (e.className) s.add(e.className.trim());
+    });
+    return Array.from(s).sort();
+  }, [diaryEntries]);
+
+  const filteredDiaryEntries = useMemo(() => {
+    return diaryEntries.filter((e) => {
+      if (diaryDateFilter !== "all" && e.date !== diaryDateFilter) return false;
+      if (selectedDiaryClass !== "all" && e.className !== selectedDiaryClass) return false;
+      return true;
+    });
+  }, [diaryEntries, diaryDateFilter, selectedDiaryClass]);
 
   // أزرار سريعة لموعد تسليم الواجب بنقرة واحدة
   const setQuickDueDate = (daysAhead: number) => {
@@ -889,6 +963,223 @@ export default function AdminBoardPage() {
 
           {/* نموذج إدخال الدرس */}
           <form onSubmit={handleSaveLesson} className="p-3.5 sm:p-6 space-y-5">
+            {/* ── خيار نمط التوثيق: اعتماد على الدفتر اليومي (سريع وتلقائي دون كتابة) أو كتابة يدوية ── */}
+            <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 p-3 sm:p-4 rounded-2xl border border-emerald-200/90 space-y-3 shadow-2xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div className="flex items-center gap-2">
+                  <span className="w-8 h-8 rounded-xl bg-[#107a57] text-white flex items-center justify-center text-sm shadow-2xs">
+                    ⚡
+                  </span>
+                  <div>
+                    <h3 className="text-xs sm:text-sm font-black text-emerald-950">
+                      طريقة تحضير وتوثيق الدرس:
+                    </h3>
+                    <p className="text-[11px] text-emerald-800 font-medium">
+                      اختر الاعتماد على الدفتر اليومي لرفع صور السبورة مباشرة دون إعادة كتابة عنوان المورد.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center bg-white p-1 rounded-xl border border-emerald-300 shadow-2xs w-full sm:w-auto">
+                  <button
+                    type="button"
+                    onClick={() => setEntrySource("diary")}
+                    className={`flex-1 sm:flex-none px-3.5 py-1.5 rounded-lg text-xs font-black transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                      entrySource === "diary"
+                        ? "bg-[#107a57] text-white shadow-2xs"
+                        : "text-gray-600 hover:bg-gray-100"
+                    }`}
+                  >
+                    <span>⚡ اعتماد على الدفتر اليومي</span>
+                    <span className="text-[10px] bg-white/20 px-1.5 py-0.2 rounded font-normal">تلقائي</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEntrySource("manual");
+                      setSelectedDiaryId(null);
+                    }}
+                    className={`flex-1 sm:flex-none px-3.5 py-1.5 rounded-lg text-xs font-black transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                      entrySource === "manual"
+                        ? "bg-[#107a57] text-white shadow-2xs"
+                        : "text-gray-600 hover:bg-gray-100"
+                    }`}
+                  >
+                    <span>✍️ كتابة يدوية مخصصة</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* في حالة اختيار الاعتماد على الدفتر اليومي */}
+              {entrySource === "diary" && (
+                <div className="pt-2 border-t border-emerald-200/70 space-y-2.5">
+                  {/* شريط الفلاتر السريعة لتاريخ وفوج الدفتر */}
+                  <div className="flex items-center justify-between flex-wrap gap-2 text-xs">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[11px] font-bold text-emerald-950 flex items-center gap-1">
+                        <CalendarDays className="w-3.5 h-3.5 text-emerald-700" />
+                        تاريخ الحصة:
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const now = new Date();
+                          setDiaryDateFilter(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`);
+                        }}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-black transition cursor-pointer border ${
+                          diaryDateFilter === `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(new Date().getDate()).padStart(2, "0")}`
+                            ? "bg-emerald-700 text-white border-emerald-700"
+                            : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+                        }`}
+                      >
+                        اليوم
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const d = new Date();
+                          d.setDate(d.getDate() - 1);
+                          setDiaryDateFilter(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`);
+                        }}
+                        className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 transition cursor-pointer"
+                      >
+                        أمس
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDiaryDateFilter("all")}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-black transition cursor-pointer border ${
+                          diaryDateFilter === "all"
+                            ? "bg-emerald-700 text-white border-emerald-700"
+                            : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+                        }`}
+                      >
+                        كل التواريخ
+                      </button>
+                    </div>
+
+                    {diaryClasses.length > 0 && (
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[11px] font-bold text-emerald-950">الفوج:</span>
+                        <select
+                          value={selectedDiaryClass}
+                          onChange={(e) => setSelectedDiaryClass(e.target.value)}
+                          className="py-1 px-2.5 rounded-lg border border-emerald-300 bg-white text-xs font-bold text-gray-800 focus:outline-none"
+                        >
+                          <option value="all">كل الأفواج ({diaryClasses.length})</option>
+                          {diaryClasses.map((cls) => (
+                            <option key={cls} value={cls}>
+                              فوج {cls}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* الحصة المختارة حالياً إن وُجدت */}
+                  {selectedDiaryId && formTitle && (
+                    <div className="p-3 bg-white rounded-xl border-2 border-emerald-500 shadow-sm flex items-center justify-between gap-3 animate-in fade-in duration-150">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center text-xs shrink-0 font-black">
+                          ✓
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-xs font-black text-gray-900 truncate flex items-center gap-2">
+                            <span>{formTitle}</span>
+                            <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-md">
+                              {formLevel} متوسط
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-gray-500 flex items-center gap-2 flex-wrap">
+                            {formField && <span>الميدان: {formField}</span>}
+                            {formSectionTitle && <span>• المقطع: {formSectionTitle}</span>}
+                            {formHomeworkNotes && <span>• الواجب: {formHomeworkNotes}</span>}
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setSelectedDiaryId(null)}
+                        className="px-2.5 py-1 text-[11px] font-black text-emerald-800 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 rounded-lg border border-emerald-300 transition shrink-0 cursor-pointer"
+                      >
+                        اختيار حصة أخرى ↺
+                      </button>
+                    </div>
+                  )}
+
+                  {/* قائمة بطاقات الحصص المتاحة في الدفتر اليومي */}
+                  {(!selectedDiaryId || !formTitle) && (
+                    <div>
+                      {filteredDiaryEntries.length === 0 ? (
+                        <div className="p-4 bg-white/80 rounded-xl border border-dashed border-emerald-300 text-center space-y-2">
+                          <p className="text-xs font-bold text-gray-600">
+                            لا توجد حصص مسجلة في الدفتر اليومي لهذا التاريخ ({diaryDateFilter === "all" ? "العام" : diaryDateFilter}).
+                          </p>
+                          <div className="flex items-center justify-center gap-2 flex-wrap pt-1">
+                            <button
+                              type="button"
+                              onClick={() => setDiaryDateFilter("all")}
+                              className="px-3 py-1.5 rounded-xl bg-white border border-emerald-300 text-emerald-800 text-xs font-black hover:bg-emerald-50 transition cursor-pointer"
+                            >
+                              عرض كل حصص الدفتر السابقة
+                            </button>
+                            <Link
+                              href="/admin/diary"
+                              className="px-3 py-1.5 rounded-xl bg-[#107a57] text-white text-xs font-black hover:bg-[#0c5c41] transition"
+                            >
+                              الانتقال للدفتر اليومي للتحضير ↗
+                            </Link>
+                            <button
+                              type="button"
+                              onClick={() => setEntrySource("manual")}
+                              className="px-3 py-1.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold transition cursor-pointer"
+                            >
+                              أو كتابة يدوية هنا ✍️
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-1.5">
+                          <span className="text-[11px] font-black text-emerald-950 block">
+                            انقر على أي حصة لاستيراد عنوان المورد والبيانات فوراً:
+                          </span>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
+                            {filteredDiaryEntries.map((entry) => (
+                              <button
+                                key={entry.id}
+                                type="button"
+                                onClick={() => selectDiaryEntry(entry)}
+                                className="p-2.5 bg-white hover:bg-emerald-50/70 border border-emerald-200 hover:border-emerald-500 rounded-xl text-right transition cursor-pointer flex items-start gap-2.5 group active:scale-98 shadow-2xs"
+                              >
+                                <span className="px-2 py-1 rounded-lg bg-emerald-100 text-emerald-900 font-mono font-black text-xs shrink-0 group-hover:bg-emerald-700 group-hover:text-white transition">
+                                  {entry.className}
+                                </span>
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-xs font-black text-gray-900 truncate group-hover:text-[#107a57] transition">
+                                    {entry.lessonTitle}
+                                  </div>
+                                  <div className="text-[10px] text-gray-500 flex items-center gap-1.5 flex-wrap mt-0.5">
+                                    {entry.field && <span>{entry.field}</span>}
+                                    {entry.periodTime && <span>• {entry.periodTime}</span>}
+                                    {entry.date && <span>• {entry.date}</span>}
+                                  </div>
+                                </div>
+                                <span className="text-[10px] font-black text-emerald-700 shrink-0 mt-1 opacity-80 group-hover:opacity-100">
+                                  اختيار ⚡
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* ── الخطوة 1: المستوى الدراسي ── */}
             <div className="space-y-1.5">
               <label className="text-xs font-black text-gray-900 flex items-center justify-between">
@@ -1172,46 +1463,80 @@ export default function AdminBoardPage() {
                 </div>
               )}
 
-              {/* المعاينة المصغرة للصور مع الحجم وزر الحذف */}
+              {/* المعاينة المصغرة للصور مع الحجم وترتيب الصور (مرتبة بدقة) */}
               {preparedFiles.length > 0 && (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
-                  {preparedFiles.map((item, idx) => (
-                    <div
-                      key={idx}
-                      className="relative rounded-2xl overflow-hidden border border-emerald-300 bg-white shadow-2xs p-1 flex flex-col gap-1 group"
-                    >
+                <div className="space-y-1.5 pt-1">
+                  <div className="flex items-center justify-between text-[11px] font-bold text-gray-600 px-1">
+                    <span>صور السبورة المحددة ({preparedFiles.length}) - يمكنك إعادة الترتيب بالأسهم:</span>
+                    <span className="text-emerald-700 font-mono">
+                      إجمالي: {Math.round(preparedFiles.reduce((acc, f) => acc + f.sizeKb, 0))} KB
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+                    {preparedFiles.map((item, idx) => (
                       <div
-                        className="relative aspect-4/3 rounded-xl overflow-hidden bg-gray-100 cursor-pointer"
-                        onClick={() => setLightboxImg(item.previewUrl)}
+                        key={idx}
+                        className="relative rounded-2xl overflow-hidden border-2 border-emerald-300 bg-white shadow-2xs p-1.5 flex flex-col gap-1.5 group"
                       >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={item.previewUrl}
-                          alt={`معاينة ${idx + 1}`}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                        />
-                        <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
-                          <Maximize2 className="w-4 h-4" />
+                        <div
+                          className="relative aspect-4/3 rounded-xl overflow-hidden bg-gray-100 cursor-pointer"
+                          onClick={() => setLightboxImg(item.previewUrl)}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={item.previewUrl}
+                            alt={`معاينة ${idx + 1}`}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          />
+                          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
+                            <Maximize2 className="w-4 h-4" />
+                          </div>
+
+                          {/* وسام ترتيب الصورة الرقمي */}
+                          <span className="absolute top-1.5 right-1.5 px-2 py-0.5 rounded-lg bg-black/70 text-white font-mono font-black text-[11px] shadow-sm">
+                            صورة #{idx + 1}
+                          </span>
                         </div>
-                      </div>
 
-                      <div className="flex items-center justify-between px-1 text-[10px]">
-                        <span className="text-emerald-800 font-bold font-mono">
-                          {item.sizeKb} KB
-                        </span>
-                        <span className="text-gray-400">صورة #{idx + 1}</span>
-                      </div>
+                        <div className="flex items-center justify-between px-1 text-[10px]">
+                          <span className="text-emerald-800 font-bold font-mono">
+                            {item.sizeKb} KB
+                          </span>
+                          
+                          {/* أزرار تقديم وتأخير الترتيب */}
+                          <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5">
+                            <button
+                              type="button"
+                              disabled={idx === 0}
+                              onClick={() => movePreparedFile(idx, idx - 1)}
+                              className="p-1 rounded text-gray-700 hover:text-emerald-700 hover:bg-white disabled:opacity-20 cursor-pointer transition"
+                              title="تقديم الترتيب"
+                            >
+                              <ArrowUp className="w-3 h-3" />
+                            </button>
+                            <button
+                              type="button"
+                              disabled={idx === preparedFiles.length - 1}
+                              onClick={() => movePreparedFile(idx, idx + 1)}
+                              className="p-1 rounded text-gray-700 hover:text-emerald-700 hover:bg-white disabled:opacity-20 cursor-pointer transition"
+                              title="تأخير الترتيب"
+                            >
+                              <ArrowDown className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
 
-                      <button
-                        type="button"
-                        onClick={() => removePreparedFile(idx)}
-                        className="absolute top-1.5 left-1.5 w-5 h-5 rounded-full bg-red-600/90 hover:bg-red-700 text-white flex items-center justify-center text-xs shadow-sm cursor-pointer"
-                        title="حذف هذه الصورة"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
+                        <button
+                          type="button"
+                          onClick={() => removePreparedFile(idx)}
+                          className="absolute top-1.5 left-1.5 w-6 h-6 rounded-full bg-red-600/90 hover:bg-red-700 text-white flex items-center justify-center text-xs shadow-sm cursor-pointer transition active:scale-90"
+                          title="حذف هذه الصورة"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>

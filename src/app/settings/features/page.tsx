@@ -29,6 +29,7 @@ import {
   Info,
   GraduationCap,
   BookMarked,
+  Building2,
 } from "lucide-react";
 import { LoginRequired } from "@/components/LoginRequired";
 import {
@@ -133,7 +134,7 @@ const FEATURE_DEFINITIONS: FeatureCardDef[] = [
     parentsDescription: "قناة تواصل راقية ومباشرة مع الأستاذ دون إحراج أو إزعاج هاتفي.",
   },
 
-  // فضاء التفتيش والملتقى
+  // فضاء التفتيش والملتقى والإدارة
   {
     key: "forum",
     label: "ملتقى الأساتذة البيداغوجي",
@@ -148,6 +149,15 @@ const FEATURE_DEFINITIONS: FeatureCardDef[] = [
     label: "فضاء التفتيش والمناشير الرسمية",
     description: "استقبال مناشير المفتشية، الندوات التكوينية، إيداع المذكرات، وسجل التوصيات.",
     icon: ShieldCheck,
+    group: "inspection",
+    forParentsToo: false,
+    badge: "معطل افتراضياً لمنع التشتيت",
+  },
+  {
+    key: "principalSync",
+    label: "فضاء إدارة المؤسسة (المدير والمراقب)",
+    description: "متابعة التأشيرات الإدارية، رزنامة الامتحانات وساعات الاستقبال مع إدارة المؤسسة.",
+    icon: Building2,
     group: "inspection",
     forParentsToo: false,
     badge: "معطل افتراضياً لمنع التشتيت",

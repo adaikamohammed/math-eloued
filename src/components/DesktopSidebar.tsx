@@ -37,7 +37,7 @@ import { useLayout } from "@/context/LayoutContext";
 import { supabase } from "@/lib/supabase";
 import { clearInspectionCache } from "@/app/inspector/shared";
 import { clearAllTeacherBrowserCaches, logoutTeacher } from "@/lib/offlineAuth";
-import { TeacherFeatureFlags } from "@/lib/types";
+import { TeacherFeatureFlags, DEFAULT_FEATURE_FLAGS } from "@/lib/types";
 
 interface NavItem {
   label: string;
@@ -113,7 +113,20 @@ export function DesktopSidebar() {
 
     // ─── 0. إذا كان المستخدم المشرف العام ومدير المنصة ───
     if (activeUser && activeUser.role === "admin") {
-      return [
+      const flags: TeacherFeatureFlags = { ...DEFAULT_FEATURE_FLAGS, ...(featureFlags || {}) };
+
+      const inspectionItems: NavItem[] = [];
+      if (flags.inspectorSync === true) {
+        inspectionItems.push({ label: "فضاء التفتيش والمناشير", href: "/inspector", icon: ShieldCheck });
+      }
+      if (flags.principalSync === true) {
+        inspectionItems.push({ label: "فضاء إدارة المؤسسة", href: "/principal", icon: Building2 });
+      }
+      if (flags.forum === true) {
+        inspectionItems.push({ label: "الملتقى البيداغوجي", href: "/forum", icon: Sparkles });
+      }
+
+      const adminCategories: NavCategory[] = [
         {
           title: "الإدارة العامة للمنصة 🛡️",
           items: [
@@ -129,7 +142,7 @@ export function DesktopSidebar() {
         {
           title: "الميدان التربوي (فضاء الأستاذ)",
           items: [
-            { label: "لوحة تحكم الأستاذ والدروس", href: "/admin", icon: GraduationCap },
+            { label: "لوحة التحكم الرئيسية", href: "/admin", icon: GraduationCap },
             { label: "كراس الدروس والسبورة", href: "/admin/board", icon: BookOpen },
             { label: "إدارة الأفواج والتلاميذ", href: "/admin/students", icon: Users },
             { label: "التوقيت الأسبوعي", href: "/admin/timetable", icon: Calendar },
@@ -141,27 +154,29 @@ export function DesktopSidebar() {
             { label: "لوحة الشرف وتكريم النوابغ", href: "/honor", icon: Trophy },
           ],
         },
-        {
-          title: "الفضاءات الرسمية الميدانية",
-          items: [
-            { label: "فضاء التفتيش والمناشير", href: "/inspector", icon: ShieldCheck },
-            { label: "فضاء إدارة المؤسسة", href: "/principal", icon: Building2 },
-            { label: "الملتقى البيداغوجي", href: "/forum", icon: Sparkles },
-          ],
-        },
-        {
-          title: "إدارة الفضاء والتخصيص",
-          items: [
-            { label: "تخصيص الواجهة والصفحات", href: "/settings/features", icon: Sliders },
-            { label: "إعدادات الحساب وكلمة المرور", href: "/settings", icon: Settings },
-          ],
-        },
       ];
+
+      if (inspectionItems.length > 0) {
+        adminCategories.push({
+          title: "الفضاءات الرسمية الميدانية",
+          items: inspectionItems,
+        });
+      }
+
+      adminCategories.push({
+        title: "إدارة الفضاء والتخصيص",
+        items: [
+          { label: "تخصيص الواجهة والصفحات", href: "/settings/features", icon: Sliders },
+          { label: "إعدادات الحساب وكلمة المرور", href: "/settings", icon: Settings },
+        ],
+      });
+
+      return adminCategories;
     }
 
     // ─── 1. إذا كان المستخدم أستاذاً مسجلاً ───
     if (activeUser && activeUser.role === "teacher") {
-      const flags = featureFlags || {};
+      const flags: TeacherFeatureFlags = { ...DEFAULT_FEATURE_FLAGS, ...(featureFlags || {}) };
 
       const pedagogyItems: NavItem[] = [
         {
@@ -251,7 +266,7 @@ export function DesktopSidebar() {
 
       const inspectionItems: NavItem[] = [];
 
-      if (flags.forum !== false) {
+      if (flags.forum === true) {
         inspectionItems.push({
           label: "ملتقى الأساتذة البيداغوجي",
           href: "/forum",
@@ -259,11 +274,19 @@ export function DesktopSidebar() {
         });
       }
 
-      if (flags.inspectorSync !== false) {
+      if (flags.inspectorSync === true) {
         inspectionItems.push({
           label: "فضاء التفتيش والمناشير",
           href: "/inspector",
           icon: ShieldCheck,
+        });
+      }
+
+      if (flags.principalSync === true) {
+        inspectionItems.push({
+          label: "فضاء إدارة المؤسسة",
+          href: "/principal",
+          icon: Building2,
         });
       }
 

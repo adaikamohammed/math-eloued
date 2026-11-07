@@ -403,6 +403,7 @@ export type TeacherFeatureFlags = {
   messages?: boolean;              // صندوق الرسائل المجهولة
   penalties?: boolean;             // سجل الملاحظات والخصومات
   inspectorSync?: boolean;         // الربط مع المفتشية البيداغوجية
+  principalSync?: boolean;         // فضاء إدارة المؤسسة (المدير والمراقب)
   students?: boolean;              // إدارة الأفواج والتلاميذ
   timetable?: boolean;             // التوقيت الأسبوعي
   diary?: boolean;                 // الدفتر اليومي (ماذا سأدرس غداً)
@@ -416,7 +417,8 @@ export const DEFAULT_FEATURE_FLAGS: TeacherFeatureFlags = {
   continuousAssessment: true,
   honors: true,
   messages: true,
-  inspectorSync: false, // معطل افتراضياً لمنع تشتيت الأستاذ والولي، ويمكن تفعيله بلمسة واحدة من الإعدادات
+  inspectorSync: false, // معطل افتراضياً لمنع تشتيت الأستاذ والولي
+  principalSync: false, // معطل افتراضياً لمنع تشتيت الأستاذ والولي
   students: true,
   timetable: true,
   diary: true,

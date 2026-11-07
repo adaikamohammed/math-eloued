@@ -64,29 +64,29 @@ export function MobileBottomNav() {
     { label: "دخول الأستاذ", href: "/login", icon: GraduationCap },
   ];
 
-  if (user && user.role === "teacher") {
+  if (user && (user.role === "teacher" || user.role === "admin")) {
     const flags = featureFlags || {};
     const teacherNav: { label: string; href: string; icon: any }[] = [
       { label: "لوحتي", href: "/admin", icon: GraduationCap },
     ];
 
-    if (flags.students !== false) {
-      teacherNav.push({ label: "التلاميذ", href: "/admin/students", icon: Users });
-    }
     if (flags.boardLessons !== false) {
       teacherNav.push({ label: "السبورة", href: "/admin/board", icon: BookOpen });
-    }
-    if (flags.timetable !== false) {
-      teacherNav.push({ label: "التوقيت", href: "/admin/timetable", icon: Calendar });
     }
     if (flags.diary !== false) {
       teacherNav.push({ label: "الدفتر", href: "/admin/diary", icon: ClipboardList });
     }
+    if (flags.students !== false) {
+      teacherNav.push({ label: "التلاميذ", href: "/admin/students", icon: Users });
+    }
+    if (flags.timetable !== false && teacherNav.length < 5) {
+      teacherNav.push({ label: "التوقيت", href: "/admin/timetable", icon: Calendar });
+    }
+    if (flags.inspectorSync === true && teacherNav.length < 5) {
+      teacherNav.push({ label: "التفتيش", href: "/inspector", icon: ShieldCheck });
+    }
     if (flags.honors !== false && teacherNav.length < 5) {
       teacherNav.push({ label: "الشرف", href: "/honor", icon: Trophy });
-    }
-    if (flags.inspectorSync !== false && teacherNav.length < 5) {
-      teacherNav.push({ label: "التفتيش", href: "/inspector", icon: ShieldCheck });
     }
     if (teacherNav.length < 5) {
       teacherNav.push({ label: "التخصيص", href: "/settings/features", icon: Sliders });
