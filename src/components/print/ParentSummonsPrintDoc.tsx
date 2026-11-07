@@ -1,5 +1,6 @@
 import React from "react";
 import { ParentSummons } from "@/lib/types";
+import { getCurrentAcademicYear } from "@/lib/academicYear";
 
 interface Props {
   summons: ParentSummons;
@@ -36,7 +37,7 @@ export function ParentSummonsPrintDoc({
             <p className="text-[11px] text-gray-700">{schoolName}</p>
           </div>
           <div className="text-left text-[11px]">
-            <p>السنة الدراسية: 2026/2027</p>
+            <p>السنة الدراسية: {getCurrentAcademicYear()}</p>
             <p>التاريخ: {today}</p>
           </div>
         </div>

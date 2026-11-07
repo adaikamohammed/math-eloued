@@ -53,6 +53,7 @@ import {
   TeacherTimetable,
 } from "@/lib/types";
 import { getClassColors } from "@/app/admin/timetable/page";
+import { getCurrentAcademicYear } from "@/lib/academicYear";
 import {
   printCahierTextesReport,
   downloadCahierTextesPDF,
@@ -800,7 +801,7 @@ export default function CahierDeTextesPage() {
     if (periodFilterType === "custom") {
       return `الفترة من ${formatArabicFullDate(customStartDate)} إلى ${formatArabicFullDate(customEndDate)}`;
     }
-    return "كامل الموسم الدراسي 2026 / 2027";
+    return `كامل الموسم الدراسي ${getCurrentAcademicYear()}`;
   }, [periodFilterType, selectedMonth, currentWeekStart, currentWeekEnd, selectedSingleDate, customStartDate, customEndDate]);
 
   // تشغيل تنزيل الـ PDF الأفقي للفترة المحددة
@@ -1462,7 +1463,7 @@ export default function CahierDeTextesPage() {
 
             {periodFilterType === "all" && (
               <div className="text-xs text-gray-500 font-medium">
-                عرض كامل الحصص المسجلة لفوج ({activeClass}) طيلة الموسم الدراسي 2026 / 2027 م ({allActiveClassEntries.length} حصة).
+                عرض كامل الحصص المسجلة لفوج ({activeClass}) طيلة الموسم الدراسي {getCurrentAcademicYear()} ({allActiveClassEntries.length} حصة).
               </div>
             )}
 

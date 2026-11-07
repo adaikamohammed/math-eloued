@@ -1,4 +1,6 @@
 import { OfficialGradeRecord, StudentRosterItem, getLevelFromClassName, getOfficialSubjectCoefficient } from "./types";
+import { getCurrentAcademicYear } from "./academicYear";
+import { printHtmlInLandscapeIframe } from "./pdfReportGenerator";
 
 export interface GradebookPdfOptions {
   teacherName: string;
@@ -11,6 +13,9 @@ export interface GradebookPdfOptions {
   coefficient?: number;
   trimester: 1 | 2 | 3;
   academicYear?: string;
+  isBlankTemplate?: boolean;
+  docTitle?: string;
+  fileName?: string;
   students: StudentRosterItem[];
   records: Record<string, OfficialGradeRecord>;
   includeCriteriaBreakdown?: boolean;
@@ -50,15 +55,26 @@ export function generateGradebookHTML(options: GradebookPdfOptions): string {
   const levelLabel = getLevelLabel(cls);
   const trimesterNum = options.trimester || 1;
   const trimesterLabel = getTrimesterLabel(trimesterNum);
-  const academicYear = options.academicYear || "2026 / 2027";
+  const academicYear = options.academicYear || getCurrentAcademicYear();
   const levelNum = getLevelFromClassName(cls);
   const coef = options.coefficient ?? getOfficialSubjectCoefficient(subject, levelNum);
   const includeBreakdown = Boolean(options.includeCriteriaBreakdown);
+  const isBlank = Boolean(options.isBlankTemplate);
 
   // إعداد قائمة التلاميذ وسجلاتهم
-  const sortedStudents = [...options.students].sort((a, b) =>
+  let sortedStudents = [...options.students].sort((a, b) =>
     a.studentName.localeCompare(b.studentName, "ar")
   );
+
+  // إذا كان النموذج فارغاً دون تلاميذ، ننشئ 25 سطراً فارغاً للرصد اليدوي بالقلم
+  if (isBlank && sortedStudents.length === 0) {
+    sortedStudents = Array.from({ length: 25 }, (_, i) => ({
+      id: `blank_${i + 1}`,
+      studentName: `................................................`,
+      className: cls,
+      groupName: "فوج 1",
+    }));
+  }
 
   // حساب معدلات كل تلميذ
   interface ComputedRow {
@@ -66,14 +82,14 @@ export function generateGradebookHTML(options: GradebookPdfOptions): string {
     name: string;
     group: string;
     rec: OfficialGradeRecord;
-    continuous: number;
-    bScore: number;
-    nb1: number;
-    nb2: number;
-    hw1: number;
-    hw2: number;
-    q1: number;
-    q2: number;
+    continuous?: number;
+    bScore?: number;
+    nb1?: number;
+    nb2?: number;
+    hw1?: number;
+    hw2?: number;
+    q1?: number;
+    q2?: number;
     test1?: number;
     test2?: number;
     testAvg?: number;
@@ -85,26 +101,31 @@ export function generateGradebookHTML(options: GradebookPdfOptions): string {
   }
 
   const computedRows: ComputedRow[] = sortedStudents.map((st, idx) => {
-    const rec = options.records[st.studentName] || {
-      studentName: st.studentName,
-      className: cls,
-      trimester: trimesterNum,
-      continuousScore: 20,
-    };
+    if (isBlank) {
+      return {
+        index: idx + 1,
+        name: st.studentName,
+        group: st.groupName || "فوج 1",
+        rec: { studentName: st.studentName, className: cls, trimester: trimesterNum },
+        notes: "",
+      };
+    }
+
+    const rec = options.records[st.studentName];
 
     // عناصر التقويم المستمر
-    const bScore = rec.behaviorScore ?? 4;
-    const nb1 = rec.notebook1Score ?? 2;
-    const nb2 = rec.notebook2Score ?? 2;
-    const hw1 = rec.homework1Score ?? 2;
-    const hw2 = rec.homework2Score ?? 2;
-    const q1 = rec.quiz1Score ?? 4;
-    const q2 = rec.quiz2Score ?? 4;
-    const continuous = rec.continuousScore ?? (bScore + nb1 + nb2 + hw1 + hw2 + q1 + q2);
+    const bScore = rec?.behaviorScore;
+    const nb1 = rec?.notebook1Score;
+    const nb2 = rec?.notebook2Score;
+    const hw1 = rec?.homework1Score;
+    const hw2 = rec?.homework2Score;
+    const q1 = rec?.quiz1Score;
+    const q2 = rec?.quiz2Score;
+    const continuous = rec?.continuousScore;
 
     // الفرض
-    const test1 = rec.test1Score;
-    const test2 = rec.test2Score;
+    const test1 = rec?.test1Score;
+    const test2 = rec?.test2Score;
     let testAvg: number | undefined = undefined;
     if (test1 !== undefined && test2 !== undefined) {
       testAvg = (test1 + test2) / 2;
@@ -114,12 +135,12 @@ export function generateGradebookHTML(options: GradebookPdfOptions): string {
 
     // معدل المراقبة المستمرة = (التقويم + الفرض) ÷ 2
     let monitoringAvg: number | undefined = undefined;
-    if (testAvg !== undefined) {
+    if (continuous !== undefined && testAvg !== undefined) {
       monitoringAvg = (continuous + testAvg) / 2;
     }
 
     // الاختبار والمعدل الفصلي للمادة
-    const exam = rec.examScore;
+    const exam = rec?.examScore;
     let subjectAvg: number | undefined = undefined;
     let weightedTotal: number | undefined = undefined;
     if (monitoringAvg !== undefined && exam !== undefined) {
@@ -131,7 +152,7 @@ export function generateGradebookHTML(options: GradebookPdfOptions): string {
       index: idx + 1,
       name: st.studentName,
       group: st.groupName || "فوج 1",
-      rec,
+      rec: rec || { studentName: st.studentName, className: cls, trimester: trimesterNum },
       continuous,
       bScore,
       nb1,
@@ -147,7 +168,7 @@ export function generateGradebookHTML(options: GradebookPdfOptions): string {
       exam,
       subjectAvg,
       weightedTotal,
-      notes: rec.notes || "",
+      notes: rec?.notes || "",
     };
   });
 
@@ -184,7 +205,36 @@ export function generateGradebookHTML(options: GradebookPdfOptions): string {
       // صفوف الجدول
       const tableRowsHtml = pageRows
         .map((row) => {
-          const formattedContinuous = Number(row.continuous.toFixed(2));
+          if (isBlank) {
+            return `
+              <tr>
+                <td class="col-num">${row.index < 10 ? "0" + row.index : row.index}</td>
+                <td class="col-name">${row.name}</td>
+                ${
+                  includeBreakdown
+                    ? `
+                  <td class="col-metric cell-blank"><span class="manual-dot">...</span></td>
+                  <td class="col-metric cell-blank"><span class="manual-dot">..</span></td>
+                  <td class="col-metric cell-blank"><span class="manual-dot">..</span></td>
+                  <td class="col-metric cell-blank"><span class="manual-dot">..</span></td>
+                  <td class="col-metric cell-blank"><span class="manual-dot">..</span></td>
+                  <td class="col-metric cell-blank"><span class="manual-dot">...</span></td>
+                  <td class="col-metric cell-blank"><span class="manual-dot">...</span></td>
+                `
+                    : ""
+                }
+                <td class="col-score cell-blank"><span class="manual-dot">......</span></td>
+                <td class="col-score cell-blank"><span class="manual-dot">......</span></td>
+                <td class="col-score cell-blank"><span class="manual-dot">......</span></td>
+                <td class="col-score cell-blank"><span class="manual-dot">......</span></td>
+                <td class="col-score cell-blank"><span class="manual-dot">......</span></td>
+                <td class="col-notes cell-blank"></td>
+              </tr>
+            `;
+          }
+
+          const hasContinuous = row.rec && row.rec.continuousScore !== undefined;
+          const formattedContinuous = hasContinuous ? Number(row.continuous?.toFixed(2) ?? 0) : "-";
           const formattedTest = row.test1 !== undefined ? row.test1.toFixed(2) : "-";
           const formattedMonitoring =
             row.monitoringAvg !== undefined ? row.monitoringAvg.toFixed(2) : "-";
@@ -205,13 +255,13 @@ export function generateGradebookHTML(options: GradebookPdfOptions): string {
               ${
                 includeBreakdown
                   ? `
-                <td class="col-metric">${row.bScore}</td>
-                <td class="col-metric">${row.nb1}</td>
-                <td class="col-metric">${row.nb2}</td>
-                <td class="col-metric">${row.hw1}</td>
-                <td class="col-metric">${row.hw2}</td>
-                <td class="col-metric">${row.q1}</td>
-                <td class="col-metric">${row.q2}</td>
+                <td class="col-metric">${row.bScore !== undefined ? row.bScore : "-"}</td>
+                <td class="col-metric">${row.nb1 !== undefined ? row.nb1 : "-"}</td>
+                <td class="col-metric">${row.nb2 !== undefined ? row.nb2 : "-"}</td>
+                <td class="col-metric">${row.hw1 !== undefined ? row.hw1 : "-"}</td>
+                <td class="col-metric">${row.hw2 !== undefined ? row.hw2 : "-"}</td>
+                <td class="col-metric">${row.q1 !== undefined ? row.q1 : "-"}</td>
+                <td class="col-metric">${row.q2 !== undefined ? row.q2 : "-"}</td>
               `
                   : ""
               }
@@ -235,10 +285,10 @@ export function generateGradebookHTML(options: GradebookPdfOptions): string {
               وزارة التربية الوطنية • مديرية التربية لولاية ${wilaya} • ${school}
             </div>
             <div class="doc-main-title">
-              سجل التنقيط والمتابعة البيداغوجية المستمرة
+              ${isBlank ? "سجل التنقيط والمتابعة البيداغوجية المستمرة — استمارة فارغة للرصد اليدوي" : "سجل التنقيط والمتابعة البيداغوجية المستمرة"}
             </div>
             <div class="doc-subtitle">
-              ${levelLabel} — الفوج التربوي: <strong>${cls}</strong> — ${trimesterLabel} (الموسم: ${academicYear}م)
+              ${levelLabel} — الفوج التربوي: <strong>${cls}</strong> — ${trimesterLabel} (الموسم: ${academicYear})
             </div>
           </div>
 
@@ -307,7 +357,9 @@ export function generateGradebookHTML(options: GradebookPdfOptions): string {
               <span>• الطلبة: <strong>(${startNum} إلى ${endNum})</strong></span>
               <span>• صفحة <strong>${pageNum} من ${totalPages}</strong></span>
               ${
-                isLastPage && classAvg !== undefined
+                isBlank
+                  ? `<span>• <strong style="color: #475569;">نموذج ورقي فارغ للرصد اليدوي بالقلم ✍️</strong></span>`
+                  : isLastPage && classAvg !== undefined
                   ? `<span>• معدل الفوج العام: <strong class="badge-avg">${classAvg.toFixed(2)} / 20</strong></span>
                      <span>• نسبة الحاصلين على المعدل: <strong>${passRate}%</strong> (${passCount} / ${gradedRows.length})</span>`
                   : ""
@@ -542,6 +594,17 @@ export function generateGradebookHTML(options: GradebookPdfOptions): string {
       padding-right: 5px;
     }
 
+    .cell-blank {
+      background: #ffffff !important;
+      text-align: center;
+    }
+    .manual-dot {
+      color: #cbd5e1;
+      font-family: monospace;
+      font-size: 10px;
+      letter-spacing: 1.5px;
+    }
+
     /* ── التذييل والإمضاءات ── */
     .page-footer {
       margin-top: 4px;
@@ -615,44 +678,29 @@ export function generateGradebookHTML(options: GradebookPdfOptions): string {
 }
 
 /**
- * طباعة كراس التنقيط الرسمي أفقياً عبر نافذة iframe معزولة لضمان عدم تأثر المتصفح
+ * تنزيل أو حفظ كراس التنقيط كملف PDF أفقي عالي الدقة Vector
  */
-export function printGradebookReport(options: GradebookPdfOptions): void {
-  const htmlContent = generateGradebookHTML(options);
+export function downloadGradebookPDF(options: GradebookPdfOptions): void {
+  const teacherFamily = (options.teacherName || "الأستاذ").trim().split(" ")[0];
+  const trimesterLabel = options.trimester === 1 ? "الفصل_الأول" : options.trimester === 2 ? "الفصل_الثاني" : "الفصل_الثالث";
+  const calculatedDocTitle =
+    options.docTitle ||
+    options.fileName ||
+    (options.isBlankTemplate
+      ? `سجل_التنقيط_نموذج_فارغ_فوج_${options.className}_${trimesterLabel}_الأستاذ_${teacherFamily}`
+      : `سجل_التنقيط_الرسمي_فوج_${options.className}_${trimesterLabel}_الأستاذ_${teacherFamily}`);
 
-  let printIframe = document.getElementById("landscape-gradebook-print-frame") as HTMLIFrameElement | null;
-  if (!printIframe) {
-    printIframe = document.createElement("iframe");
-    printIframe.id = "landscape-gradebook-print-frame";
-    printIframe.style.position = "fixed";
-    printIframe.style.right = "0";
-    printIframe.style.bottom = "0";
-    printIframe.style.width = "0";
-    printIframe.style.height = "0";
-    printIframe.style.border = "none";
-    document.body.appendChild(printIframe);
-  }
+  const htmlContent = generateGradebookHTML({
+    ...options,
+    docTitle: calculatedDocTitle,
+  });
 
-  const iframeDoc = printIframe.contentDocument || printIframe.contentWindow?.document;
-  if (!iframeDoc) return;
-
-  iframeDoc.open();
-  iframeDoc.write(htmlContent);
-  iframeDoc.close();
-
-  setTimeout(() => {
-    try {
-      printIframe?.contentWindow?.focus();
-      printIframe?.contentWindow?.print();
-    } catch {
-      window.print();
-    }
-  }, 400);
+  printHtmlInLandscapeIframe(htmlContent, calculatedDocTitle, "landscape-gradebook-print-frame");
 }
 
 /**
- * تنزيل أو حفظ كراس التنقيط كملف PDF أفقي
+ * طباعة كراس التنقيط الرسمي أفقياً
  */
-export function downloadGradebookPDF(options: GradebookPdfOptions): void {
-  printGradebookReport(options);
+export function printGradebookReport(options: GradebookPdfOptions): void {
+  downloadGradebookPDF(options);
 }

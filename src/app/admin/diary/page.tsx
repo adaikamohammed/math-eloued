@@ -36,7 +36,9 @@ import {
   CalendarDays,
   ShieldCheck,
   BookMarked,
+  ClipboardCheck,
 } from "lucide-react";
+import { getCurrentAcademicYear } from "@/lib/academicYear";
 import { LoginRequired } from "@/components/LoginRequired";
 import { PageExplainer } from "@/components/PageExplainer";
 import { useProfile } from "@/lib/useProfile";
@@ -1275,7 +1277,7 @@ function TeacherDiaryContent() {
   };
 
   // تشغيل تحميل الـ PDF الأفقي المباشر
-  const handleDownloadLandscapePDF = () => {
+  const handleDownloadLandscapePDF = (isBlankTemplate: boolean = false) => {
     downloadLandscapeDiaryPDF({
       teacherName: printTeacherName,
       schoolName: printSchoolName,
@@ -1283,6 +1285,8 @@ function TeacherDiaryContent() {
       principalName: printPrincipalName,
       subjectName: printSubject,
       wilayaName: printWilaya,
+      academicYear: getCurrentAcademicYear(),
+      isBlankTemplate,
       days: groupedDays,
       customClasses,
       timetableSettings,
@@ -1323,7 +1327,7 @@ function TeacherDiaryContent() {
               الدفتر اليومي البيداغوجي لـلأستـاذ (CAHIER JOURNAL PÉDAGOGIQUE)
             </h1>
             <p className="text-xs font-semibold text-gray-700">
-              مادة: <span className="font-black">{printSubject}</span> • الموسم الدراسي: 2026 / 2027 م
+              مادة: <span className="font-black">{printSubject}</span> • الموسم الدراسي: {getCurrentAcademicYear()}
             </p>
           </div>
 
@@ -1352,13 +1356,23 @@ function TeacherDiaryContent() {
 
           <div className="flex items-center gap-2 flex-wrap">
             <button
-              onClick={handleDownloadLandscapePDF}
+              onClick={() => handleDownloadLandscapePDF(false)}
               type="button"
-              className="px-4 py-1.5 rounded-xl border border-emerald-600 bg-emerald-700 hover:bg-emerald-800 text-xs font-black text-white transition shadow-sm flex items-center gap-1.5 cursor-pointer"
-              title="حفظ وتصدير الدفتر اليومي كملف PDF أفقي رسمي (A4 Landscape)"
+              className="px-4 py-1.5 rounded-xl border border-emerald-600 bg-emerald-700 hover:bg-emerald-800 text-xs font-black text-white transition shadow-sm flex items-center gap-1.5 cursor-pointer active:scale-95"
+              title="حفظ وتصدير الدفتر اليومي معبأ بالحصص كملف PDF أفقي رسمي (A4 Landscape)"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>حفظ PDF أفقياً 📄</span>
+              <span>حفظ PDF (معبأ) 📄</span>
+            </button>
+
+            <button
+              onClick={() => handleDownloadLandscapePDF(true)}
+              type="button"
+              className="px-3.5 py-1.5 rounded-xl border border-dashed border-emerald-400 bg-emerald-50/80 hover:bg-emerald-100 text-xs font-black text-emerald-800 transition shadow-2xs flex items-center gap-1.5 cursor-pointer active:scale-95"
+              title="حفظ وتصدير نموذج الدفتر اليومي فارغ مهيأ للتدوين اليدوي بالقلم"
+            >
+              <ClipboardCheck className="w-3.5 h-3.5 text-emerald-600" />
+              <span>✍️ نموذج فارغ للتدوين</span>
             </button>
             <Link
               href="/admin/diary/weekly"

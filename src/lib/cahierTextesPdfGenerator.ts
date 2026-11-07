@@ -1,4 +1,5 @@
 import { CahierTextesEntry, TimetableSettings, TimetableSlot } from "./types";
+import { getCurrentAcademicYear } from "./academicYear";
 
 export interface CahierTextesPdfOptions {
   teacherName: string;
@@ -594,7 +595,7 @@ export function generateCahierTextesHTML(options: CahierTextesPdfOptions): strin
         <div class="header-info-item"><span>المؤسسة: </span><strong>${school}</strong></div>
         <div class="header-info-item"><span>الفوج التربوي المعتمد: </span><strong>فوج ${cls} (${weeklyHours})</strong></div>
         <div class="header-info-item"><span>الأستاذ(ة): </span><strong>${teacher}</strong></div>
-        <div class="header-info-item"><span>الفترة المحددة بالسجل: </span><strong style="color: #0369a1;">${options.periodLabel || "كامل الموسم الدراسي 2026 / 2027"}</strong></div>
+        <div class="header-info-item"><span>الفترة المحددة بالسجل: </span><strong style="color: #0369a1;">${options.periodLabel || `كامل الموسم الدراسي ${getCurrentAcademicYear()}`}</strong></div>
         <div class="header-info-item"><span>المقاطعة التفتيشية: </span><strong>${district}</strong></div>
         <div class="header-info-item"><span>السيد مفتش التربية الوطنية: </span><strong>${inspector}</strong></div>
       </div>

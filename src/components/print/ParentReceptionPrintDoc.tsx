@@ -1,5 +1,6 @@
 import React from "react";
 import { UserProfile, MIDDLE_SCHOOL_SUBJECTS } from "@/lib/types";
+import { getCurrentAcademicYear } from "@/lib/academicYear";
 import { PrintOfficialHeader } from "./PrintOfficialHeader";
 import { OfficialSignatures } from "./OfficialSignatures";
 
@@ -13,7 +14,7 @@ export function ParentReceptionPrintDoc({ schoolName, teachers }: Props) {
     <div className="font-sans text-black leading-relaxed" dir="rtl">
       <PrintOfficialHeader
         title="دليل استقبال أولياء التلاميذ بالمؤسسة"
-        subtitle="رزنامة المقابلات البيداغوجية الدورية للأساتذة — الموسم الدراسي 2026/2027"
+        subtitle={`رزنامة المقابلات البيداغوجية الدورية للأساتذة — الموسم الدراسي ${getCurrentAcademicYear()}`}
         schoolName={schoolName}
       />
 

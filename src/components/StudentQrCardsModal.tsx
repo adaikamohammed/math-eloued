@@ -19,6 +19,7 @@ import {
   FileDown,
 } from "lucide-react";
 import { StudentRosterItem } from "@/lib/types";
+import { getCurrentAcademicYear } from "@/lib/academicYear";
 
 interface StudentQrCardsModalProps {
   isOpen: boolean;
@@ -287,7 +288,7 @@ export function StudentQrCardsModal({
                     <div className="border-b border-emerald-100 pb-1.5 mb-2 text-center space-y-0.5">
                       <div className="flex items-center justify-between text-[8px] sm:text-[9px] font-bold text-slate-500">
                         <span>الجمهورية الجزائرية الديمقراطية الشعبية</span>
-                        <span>الموسم: 2026 / 2027</span>
+                        <span>الموسم: {getCurrentAcademicYear()}</span>
                       </div>
                       <div className="flex items-center justify-between text-[9px] sm:text-[10px] font-black text-emerald-900">
                         <span>منصة جسور التعليمية</span>

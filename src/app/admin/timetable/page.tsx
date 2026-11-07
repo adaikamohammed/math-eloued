@@ -29,11 +29,13 @@ import {
   ChevronUp,
   ChevronDown,
   ArrowUpDown,
+  ClipboardCheck,
 } from "lucide-react";
 import { LoginRequired } from "@/components/LoginRequired";
 import { checkTeacherSession, getPersistedTeacherSession } from "@/lib/offlineAuth";
 import { useProfile } from "@/lib/useProfile";
 import { downloadTimetableLandscapePDF } from "@/lib/pdfReportGenerator";
+import { getCurrentAcademicYear } from "@/lib/academicYear";
 import {
   getTeacherOfflineData,
   saveTeacherOfflineData,
@@ -786,7 +788,7 @@ export default function TeacherTimetablePage() {
   };
 
   // حفظ وتصدير جدول التوقيت الأسبوعي كملف PDF أفقي رسمي (A4 Landscape)
-  const handleDownloadLandscapePDF = () => {
+  const handleDownloadLandscapePDF = (isBlankTemplate: boolean = false) => {
     const printTeacherName = printFormData.teacherName || settings.teacherName || profile?.full_name || "الأستاذ(ة)";
     const printSchoolName = printFormData.schoolName || settings.schoolName || profile?.school_custom_name || "المتوسطة التعليمية";
     const printSubject = printFormData.subjectName || settings.subjectName || profile?.subject || "الرياضيات";
@@ -799,7 +801,8 @@ export default function TeacherTimetablePage() {
       principalName: printFormData.principalName || settings.principalName,
       wilayaName: printWilaya,
       subjectName: printSubject,
-      academicYear: "2025 / 2026 م",
+      academicYear: getCurrentAcademicYear(),
+      isBlankTemplate,
       slots: slots.map((s) => ({
         day: s.day,
         startTime: s.start,
@@ -975,15 +978,26 @@ export default function TeacherTimetablePage() {
               <span>مواقيت الحصص والاستراحة</span>
             </button>
 
-            {/* زر حفظ PDF أفقي */}
+            {/* زر حفظ PDF أفقي معبأ */}
             <button
-              onClick={handleDownloadLandscapePDF}
+              onClick={() => handleDownloadLandscapePDF(false)}
               type="button"
               className="px-4 py-1.5 rounded-xl border border-emerald-600 bg-emerald-700 hover:bg-emerald-800 text-xs font-black text-white transition shadow-sm flex items-center gap-1.5 cursor-pointer active:scale-95"
-              title="حفظ وتصدير جدول التوقيت كملف PDF أفقي رسمي (A4 Landscape)"
+              title="حفظ وتصدير جدول التوقيت كملف PDF معبأ بالحصص المسجلة"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>حفظ PDF أفقياً 📄</span>
+              <span>حفظ PDF (معبأ) 📄</span>
+            </button>
+
+            {/* زر نموذج فارغ للتخطيط */}
+            <button
+              onClick={() => handleDownloadLandscapePDF(true)}
+              type="button"
+              className="px-3.5 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-xs font-black text-slate-800 transition shadow-2xs flex items-center gap-1.5 cursor-pointer active:scale-95"
+              title="تنزيل جدول توقيت أسبوعي فارغ للرسم والتخطيط اليدوي بالقلم"
+            >
+              <ClipboardCheck className="w-3.5 h-3.5 text-slate-600" />
+              <span>✍️ نموذج فارغ للتخطيط</span>
             </button>
 
             <Link
@@ -1020,7 +1034,7 @@ export default function TeacherTimetablePage() {
             <div className="space-y-1">
               <div className="inline-flex items-center gap-2 bg-emerald-50 text-emerald-900 border border-emerald-200 px-3 py-0.5 rounded-full text-xs font-black">
                 <Calendar className="w-3.5 h-3.5 text-emerald-700" />
-                <span>الموسم الدراسي 2025 / 2026</span>
+                <span>الموسم الدراسي {getCurrentAcademicYear()}</span>
               </div>
               <h1 className="text-lg sm:text-xl font-black text-gray-900">
                 جدول التوقيت الأسبوعي وتوزيع ساعات التدريس
@@ -1501,7 +1515,7 @@ export default function TeacherTimetablePage() {
               <div className="space-y-0.5 w-1/3">
                 <div>مديرية التربية لولاية: <strong>{settings.wilayaName || "الوادي"}</strong></div>
                 <div>متوسطة: <strong>{settings.schoolName || "......................................."}</strong></div>
-                <div>الموسم الدراسي: <strong>2025 / 2026</strong></div>
+                <div>الموسم الدراسي: <strong>{getCurrentAcademicYear()}</strong></div>
               </div>
 
               {/* الوسط: عنوان الوثيقة */}

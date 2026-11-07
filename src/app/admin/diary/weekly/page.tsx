@@ -40,7 +40,9 @@ import {
   ChevronDown,
   ChevronUp,
   Copy,
+  ClipboardCheck,
 } from "lucide-react";
+import { getCurrentAcademicYear } from "@/lib/academicYear";
 import { LoginRequired } from "@/components/LoginRequired";
 import { useProfile } from "@/lib/useProfile";
 import { checkTeacherSession, getPersistedTeacherSession } from "@/lib/offlineAuth";
@@ -923,7 +925,7 @@ export default function WeeklyDiaryPage() {
     });
   };
 
-  const handleDownloadPDF = () => {
+  const handleDownloadPDF = (isBlankTemplate: boolean = false) => {
     downloadWeeklyDiaryPDF({
       teacherName: printTeacherName,
       schoolName: printSchoolName,
@@ -931,6 +933,8 @@ export default function WeeklyDiaryPage() {
       principalName: timetable?.settings?.principalName || "السيد مدير المؤسسة",
       wilayaName: printWilaya,
       subjectName: printSubject,
+      academicYear: getCurrentAcademicYear(),
+      isBlankTemplate,
       weekStartStr: weekInfo.sundayStr,
       weekEndStr: weekInfo.thursdayStr,
       orientation,
@@ -1030,7 +1034,7 @@ export default function WeeklyDiaryPage() {
             </div>
             <div className="text-left">
               <span>المادة: </span>
-              <strong className="text-black">{printSubject}</strong> • الموسم: <strong>2026 / 2027</strong>
+              <strong className="text-black">{printSubject}</strong> • الموسم: <strong>{getCurrentAcademicYear()}</strong>
             </div>
           </div>
         </div>
@@ -1109,13 +1113,23 @@ export default function WeeklyDiaryPage() {
             </button>
 
             <button
-              onClick={handleDownloadPDF}
+              onClick={() => handleDownloadPDF(false)}
               type="button"
               className="px-4 py-1.5 rounded-xl border border-emerald-600 bg-emerald-700 hover:bg-emerald-800 text-xs font-black text-white transition shadow-sm flex items-center gap-1.5 cursor-pointer active:scale-95"
-              title="حفظ وتصدير المخطط الأسبوعي كملف PDF أفقي رسمي (A4 Landscape)"
+              title="حفظ وتصدير المخطط الأسبوعي معبأ بالحصص كملف PDF أفقي رسمي (A4 Landscape)"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>حفظ PDF أفقياً 📄</span>
+              <span>حفظ PDF (معبأ) 📄</span>
+            </button>
+
+            <button
+              onClick={() => handleDownloadPDF(true)}
+              type="button"
+              className="px-3.5 py-1.5 rounded-xl border border-dashed border-emerald-400 bg-emerald-50/80 hover:bg-emerald-100 text-xs font-black text-emerald-800 transition shadow-2xs flex items-center gap-1.5 cursor-pointer active:scale-95"
+              title="حفظ وتصدير نموذج أسبوعي فارغ مهيأ للتحضير والتخطيط اليدوي بالقلم"
+            >
+              <ClipboardCheck className="w-3.5 h-3.5 text-emerald-600" />
+              <span>✍️ نموذج فارغ للتحضير</span>
             </button>
           </div>
         </div>

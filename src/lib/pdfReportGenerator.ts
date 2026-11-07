@@ -1,4 +1,5 @@
 import { DailyDiaryEntry, SpecialDayRecord, TimetableSettings } from "./types";
+import { getCurrentAcademicYear } from "./academicYear";
 
 export interface DiaryReportDay {
   dateStr: string;
@@ -15,6 +16,8 @@ export interface DiaryReportOptions {
   principalName?: string;
   wilayaName?: string;
   subjectName?: string;
+  academicYear?: string;
+  isBlankTemplate?: boolean;
   days: DiaryReportDay[];
   customClasses?: string[];
   timetableSettings?: TimetableSettings | null;
@@ -61,14 +64,45 @@ export function generateLandscapeDiaryHTML(options: DiaryReportOptions): string 
   const principal = options.principalName || "السيد مدير المؤسسة";
   const subject = options.subjectName || "الرياضيات";
   const wilaya = options.wilayaName || "الوادي";
+  const academicYear = options.academicYear || getCurrentAcademicYear();
   const classColors = options.classColorsMap || {};
+  const isBlank = Boolean(options.isBlankTemplate);
 
-  // تصفية صارمة: لا نطبع إلا الأيام التي تحتوي حصصاً مسجلة فعلياً أو أياماً خاصة
-  const printableDays = options.days.filter((d) => {
+  // تصفية الأيام: في وضع التعبئة نطبع الأيام المسجلة، وفي وضع النموذج الفارغ نجهز هيكلاً للرصد اليدوي
+  let printableDays = options.days.filter((d) => {
     const hasEntries = Array.isArray(d.entries) && d.entries.length > 0;
     const hasSpecial = !!d.specialDay;
     return hasEntries || hasSpecial;
   });
+
+  if (isBlank) {
+    if (options.days.length > 0) {
+      printableDays = options.days.map((d) => ({
+        ...d,
+        entries: (d.entries && d.entries.length > 0
+          ? d.entries
+          : [
+              { periodTime: "08:00 - 09:00", className: "1م1", lessonTitle: "" },
+              { periodTime: "09:00 - 10:00", className: "1م2", lessonTitle: "" },
+              { periodTime: "10:00 - 11:00", className: "2م3", lessonTitle: "" },
+              { periodTime: "14:30 - 15:30", className: "1م1", lessonTitle: "" },
+            ]) as any[],
+      }));
+    } else {
+      printableDays = [
+        {
+          dateStr: "2026-11-08",
+          dayName: "......................",
+          entries: [
+            { periodTime: "08:00 - 09:00", className: "........", lessonTitle: "" },
+            { periodTime: "09:00 - 10:00", className: "........", lessonTitle: "" },
+            { periodTime: "10:00 - 11:00", className: "........", lessonTitle: "" },
+            { periodTime: "14:30 - 15:30", className: "........", lessonTitle: "" },
+          ] as any[],
+        },
+      ];
+    }
+  }
 
   const daysHtml = printableDays
     .map((day, dayIndex) => {
@@ -114,56 +148,85 @@ export function generateLandscapeDiaryHTML(options: DiaryReportOptions): string 
           const bgHex = classColors[entry.className] || "#107a57";
           const rowBgClass = idx % 2 === 1 ? "row-alt" : "row-white";
 
-          const stagesHtml =
-            entry.stages && entry.stages.length > 0
-              ? entry.stages
-                  .map((stg) => {
-                    let badgeClass = "badge-sky";
-                    if (stg.label.includes("وسيطي") || stg.label.includes("بناء")) badgeClass = "badge-emerald";
-                    else if (stg.label.includes("نهائي") || stg.label.includes("تقويم")) badgeClass = "badge-amber";
-                    else if (stg.color === "purple") badgeClass = "badge-purple";
+          const stagesHtml = isBlank
+            ? `
+              <div class="stage-item"><span class="stage-badge badge-sky">مرحلة الانطلاق (تمهيدي):</span><div class="dots-block"><div>................................................................................................................................</div><div>................................................................................................................................</div></div></div>
+              <div class="stage-item"><span class="stage-badge badge-emerald">بناء التعلمات (وسيطي):</span><div class="dots-block"><div>................................................................................................................................</div><div>................................................................................................................................</div></div></div>
+              <div class="stage-item"><span class="stage-badge badge-amber">التقويم والتعزيز (نهائي):</span><div class="dots-block"><div>................................................................................................................................</div></div></div>
+            `
+            : entry.stages && entry.stages.length > 0
+            ? entry.stages
+                .map((stg) => {
+                  let badgeClass = "badge-sky";
+                  if (stg.label.includes("وسيطي") || stg.label.includes("بناء")) badgeClass = "badge-emerald";
+                  else if (stg.label.includes("نهائي") || stg.label.includes("تقويم")) badgeClass = "badge-amber";
+                  else if (stg.color === "purple") badgeClass = "badge-purple";
 
-                    return `
-                      <div class="stage-item">
-                        <span class="stage-badge ${badgeClass}">${stg.label ? `${stg.label}:` : "مرحلة:"}</span>
-                        <div class="stage-content">
-                          ${stg.content ? stg.content : `<span class="dots">....................................................................................</span>`}
-                        </div>
+                  return `
+                    <div class="stage-item">
+                      <span class="stage-badge ${badgeClass}">${stg.label ? `${stg.label}:` : "مرحلة:"}</span>
+                      <div class="stage-content">
+                        ${stg.content ? stg.content : `<span class="dots">....................................................................................</span>`}
                       </div>
-                    `;
-                  })
-                  .join("")
-              : `
-                <div class="stage-item"><span class="stage-badge badge-sky">تمهيدي:</span><span class="dots">....................................................................................</span></div>
-                <div class="stage-item"><span class="stage-badge badge-emerald">وسيطي:</span><span class="dots">....................................................................................</span></div>
-                <div class="stage-item"><span class="stage-badge badge-amber">نهائي:</span><span class="dots">....................................................................................</span></div>
-              `;
+                    </div>
+                  `;
+                })
+                .join("")
+            : `
+              <div class="stage-item"><span class="stage-badge badge-sky">تمهيدي:</span><span class="dots">....................................................................................</span></div>
+              <div class="stage-item"><span class="stage-badge badge-emerald">وسيطي:</span><span class="dots">....................................................................................</span></div>
+              <div class="stage-item"><span class="stage-badge badge-amber">نهائي:</span><span class="dots">....................................................................................</span></div>
+            `;
 
-          const notesHtml = entry.notes
+          const notesHtml = isBlank
+            ? `<div class="dots-block"><div>................................</div><div>................................</div><div>................................</div><div>................................</div></div>`
+            : entry.notes
             ? `<div class="notes-content">${entry.notes.replace(/\n/g, "<br/>")}</div>`
             : `<div class="dots-block"><div>................................</div><div>................................</div><div>................................</div></div>`;
+
+          const timeClassContent = isBlank
+            ? `
+              <div class="period-time">${entry.periodTime || "08:00 - 09:00"}</div>
+              <div style="font-size: 10px; font-weight: 700; color: #475569; margin: 3px 0;">فوج: ...........</div>
+              <div class="note-num">مذكرة: .....</div>
+            `
+            : `
+              <div class="period-time">${entry.periodTime || "08:00 - 09:00"}</div>
+              <div class="class-badge" style="background-color: ${bgHex};">
+                ${entry.className.includes("متوسط") ? entry.className : `${entry.className} متوسط`}
+              </div>
+              ${entry.lessonNoteNumber ? `<div class="note-num">${entry.lessonNoteNumber}</div>` : ""}
+            `;
+
+          const fieldResourceContent = isBlank
+            ? `
+              <div class="dots-block" style="padding: 2px 0;">
+                <div style="font-weight: 700; margin-bottom: 4px;">الميدان: .......................................</div>
+                <div style="font-weight: 800; font-size: 11px; margin-bottom: 4px;">المورد (الدرس): ..............................</div>
+                <div style="color: #64748b; font-size: 9.5px;">المفاهيم: .......................................</div>
+              </div>
+            `
+            : `
+              <div class="field-tag">
+                <span>${entry.field || "أنشطة عددية"}</span>
+                <span class="tag-sep">|</span>
+                <span>${entry.sessionType || "درس"}</span>
+              </div>
+              <div class="lesson-title">${entry.lessonTitle}</div>
+              ${entry.concepts ? `<div class="lesson-concepts">${entry.concepts}</div>` : ""}
+              ${entry.section ? `<div class="lesson-section">${entry.section}</div>` : ""}
+            `;
 
           return `
             <tr class="${rowBgClass}">
               <!-- 1. التوقيت والفوج -->
               <td class="col-time-class">
-                <div class="period-time">${entry.periodTime || "08:00 - 09:00"}</div>
-                <div class="class-badge" style="background-color: ${bgHex};">
-                  ${entry.className.includes("متوسط") ? entry.className : `${entry.className} متوسط`}
-                </div>
-                ${entry.lessonNoteNumber ? `<div class="note-num">${entry.lessonNoteNumber}</div>` : ""}
+                ${timeClassContent}
               </td>
 
               <!-- 2. الميدان والمورد -->
               <td class="col-field-resource">
-                <div class="field-tag">
-                  <span>${entry.field || "أنشطة عددية"}</span>
-                  <span class="tag-sep">|</span>
-                  <span>${entry.sessionType || "درس"}</span>
-                </div>
-                <div class="lesson-title">${entry.lessonTitle}</div>
-                ${entry.concepts ? `<div class="lesson-concepts">${entry.concepts}</div>` : ""}
-                ${entry.section ? `<div class="lesson-section">${entry.section}</div>` : ""}
+                ${fieldResourceContent}
               </td>
 
               <!-- 3. سيرورة الحصة وسندات الكتاب المدرسي -->
@@ -603,8 +666,8 @@ export function generateLandscapeDiaryHTML(options: DiaryReportOptions): string 
     <header class="official-header">
       <p class="republic-text">الجمهورية الجزائرية الديمقراطية الشعبية</p>
       <p class="ministry-text">وزارة التربية الوطنية — مديرية التربية لولاية ${wilaya}</p>
-      <h1 class="doc-main-title">الدفتر اليومي البيداغوجي لـلأستـاذ (CAHIER JOURNAL PÉDAGOGIQUE)</h1>
-      <p class="doc-sub-info">مادة: <strong>${subject}</strong> • الموسم الدراسي: 2026 / 2027 م</p>
+      <h1 class="doc-main-title">${isBlank ? "الدفتر اليومي البيداغوجي لـلأستـاذ — استمارة فارغة للتدوين والتحضير اليدوي" : "الدفتر اليومي البيداغوجي لـلأستـاذ (CAHIER JOURNAL PÉDAGOGIQUE)"}</h1>
+      <p class="doc-sub-info">مادة: <strong>${subject}</strong> • الموسم الدراسي: <strong>${academicYear}</strong></p>
 
       <div class="header-details-grid">
         <div class="header-col"><span>المؤسسة: </span><strong>${school}</strong></div>
@@ -774,6 +837,7 @@ export interface StudentsReportOptions {
   wilayaName?: string;
   subjectName?: string;
   academicYear?: string;
+  isBlankTemplate?: boolean;
   className: string;
   students: StudentReportItem[];
   stats?: {
@@ -796,8 +860,9 @@ export function generateStudentsLandscapeHTML(options: StudentsReportOptions): s
   const principal = options.principalName || "السيد مدير المؤسسة";
   const subject = options.subjectName || "الرياضيات";
   const wilaya = options.wilayaName || "الوادي";
-  const academicYear = options.academicYear || "2025 / 2026 م";
+  const academicYear = options.academicYear || getCurrentAcademicYear();
   const className = options.className || "جميع الأفواج";
+  const isBlank = Boolean(options.isBlankTemplate);
 
   const total = options.students.length;
   const male = options.stats?.male ?? options.students.filter((s) => s.gender === "ذكر").length;
@@ -807,41 +872,84 @@ export function generateStudentsLandscapeHTML(options: StudentsReportOptions): s
   const repeaters = options.stats?.repeaters ?? options.students.filter((s) => !!s.isRepeater).length;
   const newStudents = options.stats?.newStudents ?? total - repeaters;
 
-  const rowsHtml = options.students
-    .map((student, idx) => {
-      const isAlt = idx % 2 === 1;
-      const isFemale = student.gender === "أنثى";
-      const isG2 = student.groupName === "فوج 2";
-      const isRep = !!student.isRepeater;
+  let rowsHtml = "";
+  if (isBlank) {
+    if (options.students.length > 0) {
+      rowsHtml = options.students
+        .map((student, idx) => {
+          const isAlt = idx % 2 === 1;
+          return `
+            <tr class="${isAlt ? "row-alt" : "row-white"}">
+              <td class="col-num">${idx + 1}</td>
+              <td class="col-name">${student.studentName}</td>
+              <td class="col-gender"><span class="dots-line">......</span></td>
+              <td class="col-group"><span class="dots-line">......</span></td>
+              <td class="col-status"><span class="dots-line">......</span></td>
+              <td class="col-phone"><span class="dots-line">............</span></td>
+              <td class="col-notes"></td>
+              <td class="col-eval">
+                <div class="dots-line">......................</div>
+              </td>
+            </tr>
+          `;
+        })
+        .join("");
+    } else {
+      rowsHtml = Array.from({ length: 32 }, (_, idx) => {
+        const isAlt = idx % 2 === 1;
+        return `
+          <tr class="${isAlt ? "row-alt" : "row-white"}">
+            <td class="col-num">${idx + 1}</td>
+            <td class="col-name"><div class="dots-line">................................................</div></td>
+            <td class="col-gender"><span class="dots-line">......</span></td>
+            <td class="col-group"><span class="dots-line">......</span></td>
+            <td class="col-status"><span class="dots-line">......</span></td>
+            <td class="col-phone"><span class="dots-line">............</span></td>
+            <td class="col-notes"></td>
+            <td class="col-eval">
+              <div class="dots-line">......................</div>
+            </td>
+          </tr>
+        `;
+      }).join("");
+    }
+  } else {
+    rowsHtml = options.students
+      .map((student, idx) => {
+        const isAlt = idx % 2 === 1;
+        const isFemale = student.gender === "أنثى";
+        const isG2 = student.groupName === "فوج 2";
+        const isRep = !!student.isRepeater;
 
-      return `
-        <tr class="${isAlt ? "row-alt" : "row-white"}">
-          <td class="col-num">${idx + 1}</td>
-          <td class="col-name">${student.studentName}</td>
-          <td class="col-gender">
-            <span class="badge ${isFemale ? "badge-pink" : "badge-blue"}">
-              ${isFemale ? "👧 أنثى" : "👦 ذكر"}
-            </span>
-          </td>
-          <td class="col-group">
-            <span class="badge ${isG2 ? "badge-amber" : "badge-purple"}">
-              ${isG2 ? "فوج 2" : "فوج 1"}
-            </span>
-          </td>
-          <td class="col-status">
-            <span class="badge ${isRep ? "badge-rose" : "badge-emerald"}">
-              ${isRep ? "معيد" : "جديد"}
-            </span>
-          </td>
-          <td class="col-phone" dir="ltr">${student.parentPhone || "—"}</td>
-          <td class="col-notes">${student.notes || ""}</td>
-          <td class="col-eval">
-            <div class="dots-line">......................</div>
-          </td>
-        </tr>
-      `;
-    })
-    .join("");
+        return `
+          <tr class="${isAlt ? "row-alt" : "row-white"}">
+            <td class="col-num">${idx + 1}</td>
+            <td class="col-name">${student.studentName}</td>
+            <td class="col-gender">
+              <span class="badge ${isFemale ? "badge-pink" : "badge-blue"}">
+                ${isFemale ? "👧 أنثى" : "👦 ذكر"}
+              </span>
+            </td>
+            <td class="col-group">
+              <span class="badge ${isG2 ? "badge-amber" : "badge-purple"}">
+                ${isG2 ? "فوج 2" : "فوج 1"}
+              </span>
+            </td>
+            <td class="col-status">
+              <span class="badge ${isRep ? "badge-rose" : "badge-emerald"}">
+                ${isRep ? "معيد" : "جديد"}
+              </span>
+            </td>
+            <td class="col-phone" dir="ltr">${student.parentPhone || "—"}</td>
+            <td class="col-notes">${student.notes || ""}</td>
+            <td class="col-eval">
+              <div class="dots-line">......................</div>
+            </td>
+          </tr>
+        `;
+      })
+      .join("");
+  }
 
   return `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -1056,7 +1164,7 @@ export function generateStudentsLandscapeHTML(options: StudentsReportOptions): s
     <header class="official-header">
       <p class="republic-text">الجمهورية الجزائرية الديمقراطية الشعبية</p>
       <p class="ministry-text">وزارة التربية الوطنية — مديرية التربية لولاية ${wilaya}</p>
-      <h1 class="doc-main-title">قائمة وتفويج التلاميذ الرسمية (LISTE OFFICIELLE DES ÉLÈVES)</h1>
+      <h1 class="doc-main-title">${isBlank ? "قائمة وتفويج التلاميذ — استمارة ورقية فارغة للرصد والمتابعة" : "قائمة وتفويج التلاميذ الرسمية (LISTE OFFICIELLE DES ÉLÈVES)"}</h1>
 
       <div class="header-details-grid">
         <div class="header-col"><span>المؤسسة: </span><strong>${school}</strong></div>
@@ -1068,13 +1176,23 @@ export function generateStudentsLandscapeHTML(options: StudentsReportOptions): s
     </header>
 
     <div class="stats-bar">
-      <span class="stat-badge">👥 إجمالي التلاميذ: <strong>${total}</strong></span>
-      <span class="stat-badge stat-blue">👦 ذكور: <strong>${male}</strong></span>
-      <span class="stat-badge stat-pink">👧 إناث: <strong>${female}</strong></span>
-      <span class="stat-badge stat-purple">👥 فوج 1: <strong>${group1}</strong></span>
-      <span class="stat-badge stat-amber">👥 فوج 2: <strong>${group2}</strong></span>
-      <span class="stat-badge stat-emerald">✨ جدد: <strong>${newStudents}</strong></span>
-      <span class="stat-badge stat-rose">🔄 معيدون: <strong>${repeaters}</strong></span>
+      ${
+        isBlank
+          ? `
+            <span class="stat-badge">👥 إجمالي التلاميذ المسجلين: <strong>${total > 0 ? total : "32"}</strong></span>
+            <span class="stat-badge stat-emerald">🏫 الفوج التربوي: <strong>فوج ${className}</strong></span>
+            <span class="stat-badge stat-amber">✍️ نموذج ورقي للرصد والتسجيل الصفي</span>
+          `
+          : `
+            <span class="stat-badge">👥 إجمالي التلاميذ: <strong>${total}</strong></span>
+            <span class="stat-badge stat-blue">👦 ذكور: <strong>${male}</strong></span>
+            <span class="stat-badge stat-pink">👧 إناث: <strong>${female}</strong></span>
+            <span class="stat-badge stat-purple">👥 فوج 1: <strong>${group1}</strong></span>
+            <span class="stat-badge stat-amber">👥 فوج 2: <strong>${group2}</strong></span>
+            <span class="stat-badge stat-emerald">✨ جدد: <strong>${newStudents}</strong></span>
+            <span class="stat-badge stat-rose">🔄 معيدون: <strong>${repeaters}</strong></span>
+          `
+      }
     </div>
 
     <main>
@@ -1156,6 +1274,7 @@ export interface TimetableReportOptions {
   wilayaName?: string;
   subjectName?: string;
   academicYear?: string;
+  isBlankTemplate?: boolean;
   slots: TimetableSlotReportItem[];
   settings: TimetableSettings;
   customClasses: string[];
@@ -1194,8 +1313,9 @@ export function generateTimetableLandscapeHTML(options: TimetableReportOptions):
   const principal = options.principalName || "السيد مدير المؤسسة";
   const subject = options.subjectName || "الرياضيات";
   const wilaya = options.wilayaName || "الوادي";
-  const academicYear = options.academicYear || "2025 / 2026 م";
+  const academicYear = options.academicYear || getCurrentAcademicYear();
   const settings = options.settings;
+  const isBlank = Boolean(options.isBlankTemplate);
 
   // الحصص الصباحية والمسائية
   const morningSlots = [
@@ -1239,59 +1359,81 @@ export function generateTimetableLandscapeHTML(options: TimetableReportOptions):
     const isAlt = dIdx % 2 === 1;
 
     // خلايا الصباح
-    const morningCells = morningSlots
-      .map((slot) => {
-        const item = findSlot(day, slot.start);
-        if (!item) {
-          return `<td class="cell-slot cell-empty"><span class="dash">—</span></td>`;
-        }
-        if (item.className.includes("استقبال") || item.sessionType?.includes("استقبال")) {
-          return `
-            <td class="cell-slot cell-reception">
-              <div class="slot-badge-reception">🤝 استقبال الأولياء</div>
-              ${item.room ? `<div class="slot-room">قاعة ${item.room}</div>` : ""}
-            </td>
-          `;
-        }
-        const hex = getColorHexForClass(item.className);
-        return `
-          <td class="cell-slot">
-            <div class="class-badge" style="background-color: ${hex};">${item.className}</div>
-            ${item.sessionType && item.sessionType !== "عادي" ? `<div class="session-type">${item.sessionType}</div>` : ""}
-            ${item.room ? `<div class="slot-room">قاعة ${item.room}</div>` : ""}
-          </td>
-        `;
-      })
-      .join("");
+    const morningCells = isBlank
+      ? morningSlots
+          .map(
+            () => `
+              <td class="cell-slot cell-blank-slot">
+                <div style="color: #cbd5e1; font-size: 10px; margin-bottom: 4px;">............</div>
+                <div style="color: #e2e8f0; font-size: 9px;">............</div>
+              </td>
+            `
+          )
+          .join("")
+      : morningSlots
+          .map((slot) => {
+            const item = findSlot(day, slot.start);
+            if (!item) {
+              return `<td class="cell-slot cell-empty"><span class="dash">—</span></td>`;
+            }
+            if (item.className.includes("استقبال") || item.sessionType?.includes("استقبال")) {
+              return `
+                <td class="cell-slot cell-reception">
+                  <div class="slot-badge-reception">🤝 استقبال الأولياء</div>
+                  ${item.room ? `<div class="slot-room">قاعة ${item.room}</div>` : ""}
+                </td>
+              `;
+            }
+            const hex = getColorHexForClass(item.className);
+            return `
+              <td class="cell-slot">
+                <div class="class-badge" style="background-color: ${hex};">${item.className}</div>
+                ${item.sessionType && item.sessionType !== "عادي" ? `<div class="session-type">${item.sessionType}</div>` : ""}
+                ${item.room ? `<div class="slot-room">قاعة ${item.room}</div>` : ""}
+              </td>
+            `;
+          })
+          .join("");
 
     // خلايا المساء
-    const afternoonCells = afternoonSlots
-      .map((slot) => {
-        const item = findSlot(day, slot.start);
-        if (!item) {
-          if (isTuesday && settings?.tuesdayAfternoonOff) {
-            return `<td class="cell-slot cell-tuesday-off"><span class="tuesday-text">أمسية الثلاثاء (راحة)</span></td>`;
-          }
-          return `<td class="cell-slot cell-empty"><span class="dash">—</span></td>`;
-        }
-        if (item.className.includes("استقبال") || item.sessionType?.includes("استقبال")) {
-          return `
-            <td class="cell-slot cell-reception">
-              <div class="slot-badge-reception">🤝 استقبال الأولياء</div>
-              ${item.room ? `<div class="slot-room">قاعة ${item.room}</div>` : ""}
-            </td>
-          `;
-        }
-        const hex = getColorHexForClass(item.className);
-        return `
-          <td class="cell-slot">
-            <div class="class-badge" style="background-color: ${hex};">${item.className}</div>
-            ${item.sessionType && item.sessionType !== "عادي" ? `<div class="session-type">${item.sessionType}</div>` : ""}
-            ${item.room ? `<div class="slot-room">قاعة ${item.room}</div>` : ""}
-          </td>
-        `;
-      })
-      .join("");
+    const afternoonCells = isBlank
+      ? afternoonSlots
+          .map(
+            () => `
+              <td class="cell-slot cell-blank-slot">
+                <div style="color: #cbd5e1; font-size: 10px; margin-bottom: 4px;">............</div>
+                <div style="color: #e2e8f0; font-size: 9px;">............</div>
+              </td>
+            `
+          )
+          .join("")
+      : afternoonSlots
+          .map((slot) => {
+            const item = findSlot(day, slot.start);
+            if (!item) {
+              if (isTuesday && settings?.tuesdayAfternoonOff) {
+                return `<td class="cell-slot cell-tuesday-off"><span class="tuesday-text">أمسية الثلاثاء (راحة)</span></td>`;
+              }
+              return `<td class="cell-slot cell-empty"><span class="dash">—</span></td>`;
+            }
+            if (item.className.includes("استقبال") || item.sessionType?.includes("استقبال")) {
+              return `
+                <td class="cell-slot cell-reception">
+                  <div class="slot-badge-reception">🤝 استقبال الأولياء</div>
+                  ${item.room ? `<div class="slot-room">قاعة ${item.room}</div>` : ""}
+                </td>
+              `;
+            }
+            const hex = getColorHexForClass(item.className);
+            return `
+              <td class="cell-slot">
+                <div class="class-badge" style="background-color: ${hex};">${item.className}</div>
+                ${item.sessionType && item.sessionType !== "عادي" ? `<div class="session-type">${item.sessionType}</div>` : ""}
+                ${item.room ? `<div class="slot-room">قاعة ${item.room}</div>` : ""}
+              </td>
+            `;
+          })
+          .join("");
 
     return `
       <tr class="${isAlt ? "row-alt" : "row-white"}">
@@ -1582,7 +1724,7 @@ export function generateTimetableLandscapeHTML(options: TimetableReportOptions):
     <header class="official-header">
       <p class="republic-text">الجمهورية الجزائرية الديمقراطية الشعبية</p>
       <p class="ministry-text">وزارة التربية الوطنية — مديرية التربية لولاية ${wilaya}</p>
-      <h1 class="doc-main-title">جدول التوقيت الأسبوعي لـلأستـاذ (EMPLOI DU TEMPS HEBDOMADAIRE)</h1>
+      <h1 class="doc-main-title">${isBlank ? "جدول التوقيت الأسبوعي لـلأستـاذ — استمارة فارغة للتخطيط والتوزيع اليدوي" : "جدول التوقيت الأسبوعي لـلأستـاذ (EMPLOI DU TEMPS HEBDOMADAIRE)"}</h1>
 
       <div class="header-details-grid">
         <div class="header-col"><span>المؤسسة: </span><strong>${school}</strong></div>
@@ -1614,13 +1756,32 @@ export function generateTimetableLandscapeHTML(options: TimetableReportOptions):
       </table>
 
       <div class="hours-summary-bar">
-        <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-          <span style="font-weight: 800; color: #334155;">توزيع ساعات التدريس:</span>
-          ${classesSummaryCards}
-        </div>
-        <div class="total-hours-badge">
-          الحجم الساعي الأسبوعي: ${options.classHoursSummary.activeTeachingHours} ساعة تدريس
-        </div>
+        ${
+          isBlank
+            ? `
+              <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <span style="font-weight: 800; color: #334155;">توزيع ساعات التدريس (تعبئة يدوية):</span>
+                ${(options.customClasses.length > 0 ? options.customClasses : ["1م1", "1م2", "2م3"]).map(cls => `
+                  <div class="class-hour-badge">
+                    <strong>فوج ${cls}:</strong>
+                    <span>....... سا</span>
+                  </div>
+                `).join("")}
+              </div>
+              <div class="total-hours-badge">
+                الحجم الساعي الأسبوعي: ....... ساعة
+              </div>
+            `
+            : `
+              <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                <span style="font-weight: 800; color: #334155;">توزيع ساعات التدريس:</span>
+                ${classesSummaryCards}
+              </div>
+              <div class="total-hours-badge">
+                الحجم الساعي الأسبوعي: ${options.classHoursSummary.activeTeachingHours} ساعة تدريس
+              </div>
+            `
+        }
       </div>
     </main>
 
@@ -1650,7 +1811,9 @@ export function downloadTimetableLandscapePDF(options: TimetableReportOptions): 
   const calculatedDocTitle =
     options.docTitle ||
     options.fileName ||
-    `جدول_التوقيت_الأسبوعي_الأستاذ_${teacherFamily}`;
+    (options.isBlankTemplate
+      ? `جدول_التوقيت_الأسبوعي_نموذج_فارغ_الأستاذ_${teacherFamily}`
+      : `جدول_التوقيت_الأسبوعي_الأستاذ_${teacherFamily}`);
 
   const htmlContent = generateTimetableLandscapeHTML({
     ...options,
@@ -1685,6 +1848,7 @@ export interface ContinuousReportOptions {
   wilayaName?: string;
   subjectName?: string;
   academicYear?: string;
+  isBlankTemplate?: boolean;
   className: string;
   trimester: number;
   columns: ContinuousColumnReportItem[];
@@ -1722,59 +1886,115 @@ export function generateContinuousLandscapeHTML(options: ContinuousReportOptions
   const principal = options.principalName || "السيد مدير المؤسسة";
   const subject = options.subjectName || "الرياضيات";
   const wilaya = options.wilayaName || "الوادي";
-  const academicYear = options.academicYear || "2025 / 2026 م";
+  const academicYear = options.academicYear || getCurrentAcademicYear();
   const className = options.className || "";
   const trimester = options.trimester || 1;
   const bonusSessions = options.bonusSessions || [];
+  const isBlank = Boolean(options.isBlankTemplate);
 
   const count = options.students.length;
   const stats = options.classStats || { avg: "0.00", count, above10: 0, missingTotal: 0 };
   const pct = count > 0 ? Math.round((stats.above10 / count) * 100) : 0;
 
-  const rowsHtml = options.students
-    .map((student, idx) => {
-      const isAlt = idx % 2 === 1;
-      const key = `${className.replace(/\s+/g, "")}_${student.studentName.trim()}_T${trimester}`;
-      const rec = options.records[key] || {};
-      const customScores = rec.customScores || {};
-      const bonus = rec.bonusPoints ?? 0;
-      const finalScore = rec.continuousScore ?? 0;
+  let rowsHtml = "";
+  if (isBlank) {
+    if (options.students.length > 0) {
+      rowsHtml = options.students
+        .map((student, idx) => {
+          const isAlt = idx % 2 === 1;
+          const colCells = options.columns
+            .map(() => `<td class="cell-score cell-blank"><span class="manual-dot">......</span></td>`)
+            .join("");
+          const bonusCells = bonusSessions
+            .map(() => `<td class="cell-bonus cell-blank"><span class="manual-dot">...</span></td>`)
+            .join("");
 
-      // درجات أعمدة التقويم
-      const colCells = options.columns
-        .map((col) => {
-          const isMissing = customScores[`missing_${col.id}`] === 1;
-          if (isMissing) {
-            return `<td class="cell-score cell-missing"><span class="badge-missing">لم يحضر</span></td>`;
-          }
-          const val = customScores[col.id];
-          return `<td class="cell-score">${val !== undefined ? val : "0"}</td>`;
+          return `
+            <tr class="${isAlt ? "row-alt" : "row-white"}">
+              <td class="col-num">${idx + 1}</td>
+              <td class="col-name">${student.studentName}</td>
+              ${colCells}
+              ${bonusCells}
+              <td class="cell-bonus-total cell-blank"><span class="manual-dot">...</span></td>
+              <td class="cell-final-score cell-blank"><span class="manual-dot">......</span></td>
+              <td class="col-notes cell-blank"></td>
+            </tr>
+          `;
         })
         .join("");
+    } else {
+      rowsHtml = Array.from({ length: 32 }, (_, idx) => {
+        const isAlt = idx % 2 === 1;
+        const colCells = options.columns
+          .map(() => `<td class="cell-score cell-blank"><span class="manual-dot">......</span></td>`)
+          .join("");
+        const bonusCells = bonusSessions
+          .map(() => `<td class="cell-bonus cell-blank"><span class="manual-dot">...</span></td>`)
+          .join("");
 
-      // درجات حصص النقاط الإضافية
-      const bonusCells = bonusSessions
-        .map((sess) => {
-          const val = customScores[sess.id];
-          return `<td class="cell-bonus">${val !== undefined && val > 0 ? `+${val}` : "0"}</td>`;
-        })
-        .join("");
+        return `
+          <tr class="${isAlt ? "row-alt" : "row-white"}">
+            <td class="col-num">${idx + 1}</td>
+            <td class="col-name"><div class="dots-line" style="color: #cbd5e1;">................................................</div></td>
+            ${colCells}
+            ${bonusCells}
+            <td class="cell-bonus-total cell-blank"><span class="manual-dot">...</span></td>
+            <td class="cell-final-score cell-blank"><span class="manual-dot">......</span></td>
+            <td class="col-notes cell-blank"></td>
+          </tr>
+        `;
+      }).join("");
+    }
+  } else {
+    rowsHtml = options.students
+      .map((student, idx) => {
+        const isAlt = idx % 2 === 1;
+        const key = `${className.replace(/\s+/g, "")}_${student.studentName.trim()}_T${trimester}`;
+        const rec = options.records[key] || {};
+        const customScores = rec.customScores || {};
+        const bonus = rec.bonusPoints ?? 0;
+        const finalScore = rec.continuousScore ?? 0;
 
-      return `
-        <tr class="${isAlt ? "row-alt" : "row-white"}">
-          <td class="col-num">${idx + 1}</td>
-          <td class="col-name">${student.studentName}</td>
-          ${colCells}
-          ${bonusCells}
-          <td class="cell-bonus-total">${bonus > 0 ? `+${bonus}` : "0"}</td>
-          <td class="cell-final-score ${finalScore >= 10 ? "score-high" : "score-low"}">
-            ${finalScore.toFixed(2)}
-          </td>
-          <td class="col-notes">${rec.notes || ""}</td>
-        </tr>
-      `;
-    })
-    .join("");
+        // درجات أعمدة التقويم
+        const colCells = options.columns
+          .map((col) => {
+            const isMissing = customScores[`missing_${col.id}`] === 1;
+            if (isMissing) {
+              return `<td class="cell-score cell-missing"><span class="badge-missing">لم يحضر</span></td>`;
+            }
+            const val = customScores[col.id];
+            return `<td class="cell-score">${val !== undefined && val !== null ? val : "—"}</td>`;
+          })
+          .join("");
+
+        // درجات حصص النقاط الإضافية
+        const bonusCells = bonusSessions
+          .map((sess) => {
+            const val = customScores[sess.id];
+            return `<td class="cell-bonus">${val !== undefined && val > 0 ? `+${val}` : "0"}</td>`;
+          })
+          .join("");
+
+        const hasAnyScore = options.columns.some((c) => customScores[c.id] !== undefined) || bonus > 0;
+        const displayFinal = hasAnyScore ? finalScore.toFixed(2) : "—";
+        const finalClass = hasAnyScore ? (finalScore >= 10 ? "score-high" : "score-low") : "";
+
+        return `
+          <tr class="${isAlt ? "row-alt" : "row-white"}">
+            <td class="col-num">${idx + 1}</td>
+            <td class="col-name">${student.studentName}</td>
+            ${colCells}
+            ${bonusCells}
+            <td class="cell-bonus-total">${bonus > 0 ? `+${bonus}` : "0"}</td>
+            <td class="cell-final-score ${finalClass}">
+              ${displayFinal}
+            </td>
+            <td class="col-notes">${rec.notes || ""}</td>
+          </tr>
+        `;
+      })
+      .join("");
+  }
 
   return `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -1989,6 +2209,18 @@ export function generateContinuousLandscapeHTML(options: ContinuousReportOptions
       border: 1px solid #fecaca;
     }
 
+    .cell-blank {
+      background: #ffffff !important;
+      text-align: center;
+    }
+
+    .manual-dot {
+      color: #cbd5e1;
+      font-family: monospace;
+      font-size: 11px;
+      letter-spacing: 1.5px;
+    }
+
     .row-alt { background: #f8fafc; }
     .row-white { background: #ffffff; }
 
@@ -2032,7 +2264,7 @@ export function generateContinuousLandscapeHTML(options: ContinuousReportOptions
     <header class="official-header">
       <p class="republic-text">الجمهورية الجزائرية الديمقراطية الشعبية</p>
       <p class="ministry-text">وزارة التربية الوطنية — مديرية التربية لولاية ${wilaya}</p>
-      <h1 class="doc-main-title">سجل التقويم المستمر والتنقيط الصفي (CAHIER D'ÉVALUATION CONTINUE)</h1>
+      <h1 class="doc-main-title">${isBlank ? "سجل التقويم المستمر والتنقيط الصفي — استمارة فارغة للرصد اليدوي" : "سجل التقويم المستمر والتنقيط الصفي (CAHIER D'ÉVALUATION CONTINUE)"}</h1>
 
       <div class="header-details-grid">
         <div class="header-col"><span>المؤسسة: </span><strong>${school}</strong></div>
@@ -2045,10 +2277,21 @@ export function generateContinuousLandscapeHTML(options: ContinuousReportOptions
     </header>
 
     <div class="stats-bar">
-      <span class="stat-badge stat-blue">👥 إجمالي التلاميذ: <strong>${count}</strong></span>
-      <span class="stat-badge stat-emerald">📊 معدل الفوج: <strong>${stats.avg} / 20</strong></span>
-      <span class="stat-badge stat-emerald">⭐ الحاصلون على 10 فما فوق: <strong>${stats.above10}</strong> (${pct}%)</span>
-      <span class="stat-badge stat-amber">⚠️ حالات نقص الكراس/الواجب: <strong>${stats.missingTotal}</strong></span>
+      ${
+        isBlank
+          ? `
+            <span class="stat-badge stat-blue">👥 إجمالي التلاميذ: <strong>${count > 0 ? count : 32}</strong></span>
+            <span class="stat-badge stat-emerald">🏫 الفوج التربوي: <strong>فوج ${className}</strong></span>
+            <span class="stat-badge stat-purple">📅 الفصل الدراسي: <strong>الفصل ${trimester}</strong></span>
+            <span class="stat-badge stat-amber">✍️ نموذج ورقي فارغ للرصد بالقلم</span>
+          `
+          : `
+            <span class="stat-badge stat-blue">👥 إجمالي التلاميذ: <strong>${count}</strong></span>
+            <span class="stat-badge stat-emerald">📊 معدل الفوج: <strong>${stats.avg} / 20</strong></span>
+            <span class="stat-badge stat-emerald">⭐ الحاصلون على 10 فما فوق: <strong>${stats.above10}</strong> (${pct}%)</span>
+            ${stats.missingTotal > 0 ? `<span class="stat-badge stat-amber">⚠️ حالات نقص الكراس/الواجب: <strong>${stats.missingTotal}</strong></span>` : ""}
+          `
+      }
     </div>
 
     <main>
@@ -2114,7 +2357,9 @@ export function downloadContinuousLandscapePDF(options: ContinuousReportOptions)
   const calculatedDocTitle =
     options.docTitle ||
     options.fileName ||
-    `سجل_التقويم_المستمر_فوج_${options.className}_الفصل_${options.trimester}_الأستاذ_${teacherFamily}`;
+    (options.isBlankTemplate
+      ? `سجل_التقويم_المستمر_نموذج_فارغ_فوج_${options.className}_الفصل_${options.trimester}_الأستاذ_${teacherFamily}`
+      : `سجل_التقويم_المستمر_فوج_${options.className}_الفصل_${options.trimester}_الأستاذ_${teacherFamily}`);
 
   const htmlContent = generateContinuousLandscapeHTML({
     ...options,

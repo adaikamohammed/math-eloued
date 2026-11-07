@@ -17,6 +17,7 @@ import {
   X,
   Sparkles,
   Download,
+  ClipboardCheck,
 } from "lucide-react";
 import {
   OfficialGradeRecord,
@@ -28,6 +29,7 @@ import { checkTeacherSession, getPersistedTeacherSession } from "@/lib/offlineAu
 import { saveTeacherOfflineData, setupAutoSync } from "@/lib/offlineStorage";
 import { useProfile } from "@/lib/useProfile";
 import { downloadContinuousLandscapePDF } from "@/lib/pdfReportGenerator";
+import { getCurrentAcademicYear } from "@/lib/academicYear";
 
 // تعريف بنية العمود المرن في التقويم المستمر
 export interface ContinuousColumn {
@@ -715,7 +717,7 @@ export default function ContinuousEvalMobilePage() {
   }, [classStudents, getRecord]);
 
   // حفظ وتصدير سجل التقويم المستمر كملف PDF أفقي رسمي (A4 Landscape)
-  const handleDownloadLandscapePDF = () => {
+  const handleDownloadLandscapePDF = (isBlankTemplate: boolean = false) => {
     const printTeacherName = profile?.full_name || "الأستاذ(ة)";
     const printSchoolName = profile?.school_custom_name || "المتوسطة التعليمية";
     const printSubject = profile?.subject || "الرياضيات";
@@ -728,7 +730,8 @@ export default function ContinuousEvalMobilePage() {
       wilayaName: printWilaya,
       className: selectedClass,
       trimester: selectedTrimester,
-      academicYear: "2025 / 2026 م",
+      academicYear: getCurrentAcademicYear(),
+      isBlankTemplate,
       columns: columns.map((c) => ({
         id: c.id,
         title: c.title,
@@ -822,15 +825,26 @@ export default function ContinuousEvalMobilePage() {
               <span>تخصيص الأعمدة ({columns.length})</span>
             </button>
 
-            {/* زر حفظ PDF أفقي */}
+            {/* زر حفظ PDF معبأ */}
             <button
-              onClick={handleDownloadLandscapePDF}
+              onClick={() => handleDownloadLandscapePDF(false)}
               type="button"
-              className="py-2 px-3.5 rounded-xl border border-emerald-600 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-black flex items-center gap-1.5 shadow-sm transition active:scale-95 cursor-pointer"
-              title="حفظ وتصدير سجل التقويم المستمر كملف PDF أفقي رسمي (A4 Landscape)"
+              className="py-2 px-3 rounded-xl border border-emerald-600 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-black flex items-center gap-1.5 shadow-sm transition active:scale-95 cursor-pointer"
+              title="حفظ وتصدير سجل التقويم المستمر معبأ بالنقاط والبيانات المسجلة"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>حفظ PDF أفقياً 📄</span>
+              <span>حفظ PDF (معبأ) 📄</span>
+            </button>
+
+            {/* زر نموذج فارغ للرصد */}
+            <button
+              onClick={() => handleDownloadLandscapePDF(true)}
+              type="button"
+              className="py-2 px-3 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-800 text-xs font-black flex items-center gap-1.5 shadow-2xs transition active:scale-95 cursor-pointer"
+              title="تنزيل نموذج ورقي فارغ للرصد اليدوي بالقلم داخل القسم"
+            >
+              <ClipboardCheck className="w-3.5 h-3.5 text-slate-600" />
+              <span>✍️ نموذج فارغ للرصد</span>
             </button>
 
             <Link

@@ -584,8 +584,8 @@ export default function GradebookEvaluationPage() {
     });
   };
 
-  // تشغيل حفظ وتحميل PDF أفقياً
-  const handleDownloadPDF = () => {
+  // تشغيل حفظ وتحميل PDF أفقياً (معبأ أو نموذج فارغ للرصد اليدوي)
+  const handleDownloadPDF = (isBlankTemplate: boolean = false) => {
     downloadGradebookPDF({
       teacherName: profile?.fullName || "الأستاذ(ة)",
       schoolName: profile?.schoolCustomName || "المؤسسة التعليمية",
@@ -599,6 +599,7 @@ export default function GradebookEvaluationPage() {
       students: classStudents,
       records: gradeRecords,
       includeCriteriaBreakdown: false,
+      isBlankTemplate,
     });
   };
 
@@ -740,22 +741,22 @@ export default function GradebookEvaluationPage() {
               <span>تصدير Excel 📊</span>
             </button>
             <button
-              onClick={handlePrintLandscape}
-              type="button"
-              className="px-3.5 py-1.5 rounded-xl border border-gray-300 bg-white text-xs font-bold text-gray-800 hover:bg-gray-50 transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
-              title="طباعة سجل التنقيط أفقياً A4 رسمي"
-            >
-              <Printer className="w-3.5 h-3.5 text-[#107a57]" />
-              <span>طباعة أفقياً A4 🖨️</span>
-            </button>
-            <button
-              onClick={handleDownloadPDF}
+              onClick={() => handleDownloadPDF(false)}
               type="button"
               className="px-3.5 py-1.5 rounded-xl border border-[#107a57]/30 bg-[#e6f4ee] text-xs font-black text-[#107a57] hover:bg-[#d8efe5] transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
-              title="حفظ وتنزيل كراس التنقيط كملف PDF أفقي عالي الدقة"
+              title="حفظ وتنزيل كراس التنقيط كملف PDF معبأ بالبيانات والنقاط المسجلة"
             >
               <Download className="w-3.5 h-3.5 text-[#107a57]" />
-              <span>تحميل PDF أفقياً 📄</span>
+              <span>حفظ PDF (معبأ) 📄</span>
+            </button>
+            <button
+              onClick={() => handleDownloadPDF(true)}
+              type="button"
+              className="px-3.5 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-black text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
+              title="تنزيل استمارة كراس التنقيط فارغة للرصد اليدوي بالقلم داخل القسم"
+            >
+              <ClipboardCheck className="w-3.5 h-3.5 text-slate-600" />
+              <span>✍️ نموذج فارغ للرصد</span>
             </button>
             <button
               onClick={handleSaveToServer}

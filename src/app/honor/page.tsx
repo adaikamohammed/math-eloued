@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useTeacherId, withTeacher, teacherHomeHref, useTeacherInfo, teacherLabel } from "@/lib/teacherParam";
+import { getCurrentAcademicYear } from "@/lib/academicYear";
 import {
   ArrowRight,
   Trophy,
@@ -1016,7 +1017,7 @@ ${item.notes ? `💬 كلمة الأستاذ: «${item.notes}»\n` : ""}
                 <div className="flex items-center justify-between text-[11px] pt-1 text-gray-600 font-medium px-4">
                   <span>مديرية التربية لولاية {profile?.wilaya || "الوادي"}</span>
                   <span>متوسطة: {profile?.school || "المتوسطة"}</span>
-                  <span>الموسم الدراسي: 2025 / 2026</span>
+                  <span>الموسم الدراسي: {getCurrentAcademicYear()}</span>
                 </div>
               </div>
 

@@ -1,4 +1,5 @@
 import React from "react";
+import { getCurrentAcademicYear } from "@/lib/academicYear";
 
 interface Props {
   title: string;
@@ -14,9 +15,10 @@ export function PrintOfficialHeader({
   subtitle,
   schoolName = "المؤسسة التعليمية",
   wilayaName = "مديرية التربية الوطنية",
-  academicYear = "2026 / 2027",
+  academicYear,
   subjectName,
 }: Props) {
+  const effectiveYear = academicYear || getCurrentAcademicYear();
   return (
     <div className="w-full text-center space-y-2 mb-6 font-sans text-black" dir="rtl">
       {/* الترويسة الدستورية الرسمية */}
@@ -37,7 +39,7 @@ export function PrintOfficialHeader({
         </div>
 
         <div className="text-left space-y-0.5">
-          <p>السنة الدراسية: {academicYear}</p>
+          <p>السنة الدراسية: {effectiveYear}</p>
           {subjectName && <p>مادة: {subjectName}</p>}
         </div>
       </div>

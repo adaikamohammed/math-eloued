@@ -30,6 +30,7 @@ import {
   ChevronDown,
   QrCode,
   Download,
+  ClipboardCheck,
 } from "lucide-react";
 import { LoginRequired } from "@/components/LoginRequired";
 import { PageExplainer } from "@/components/PageExplainer";
@@ -917,7 +918,7 @@ export default function StudentsManagementPage() {
     currentVisibleIds.length > 0 && currentVisibleIds.every((id) => selectedIds.has(id));
 
   // حفظ وتصدير قائمة وتفويج التلاميذ كملف PDF أفقي رسمي (A4 Landscape)
-  const handleDownloadLandscapePDF = () => {
+  const handleDownloadLandscapePDF = (isBlankTemplate: boolean = false) => {
     const printTeacherName = profile?.full_name || "الأستاذ(ة)";
     const printSchoolName = profile?.school_custom_name || "المتوسطة التعليمية";
     const printSubject = profile?.subject || "الرياضيات";
@@ -936,6 +937,7 @@ export default function StudentsManagementPage() {
       wilayaName: printWilaya,
       className: selectedClass === "all" ? "جميع الأفواج" : selectedClass,
       students: targetStudents,
+      isBlankTemplate,
       stats: {
         total: activeClassStudents.length,
         male: maleCount,
@@ -971,13 +973,22 @@ export default function StudentsManagementPage() {
               <span>بطاقات QR للتلاميذ 🪪</span>
             </button>
             <button
-              onClick={handleDownloadLandscapePDF}
+              onClick={() => handleDownloadLandscapePDF(false)}
               type="button"
               className="px-3.5 py-1.5 rounded-xl border border-emerald-600 bg-emerald-700 hover:bg-emerald-800 text-xs font-black text-white transition shadow-sm flex items-center gap-1.5 cursor-pointer active:scale-95"
-              title="حفظ قائمة وتفويج التلاميذ كملف PDF أفقي رسمي (A4 Landscape)"
+              title="حفظ قائمة وتفويج التلاميذ كملف PDF معبأ بالبيانات"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>حفظ PDF أفقياً 📄</span>
+              <span>حفظ PDF (معبأ) 📄</span>
+            </button>
+            <button
+              onClick={() => handleDownloadLandscapePDF(true)}
+              type="button"
+              className="px-3.5 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-xs font-black text-slate-800 transition shadow-2xs flex items-center gap-1.5 cursor-pointer active:scale-95"
+              title="تنزيل استمارة قائمة التلاميذ فارغة للرصد والتسجيل اليدوي"
+            >
+              <ClipboardCheck className="w-3.5 h-3.5 text-slate-600" />
+              <span>✍️ نموذج فارغ للتسجيل</span>
             </button>
             <button
               onClick={() => setIsClassModalOpen(true)}

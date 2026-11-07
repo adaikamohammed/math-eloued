@@ -1,4 +1,5 @@
 import { DailyDiaryEntry, TimetableSettings } from "./types";
+import { getCurrentAcademicYear } from "./academicYear";
 
 export interface WeeklyPdfDayInfo {
   name: string;
@@ -12,6 +13,8 @@ export interface WeeklyDiaryPdfOptions {
   principalName?: string;
   wilayaName?: string;
   subjectName?: string;
+  academicYear?: string;
+  isBlankTemplate?: boolean;
   weekStartStr: string; // e.g. "2026-10-04"
   weekEndStr: string;   // e.g. "2026-10-08"
   orientation?: "days-as-rows" | "days-as-cols";
@@ -66,8 +69,10 @@ export function generateWeeklyDiaryHTML(options: WeeklyDiaryPdfOptions): string 
   const principal = options.principalName || "السيد مدير المؤسسة";
   const subject = options.subjectName || "الرياضيات";
   const wilaya = options.wilayaName || "الوادي";
+  const academicYear = options.academicYear || getCurrentAcademicYear();
   const classColors = options.classColorsMap || {};
   const orientation = options.orientation || "days-as-rows";
+  const isBlank = Boolean(options.isBlankTemplate);
 
   const morningSlots = options.morningSlots.length > 0 ? options.morningSlots : ["08:00 - 09:00", "09:00 - 10:00", "10:00 - 11:00", "11:00 - 12:00"];
   const afternoonSlots = options.afternoonSlots.length > 0 ? options.afternoonSlots : ["13:30 - 14:30", "14:30 - 15:30", "15:30 - 16:30"];
@@ -136,6 +141,14 @@ export function generateWeeklyDiaryHTML(options: WeeklyDiaryPdfOptions): string 
                   <div class="day-date">${fullDate}</div>
                 </td>
                 ${allTimeSlots.map((slot) => {
+                  if (isBlank) {
+                    return `
+                      <td class="cell-slot empty-slot">
+                        <div style="color: #cbd5e1; font-size: 10px; margin-bottom: 3px;">...................</div>
+                        <div style="color: #e2e8f0; font-size: 9px;">...................</div>
+                      </td>
+                    `;
+                  }
                   const lesson = findLesson(dayObj.dateStr, slot);
                   if (!lesson) {
                     return `<td class="cell-slot empty-slot"><span class="empty-mark">—</span></td>`;
@@ -185,6 +198,14 @@ export function generateWeeklyDiaryHTML(options: WeeklyDiaryPdfOptions): string 
               <tr class="${rowClass}">
                 <td class="cell-time-side morning-time">${slot}</td>
                 ${options.schoolDays.map((d) => {
+                  if (isBlank) {
+                    return `
+                      <td class="cell-slot empty-slot">
+                        <div style="color: #cbd5e1; font-size: 10px; margin-bottom: 3px;">...................</div>
+                        <div style="color: #e2e8f0; font-size: 9px;">...................</div>
+                      </td>
+                    `;
+                  }
                   const lesson = findLesson(d.dateStr, slot);
                   if (!lesson) {
                     return `<td class="cell-slot empty-slot"><span class="empty-mark">—</span></td>`;
@@ -213,6 +234,14 @@ export function generateWeeklyDiaryHTML(options: WeeklyDiaryPdfOptions): string 
               <tr class="${rowClass}">
                 <td class="cell-time-side afternoon-time">${slot}</td>
                 ${options.schoolDays.map((d) => {
+                  if (isBlank) {
+                    return `
+                      <td class="cell-slot empty-slot">
+                        <div style="color: #cbd5e1; font-size: 10px; margin-bottom: 3px;">...................</div>
+                        <div style="color: #e2e8f0; font-size: 9px;">...................</div>
+                      </td>
+                    `;
+                  }
                   const lesson = findLesson(d.dateStr, slot);
                   if (!lesson) {
                     return `<td class="cell-slot empty-slot"><span class="empty-mark">—</span></td>`;
@@ -488,14 +517,14 @@ export function generateWeeklyDiaryHTML(options: WeeklyDiaryPdfOptions): string 
       <div class="header-top">
         <div class="republic">الجمهورية الجزائرية الديمقراطية الشعبية</div>
         <div class="ministry">وزارة التربية الوطنية — مديرية التربية لولاية ${wilaya}</div>
-        <h1 class="main-title">المخطط الأسبوعي للدفتر اليومي البيداغوجي</h1>
+        <h1 class="main-title">${isBlank ? "المخطط الأسبوعي للدفتر اليومي — استمارة فارغة للتحضير والتخطيط اليدوي" : "المخطط الأسبوعي للدفتر اليومي البيداغوجي"}</h1>
         <div class="week-range">الأسبوع: من ${formatArabicDate(options.weekStartStr)} إلى ${formatArabicDate(options.weekEndStr)}</div>
       </div>
       <div class="header-grid">
         <div class="header-col"><span>المؤسسة: </span><strong>${school}</strong></div>
         <div class="header-col"><span>الأستاذ(ة): </span><strong>${teacher}</strong></div>
         <div class="header-col"><span>المادة: </span><strong>${subject}</strong></div>
-        <div class="header-col"><span>الموسم: </span><strong>2026 / 2027</strong></div>
+        <div class="header-col"><span>الموسم: </span><strong>${academicYear}</strong></div>
       </div>
     </header>
 
@@ -534,7 +563,9 @@ export function printWeeklyDiaryReport(options: WeeklyDiaryPdfOptions): void {
   const calculatedTitle =
     options.docTitle ||
     options.fileName ||
-    `المخطط_الأسبوعي_الدفتر_اليومي_من_${options.weekStartStr}_إلى_${options.weekEndStr}_الأستاذ_${teacherFamily}`;
+    (options.isBlankTemplate
+      ? `المخطط_الأسبوعي_نموذج_فارغ_من_${options.weekStartStr}_إلى_${options.weekEndStr}_الأستاذ_${teacherFamily}`
+      : `المخطط_الأسبوعي_الدفتر_اليومي_من_${options.weekStartStr}_إلى_${options.weekEndStr}_الأستاذ_${teacherFamily}`);
 
   const htmlContent = generateWeeklyDiaryHTML({
     ...options,
