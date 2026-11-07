@@ -81,7 +81,7 @@ export function generateGradebookHTML(options: GradebookPdfOptions): string {
     index: number;
     name: string;
     group: string;
-    rec: OfficialGradeRecord;
+    rec?: Partial<OfficialGradeRecord>;
     continuous?: number;
     bScore?: number;
     nb1?: number;
