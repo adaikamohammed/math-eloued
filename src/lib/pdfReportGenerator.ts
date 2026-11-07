@@ -1344,14 +1344,14 @@ export function generateTimetableLandscapeHTML(options: TimetableReportOptions):
 
   // لوحة ألوان الأفواج
   const getColorHexForClass = (cls: string): string => {
-    if (!cls) return "#10b981";
+    if (!cls) return "#0f766e";
     if (options.classColorsMap && options.classColorsMap[cls]) {
       const colorId = options.classColorsMap[cls];
       if (DEFAULT_FALLBACK_PALETTE[colorId]) return DEFAULT_FALLBACK_PALETTE[colorId];
     }
     const idx = options.customClasses.indexOf(cls);
     const keys = Object.keys(DEFAULT_FALLBACK_PALETTE);
-    return DEFAULT_FALLBACK_PALETTE[keys[idx >= 0 ? idx % keys.length : 0]] || "#10b981";
+    return DEFAULT_FALLBACK_PALETTE[keys[idx >= 0 ? idx % keys.length : 0]] || "#0f766e";
   };
 
   const rowsHtml = DEFAULT_TIMETABLE_DAYS.map((day, dIdx) => {
@@ -1364,8 +1364,10 @@ export function generateTimetableLandscapeHTML(options: TimetableReportOptions):
           .map(
             () => `
               <td class="cell-slot cell-blank-slot">
-                <div style="color: #cbd5e1; font-size: 10px; margin-bottom: 4px;">............</div>
-                <div style="color: #e2e8f0; font-size: 9px;">............</div>
+                <div class="blank-slot-target">
+                  <div class="blank-cls">فوج: ...........</div>
+                  <div class="blank-rm">قاعة: ......</div>
+                </div>
               </td>
             `
           )
@@ -1395,45 +1397,66 @@ export function generateTimetableLandscapeHTML(options: TimetableReportOptions):
           })
           .join("");
 
-    // خلايا المساء
-    const afternoonCells = isBlank
-      ? afternoonSlots
-          .map(
-            () => `
-              <td class="cell-slot cell-blank-slot">
-                <div style="color: #cbd5e1; font-size: 10px; margin-bottom: 4px;">............</div>
-                <div style="color: #e2e8f0; font-size: 9px;">............</div>
-              </td>
-            `
-          )
-          .join("")
-      : afternoonSlots
-          .map((slot) => {
-            const item = findSlot(day, slot.start);
-            if (!item) {
-              if (isTuesday && settings?.tuesdayAfternoonOff) {
-                return `<td class="cell-slot cell-tuesday-off"><span class="tuesday-text">أمسية الثلاثاء (راحة)</span></td>`;
+    // خلايا المساء (مع دمج راحة مساء الثلاثاء بشكل أنيق)
+    let afternoonCells = "";
+
+    const hasTuesdayOff = isTuesday && settings?.tuesdayAfternoonOff !== false;
+    const tuesdayAfternoonItems = hasTuesdayOff
+      ? afternoonSlots.map((s) => findSlot(day, s.start)).filter(Boolean)
+      : [];
+
+    if (hasTuesdayOff && tuesdayAfternoonItems.length === 0 && !isBlank) {
+      // دمج خلايا الثلاثاء مساء في شريط راحة موحد مطابق للواقع التربوي الجزائري
+      afternoonCells = `
+        <td colspan="${afternoonSlots.length}" class="cell-slot cell-tuesday-rest">
+          <div class="tuesday-rest-banner">
+            <span class="tuesday-rest-icon">☕</span>
+            <span class="tuesday-rest-title">أمسية الثلاثاء — فترة الراحة البيداغوجية الأسبوعية وتنسيق المادة</span>
+          </div>
+        </td>
+      `;
+    } else {
+      afternoonCells = isBlank
+        ? afternoonSlots
+            .map(
+              () => `
+                <td class="cell-slot cell-blank-slot">
+                  <div class="blank-slot-target">
+                    <div class="blank-cls">فوج: ...........</div>
+                    <div class="blank-rm">قاعة: ......</div>
+                  </div>
+                </td>
+              `
+            )
+            .join("")
+        : afternoonSlots
+            .map((slot) => {
+              const item = findSlot(day, slot.start);
+              if (!item) {
+                if (isTuesday && settings?.tuesdayAfternoonOff) {
+                  return `<td class="cell-slot cell-tuesday-off"><span class="tuesday-text">أمسية الثلاثاء (راحة)</span></td>`;
+                }
+                return `<td class="cell-slot cell-empty"><span class="dash">—</span></td>`;
               }
-              return `<td class="cell-slot cell-empty"><span class="dash">—</span></td>`;
-            }
-            if (item.className.includes("استقبال") || item.sessionType?.includes("استقبال")) {
+              if (item.className.includes("استقبال") || item.sessionType?.includes("استقبال")) {
+                return `
+                  <td class="cell-slot cell-reception">
+                    <div class="slot-badge-reception">🤝 استقبال الأولياء</div>
+                    ${item.room ? `<div class="slot-room">قاعة ${item.room}</div>` : ""}
+                  </td>
+                `;
+              }
+              const hex = getColorHexForClass(item.className);
               return `
-                <td class="cell-slot cell-reception">
-                  <div class="slot-badge-reception">🤝 استقبال الأولياء</div>
+                <td class="cell-slot">
+                  <div class="class-badge" style="background-color: ${hex};">${item.className}</div>
+                  ${item.sessionType && item.sessionType !== "عادي" ? `<div class="session-type">${item.sessionType}</div>` : ""}
                   ${item.room ? `<div class="slot-room">قاعة ${item.room}</div>` : ""}
                 </td>
               `;
-            }
-            const hex = getColorHexForClass(item.className);
-            return `
-              <td class="cell-slot">
-                <div class="class-badge" style="background-color: ${hex};">${item.className}</div>
-                ${item.sessionType && item.sessionType !== "عادي" ? `<div class="session-type">${item.sessionType}</div>` : ""}
-                ${item.room ? `<div class="slot-room">قاعة ${item.room}</div>` : ""}
-              </td>
-            `;
-          })
-          .join("");
+            })
+            .join("");
+    }
 
     return `
       <tr class="${isAlt ? "row-alt" : "row-white"}">
@@ -1456,53 +1479,67 @@ export function generateTimetableLandscapeHTML(options: TimetableReportOptions):
         <div class="class-hour-badge" style="border-right: 3px solid ${hex};">
           <strong style="color: ${hex};">فوج ${cls}:</strong>
           <span>${st.total} سا</span>
-          ${st.td > 0 ? `<small>(${st.td} تفويج)</small>` : ""}
+          ${st.td > 0 ? `<small style="color: #64748b;">(${st.td} تفويج)</small>` : ""}
         </div>
       `;
     })
     .join("");
 
+  const teacherFamily = (teacher || "الأستاذ").trim().split(" ")[0];
+  const defaultTitle = isBlank
+    ? `جدول_التوقيت_الأسبوعي_نموذج_فارغ_الأستاذ_${teacherFamily}`
+    : `جدول_التوقيت_الأسبوعي_الأستاذ_${teacherFamily}`;
+
   return `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
-  <title>${options.docTitle || `جدول_التوقيت_الأسبوعي_الأستاذ_${teacher}`}</title>
+  <title>${options.docTitle || defaultTitle}</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap');
 
     @page {
       size: A4 landscape;
-      margin: 8mm 10mm 8mm 10mm;
+      margin: 6mm 8mm;
     }
 
     * {
       box-sizing: border-box;
+      margin: 0;
+      padding: 0;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
     }
 
     body {
       font-family: 'Cairo', 'Segoe UI', Tahoma, Arial, sans-serif;
-      margin: 0;
-      padding: 0;
       background: #ffffff;
-      color: #111827;
-      font-size: 11px;
-      line-height: 1.35;
+      color: #0f172a;
+      font-size: 10.5px;
+      line-height: 1.3;
       direction: rtl;
       text-align: right;
     }
 
     .report-container {
       width: 100%;
-      max-width: 277mm;
+      max-width: 281mm;
       margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      min-height: 194mm;
+      max-height: 196mm;
+      justify-content: space-between;
+      page-break-inside: avoid;
     }
 
+    /* ─── الترويسة الوزارية الرسمية ─── */
     .official-header {
-      border-bottom: 2px solid #0f172a;
-      padding-bottom: 5px;
-      margin-bottom: 8px;
+      border: 1.5px solid #0f172a;
+      border-radius: 8px;
+      padding: 5px 12px;
+      background: #f8fafc;
+      margin-bottom: 5px;
       text-align: center;
     }
 
@@ -1510,31 +1547,42 @@ export function generateTimetableLandscapeHTML(options: TimetableReportOptions):
       font-size: 11px;
       font-weight: 700;
       color: #334155;
-      margin: 0 0 1px 0;
+      line-height: 1.2;
     }
 
     .ministry-text {
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 700;
-      color: #334155;
-      margin: 0 0 3px 0;
+      color: #475569;
+      line-height: 1.2;
+      margin: 1px 0;
     }
 
     .doc-main-title {
-      font-size: 15px;
+      font-size: 14px;
       font-weight: 900;
       color: #0f172a;
-      margin: 0 0 3px 0;
+      margin: 2px 0 1px 0;
       letter-spacing: 0.2px;
     }
 
+    .doc-subtitle-fr {
+      font-size: 8.5px;
+      font-weight: 700;
+      color: #64748b;
+      letter-spacing: 0.5px;
+      margin-bottom: 2px;
+    }
+
     .header-details-grid {
-      display: flex;
-      justify-content: space-between;
+      display: grid;
+      grid-template-columns: 1.2fr 1fr 1fr 1fr 1fr;
+      gap: 6px;
       border-top: 1px solid #cbd5e1;
-      padding-top: 4px;
-      margin-top: 4px;
-      font-size: 11px;
+      padding-top: 3px;
+      margin-top: 3px;
+      font-size: 10px;
+      color: #334155;
     }
 
     .header-col strong {
@@ -1542,48 +1590,48 @@ export function generateTimetableLandscapeHTML(options: TimetableReportOptions):
       font-weight: 800;
     }
 
-    /* جدول التوقيت */
+    /* ─── شبكة جدول التوقيت ─── */
     .timetable-grid {
       width: 100%;
       border-collapse: collapse;
       border: 1.5px solid #0f172a;
       table-layout: fixed;
-      margin-bottom: 8px;
+      margin-bottom: 4px;
     }
 
     .timetable-grid th {
-      background: #1e293b;
+      background: #0f172a;
       color: #ffffff;
-      padding: 6px 3px;
+      padding: 4px 2px;
       font-weight: 800;
       text-align: center;
       border: 1px solid #334155;
-      font-size: 10.5px;
+      font-size: 10px;
     }
 
     .timetable-grid td {
-      border: 1px solid #cbd5e1;
-      padding: 6px 4px;
+      border: 1px solid #94a3b8;
+      padding: 3px 2px;
       text-align: center;
       vertical-align: middle;
-      height: 48px;
+      height: 44px;
     }
 
-    .th-day { width: 11%; }
-    .th-slot { width: 11%; }
-    .th-break { width: 6%; background: #475569 !important; font-size: 9.5px; }
+    .th-day { width: 10%; background: #0f172a !important; }
+    .th-slot { width: 12%; }
+    .th-break { width: 5.5%; background: #334155 !important; font-size: 8.5px; }
 
     .col-day {
       background: #0f172a;
       color: #ffffff;
       font-weight: 900;
-      font-size: 11.5px;
+      font-size: 11px;
     }
 
     .col-break {
       background: #f1f5f9;
-      color: #64748b;
-      font-size: 9px;
+      color: #475569;
+      font-size: 8.5px;
       font-weight: 800;
       padding: 2px !important;
     }
@@ -1591,28 +1639,29 @@ export function generateTimetableLandscapeHTML(options: TimetableReportOptions):
     .break-text {
       writing-mode: vertical-rl;
       letter-spacing: 2px;
+      font-size: 9px;
     }
 
     .class-badge {
       display: inline-block;
       color: #ffffff;
       font-weight: 900;
-      font-size: 11px;
-      padding: 2.5px 8px;
-      border-radius: 6px;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+      font-size: 10.5px;
+      padding: 1.5px 7px;
+      border-radius: 4px;
+      line-height: 1.2;
     }
 
     .session-type {
-      font-size: 9px;
+      font-size: 8px;
       font-weight: 700;
       color: #475569;
-      margin-top: 2px;
+      margin-top: 1.5px;
     }
 
     .slot-room {
-      font-size: 8.5px;
-      font-weight: 600;
+      font-size: 8px;
+      font-weight: 700;
       color: #64748b;
     }
 
@@ -1625,96 +1674,147 @@ export function generateTimetableLandscapeHTML(options: TimetableReportOptions):
       background: #7e22ce;
       color: #ffffff;
       font-weight: 800;
-      font-size: 9.5px;
-      padding: 2px 6px;
+      font-size: 9px;
+      padding: 1.5px 6px;
       border-radius: 4px;
+      line-height: 1.2;
     }
 
     .cell-tuesday-off {
       background: #f8fafc;
       color: #94a3b8;
-      font-size: 9.5px;
+      font-size: 9px;
       font-weight: 700;
+    }
+
+    .cell-tuesday-rest {
+      background: #f8fafc;
+      border: 1px dashed #cbd5e1;
+    }
+
+    .tuesday-rest-banner {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      color: #64748b;
+      font-size: 10px;
+      font-weight: 800;
+    }
+
+    .tuesday-rest-icon {
+      font-size: 12px;
     }
 
     .cell-empty {
       color: #cbd5e1;
-      font-size: 14px;
+      font-size: 13px;
     }
 
     .dash {
       color: #cbd5e1;
+      font-weight: 700;
     }
 
-    .row-alt { background: #fafafa; }
+    .row-alt { background: #fafaf9; }
     .row-white { background: #ffffff; }
 
-    /* شريط توزيع الساعات أسفل الجدول */
+    /* ─── خانة النموذج الفارغ للتخطيط اليدوي ─── */
+    .cell-blank-slot {
+      background: #ffffff;
+    }
+
+    .blank-slot-target {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 3px;
+      height: 100%;
+    }
+
+    .blank-cls {
+      font-size: 9px;
+      font-weight: 800;
+      color: #475569;
+    }
+
+    .blank-rm {
+      font-size: 8px;
+      font-weight: 700;
+      color: #94a3b8;
+    }
+
+    /* ─── شريط توزيع الساعات أسفل الجدول ─── */
     .hours-summary-bar {
       display: flex;
       align-items: center;
       justify-content: space-between;
       flex-wrap: wrap;
-      gap: 6px;
+      gap: 5px;
       background: #f8fafc;
       border: 1px solid #cbd5e1;
-      border-radius: 8px;
-      padding: 6px 10px;
-      font-size: 10.5px;
-      margin-bottom: 6px;
+      border-radius: 6px;
+      padding: 3px 8px;
+      font-size: 9.5px;
+      margin-bottom: 4px;
     }
 
     .class-hour-badge {
       background: #ffffff;
       border: 1px solid #e2e8f0;
-      padding: 3px 8px;
-      border-radius: 5px;
+      padding: 1.5px 6px;
+      border-radius: 4px;
       display: inline-flex;
       align-items: center;
-      gap: 4px;
-      font-size: 10px;
+      gap: 3px;
+      font-size: 9px;
     }
 
     .total-hours-badge {
       background: #0f172a;
       color: #ffffff;
-      padding: 3px 10px;
-      border-radius: 6px;
+      padding: 2px 8px;
+      border-radius: 4px;
       font-weight: 900;
-      font-size: 11px;
+      font-size: 9.5px;
     }
 
-    /* التوقيعات الرسمية */
+    /* ─── كتلة التوقيعات الرسمية ─── */
     .signatures-block {
-      margin-top: 12px;
+      border: 1.5px solid #0f172a;
+      border-radius: 6px;
+      padding: 4px 10px;
+      background: #f8fafc;
       page-break-inside: avoid;
     }
 
     .signatures-grid {
-      display: flex;
-      justify-content: space-between;
-      gap: 16px;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+      text-align: center;
     }
 
     .signature-card {
-      flex: 1;
       border: 1px dashed #94a3b8;
-      border-radius: 6px;
-      padding: 7px 10px;
-      text-align: center;
-      min-height: 48px;
+      border-radius: 5px;
+      padding: 4px 8px;
+      height: 42px;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      background: #fafaf7;
-      font-size: 10px;
-      font-weight: 700;
-      color: #475569;
+      background: #ffffff;
+    }
+
+    .signature-card span {
+      font-size: 9px;
+      font-weight: 800;
+      color: #334155;
     }
 
     .signer-name {
-      font-size: 11px;
-      font-weight: 900;
+      font-size: 8.5px;
+      font-weight: 800;
       color: #0f172a;
     }
   </style>
@@ -1724,7 +1824,20 @@ export function generateTimetableLandscapeHTML(options: TimetableReportOptions):
     <header class="official-header">
       <p class="republic-text">الجمهورية الجزائرية الديمقراطية الشعبية</p>
       <p class="ministry-text">وزارة التربية الوطنية — مديرية التربية لولاية ${wilaya}</p>
-      <h1 class="doc-main-title">${isBlank ? "جدول التوقيت الأسبوعي لـلأستـاذ — استمارة فارغة للتخطيط والتوزيع اليدوي" : "جدول التوقيت الأسبوعي لـلأستـاذ (EMPLOI DU TEMPS HEBDOMADAIRE)"}</h1>
+      <h1 class="doc-main-title">
+        ${
+          isBlank
+            ? "جدول التوقيت الأسبوعي لـلأستـاذ — نموذج فارغ للتخطيط والتوزيع الأسبوعي"
+            : "جدول التوقيت الأسبوعي لـلأستـاذ"
+        }
+      </h1>
+      <p class="doc-subtitle-fr">
+        ${
+          isBlank
+            ? "EMPLOI DU TEMPS HEBDOMADAIRE DE L'ENSEIGNANT (MODÈLE VIERGE)"
+            : "EMPLOI DU TEMPS HEBDOMADAIRE DE L'ENSEIGNANT"
+        }
+      </p>
 
       <div class="header-details-grid">
         <div class="header-col"><span>المؤسسة: </span><strong>${school}</strong></div>
@@ -1776,6 +1889,7 @@ export function generateTimetableLandscapeHTML(options: TimetableReportOptions):
               <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
                 <span style="font-weight: 800; color: #334155;">توزيع ساعات التدريس:</span>
                 ${classesSummaryCards}
+                ${options.classHoursSummary.receptionCount > 0 ? `<div class="class-hour-badge" style="border-right: 3px solid #7e22ce;"><strong style="color: #7e22ce;">استقبال الأولياء:</strong> <span>1 سا</span></div>` : ""}
               </div>
               <div class="total-hours-badge">
                 الحجم الساعي الأسبوعي: ${options.classHoursSummary.activeTeachingHours} ساعة تدريس
@@ -1788,7 +1902,7 @@ export function generateTimetableLandscapeHTML(options: TimetableReportOptions):
     <footer class="signatures-block">
       <div class="signatures-grid">
         <div class="signature-card">
-          <span>إمضاء الأستاذ(ة)</span>
+          <span>إمضاء وختم الأستاذ(ة)</span>
           <span class="signer-name">${teacher}</span>
         </div>
         <div class="signature-card">

@@ -60,7 +60,8 @@ function cleanResourceTitleForWeekly(title: string): string {
 }
 
 /**
- * توليد كود HTML مستقل للمخطط الأسبوعي بمقاس A4 Landscape
+ * توليد كود HTML مستقل فائق الجودة للمخطط الأسبوعي بمقاس A4 Landscape
+ * ومطابق تماماً لنماذج وزارة التربية الوطنية مع ضمان ملاءمة الصفحة الفردية
  */
 export function generateWeeklyDiaryHTML(options: WeeklyDiaryPdfOptions): string {
   const teacher = options.teacherName || "الأستاذ(ة)";
@@ -74,8 +75,14 @@ export function generateWeeklyDiaryHTML(options: WeeklyDiaryPdfOptions): string 
   const orientation = options.orientation || "days-as-rows";
   const isBlank = Boolean(options.isBlankTemplate);
 
-  const morningSlots = options.morningSlots.length > 0 ? options.morningSlots : ["08:00 - 09:00", "09:00 - 10:00", "10:00 - 11:00", "11:00 - 12:00"];
-  const afternoonSlots = options.afternoonSlots.length > 0 ? options.afternoonSlots : ["13:30 - 14:30", "14:30 - 15:30", "15:30 - 16:30"];
+  const morningSlots =
+    options.morningSlots.length > 0
+      ? options.morningSlots
+      : ["08:00 - 09:00", "09:00 - 10:00", "10:00 - 11:00", "11:00 - 12:00"];
+  const afternoonSlots =
+    options.afternoonSlots.length > 0
+      ? options.afternoonSlots
+      : ["13:30 - 14:30", "14:30 - 15:30", "15:30 - 16:30"];
   const allTimeSlots = [...morningSlots, ...afternoonSlots];
 
   const parseSlotMinutes = (timeStr: string): number | null => {
@@ -86,6 +93,19 @@ export function generateWeeklyDiaryHTML(options: WeeklyDiaryPdfOptions): string 
     if (hourOnly) return parseInt(hourOnly[1], 10) * 60;
     return null;
   };
+
+  // إحصائيات الحصص في الأسبوع
+  let totalSessionsCount = 0;
+  const activeClassesSet = new Set<string>();
+  Object.values(options.dayLessonsMap || {}).forEach((list) => {
+    list.forEach((e) => {
+      totalSessionsCount++;
+      if (e.className && e.className !== "فراغ" && e.className !== "راحة") {
+        activeClassesSet.add(e.className);
+      }
+    });
+  });
+  const classesList = Array.from(activeClassesSet).sort().join(" • ");
 
   // Helper لإيجاد الحصة المطابقة ليوم وتوقيت محدد دون تكرار
   const findLesson = (dateStr: string, slotTime: string): DailyDiaryEntry | undefined => {
@@ -115,7 +135,7 @@ export function generateWeeklyDiaryHTML(options: WeeklyDiaryPdfOptions): string 
   let tableHtml = "";
 
   if (orientation === "days-as-rows") {
-    // الأيام صفوف، والتوقيتات أعمدة
+    // الأيام صفوف، والتوقيتات أعمدة (النمط القياسي المعتمد في التفتيش الجزائري)
     tableHtml = `
       <table class="weekly-table">
         <thead>
@@ -143,26 +163,46 @@ export function generateWeeklyDiaryHTML(options: WeeklyDiaryPdfOptions): string 
                 ${allTimeSlots.map((slot) => {
                   if (isBlank) {
                     return `
-                      <td class="cell-slot empty-slot">
-                        <div style="color: #cbd5e1; font-size: 10px; margin-bottom: 3px;">...................</div>
-                        <div style="color: #e2e8f0; font-size: 9px;">...................</div>
+                      <td class="cell-slot blank-slot">
+                        <div class="blank-slot-box">
+                          <div class="blank-head">
+                            <span class="blank-label">فوج: .....</span>
+                            <span class="blank-label">م: .....</span>
+                          </div>
+                          <div class="blank-lines">
+                            <div class="blank-dotted-line">.....................................</div>
+                            <div class="blank-dotted-line">.....................................</div>
+                          </div>
+                        </div>
                       </td>
                     `;
                   }
                   const lesson = findLesson(dayObj.dateStr, slot);
                   if (!lesson) {
-                    return `<td class="cell-slot empty-slot"><span class="empty-mark">—</span></td>`;
+                    return `<td class="cell-slot empty-slot"><span class="empty-dash">—</span></td>`;
                   }
-                  const bgHex = classColors[lesson.className] || "#107a57";
-                  const cleanTitle = cleanResourceTitleForWeekly(lesson.lessonTitle || (lesson as any).resourceTitle || "");
+                  const bgHex = classColors[lesson.className] || "#0f766e";
+                  const cleanTitle = cleanResourceTitleForWeekly(
+                    lesson.lessonTitle || (lesson as any).resourceTitle || ""
+                  );
+                  const noteNum = lesson.lessonNoteNumber ? `م:${lesson.lessonNoteNumber}` : "";
+                  const sessionType =
+                    lesson.sessionType &&
+                    lesson.sessionType !== "درس ومورد" &&
+                    lesson.sessionType !== "درس"
+                      ? lesson.sessionType
+                      : "";
 
                   return `
                     <td class="cell-slot active-slot">
-                      <div class="slot-badge" style="background-color: ${bgHex};">
-                        ${lesson.className}
+                      <div class="slot-box">
+                        <div class="slot-head">
+                          <span class="slot-class-badge" style="background-color: ${bgHex};">${lesson.className}</span>
+                          ${noteNum ? `<span class="slot-memo-badge">${noteNum}</span>` : ""}
+                        </div>
+                        <div class="slot-lesson-title" title="${cleanTitle}">${cleanTitle}</div>
+                        ${sessionType ? `<div class="slot-session-type">${sessionType}</div>` : ""}
                       </div>
-                      <div class="slot-title">${cleanTitle}</div>
-                      ${lesson.sessionType && lesson.sessionType !== "درس ومورد" ? `<div class="slot-type">${lesson.sessionType}</div>` : ""}
                     </td>
                   `;
                 }).join("")}
@@ -178,7 +218,7 @@ export function generateWeeklyDiaryHTML(options: WeeklyDiaryPdfOptions): string 
       <table class="weekly-table">
         <thead>
           <tr>
-            <th class="col-day-header">الفترة / التوقيت</th>
+            <th class="col-day-header" style="width: 14%;">الفترة / التوقيت</th>
             ${options.schoolDays.map((d) => `
               <th class="day-col-header">
                 <div class="day-name">${d.name}</div>
@@ -200,23 +240,39 @@ export function generateWeeklyDiaryHTML(options: WeeklyDiaryPdfOptions): string 
                 ${options.schoolDays.map((d) => {
                   if (isBlank) {
                     return `
-                      <td class="cell-slot empty-slot">
-                        <div style="color: #cbd5e1; font-size: 10px; margin-bottom: 3px;">...................</div>
-                        <div style="color: #e2e8f0; font-size: 9px;">...................</div>
+                      <td class="cell-slot blank-slot">
+                        <div class="blank-slot-box">
+                          <div class="blank-head">
+                            <span class="blank-label">فوج: .....</span>
+                            <span class="blank-label">م: .....</span>
+                          </div>
+                          <div class="blank-lines">
+                            <div class="blank-dotted-line">.....................................</div>
+                            <div class="blank-dotted-line">.....................................</div>
+                          </div>
+                        </div>
                       </td>
                     `;
                   }
                   const lesson = findLesson(d.dateStr, slot);
                   if (!lesson) {
-                    return `<td class="cell-slot empty-slot"><span class="empty-mark">—</span></td>`;
+                    return `<td class="cell-slot empty-slot"><span class="empty-dash">—</span></td>`;
                   }
-                  const bgHex = classColors[lesson.className] || "#107a57";
-                  const cleanTitle = cleanResourceTitleForWeekly(lesson.lessonTitle || (lesson as any).resourceTitle || "");
+                  const bgHex = classColors[lesson.className] || "#0f766e";
+                  const cleanTitle = cleanResourceTitleForWeekly(
+                    lesson.lessonTitle || (lesson as any).resourceTitle || ""
+                  );
+                  const noteNum = lesson.lessonNoteNumber ? `م:${lesson.lessonNoteNumber}` : "";
 
                   return `
                     <td class="cell-slot active-slot">
-                      <div class="slot-badge" style="background-color: ${bgHex};">${lesson.className}</div>
-                      <div class="slot-title">${cleanTitle}</div>
+                      <div class="slot-box">
+                        <div class="slot-head">
+                          <span class="slot-class-badge" style="background-color: ${bgHex};">${lesson.className}</span>
+                          ${noteNum ? `<span class="slot-memo-badge">${noteNum}</span>` : ""}
+                        </div>
+                        <div class="slot-lesson-title">${cleanTitle}</div>
+                      </div>
                     </td>
                   `;
                 }).join("")}
@@ -236,23 +292,39 @@ export function generateWeeklyDiaryHTML(options: WeeklyDiaryPdfOptions): string 
                 ${options.schoolDays.map((d) => {
                   if (isBlank) {
                     return `
-                      <td class="cell-slot empty-slot">
-                        <div style="color: #cbd5e1; font-size: 10px; margin-bottom: 3px;">...................</div>
-                        <div style="color: #e2e8f0; font-size: 9px;">...................</div>
+                      <td class="cell-slot blank-slot">
+                        <div class="blank-slot-box">
+                          <div class="blank-head">
+                            <span class="blank-label">فوج: .....</span>
+                            <span class="blank-label">م: .....</span>
+                          </div>
+                          <div class="blank-lines">
+                            <div class="blank-dotted-line">.....................................</div>
+                            <div class="blank-dotted-line">.....................................</div>
+                          </div>
+                        </div>
                       </td>
                     `;
                   }
                   const lesson = findLesson(d.dateStr, slot);
                   if (!lesson) {
-                    return `<td class="cell-slot empty-slot"><span class="empty-mark">—</span></td>`;
+                    return `<td class="cell-slot empty-slot"><span class="empty-dash">—</span></td>`;
                   }
-                  const bgHex = classColors[lesson.className] || "#107a57";
-                  const cleanTitle = cleanResourceTitleForWeekly(lesson.lessonTitle || (lesson as any).resourceTitle || "");
+                  const bgHex = classColors[lesson.className] || "#0f766e";
+                  const cleanTitle = cleanResourceTitleForWeekly(
+                    lesson.lessonTitle || (lesson as any).resourceTitle || ""
+                  );
+                  const noteNum = lesson.lessonNoteNumber ? `م:${lesson.lessonNoteNumber}` : "";
 
                   return `
                     <td class="cell-slot active-slot">
-                      <div class="slot-badge" style="background-color: ${bgHex};">${lesson.className}</div>
-                      <div class="slot-title">${cleanTitle}</div>
+                      <div class="slot-box">
+                        <div class="slot-head">
+                          <span class="slot-class-badge" style="background-color: ${bgHex};">${lesson.className}</span>
+                          ${noteNum ? `<span class="slot-memo-badge">${noteNum}</span>` : ""}
+                        </div>
+                        <div class="slot-lesson-title">${cleanTitle}</div>
+                      </div>
                     </td>
                   `;
                 }).join("")}
@@ -264,18 +336,22 @@ export function generateWeeklyDiaryHTML(options: WeeklyDiaryPdfOptions): string 
     `;
   }
 
+  const teacherFamily = teacher.trim().split(" ")[0] || "الأستاذ";
+  const defaultTitle = isBlank
+    ? `المخطط_الأسبوعي_نموذج_فارغ_من_${options.weekStartStr}_إلى_${options.weekEndStr}_الأستاذ_${teacherFamily}`
+    : `المخطط_الأسبوعي_الدفتر_اليومي_من_${options.weekStartStr}_إلى_${options.weekEndStr}_الأستاذ_${teacherFamily}`;
+
   return `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
-  <title>المخطط الأسبوعي للدفتر اليومي — ${teacher}</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <title>${options.docTitle || defaultTitle}</title>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap');
+
     @page {
       size: A4 landscape;
-      margin: 8mm 10mm;
+      margin: 6mm 8mm;
     }
     * {
       box-sizing: border-box;
@@ -285,200 +361,321 @@ export function generateWeeklyDiaryHTML(options: WeeklyDiaryPdfOptions): string 
       print-color-adjust: exact !important;
     }
     body {
-      font-family: 'Cairo', 'Segoe UI', Tahoma, sans-serif;
-      font-size: 11px;
-      line-height: 1.35;
+      font-family: 'Cairo', 'Segoe UI', Tahoma, Arial, sans-serif;
+      font-size: 10.5px;
+      line-height: 1.3;
       color: #0f172a;
       background: #ffffff;
       direction: rtl;
+      text-align: right;
     }
     .page-container {
       width: 100%;
-      max-width: 277mm;
+      max-width: 281mm;
       margin: 0 auto;
-      padding: 0;
       display: flex;
       flex-direction: column;
-      min-height: 190mm;
+      min-height: 194mm;
+      max-height: 196mm;
       justify-content: space-between;
+      page-break-inside: avoid;
     }
+
+    /* ─── الترويسة الوزارية الرسمية ─── */
     .official-header {
       border: 1.5px solid #0f172a;
-      border-radius: 6px;
-      padding: 6px 12px;
-      margin-bottom: 8px;
+      border-radius: 8px;
+      padding: 5px 12px;
       background: #f8fafc;
+      margin-bottom: 5px;
     }
     .header-top {
       text-align: center;
       border-bottom: 1px solid #cbd5e1;
-      padding-bottom: 4px;
+      padding-bottom: 3px;
       margin-bottom: 4px;
     }
-    .republic {
+    .republic-text {
       font-size: 11px;
       font-weight: 700;
       color: #334155;
+      line-height: 1.2;
     }
-    .ministry {
-      font-size: 10.5px;
+    .ministry-text {
+      font-size: 10px;
       font-weight: 700;
       color: #475569;
+      line-height: 1.2;
+      margin: 1px 0;
     }
-    .main-title {
-      font-size: 14px;
+    .doc-main-title {
+      font-size: 13.5px;
       font-weight: 900;
       color: #0f172a;
-      margin: 2px 0;
+      margin: 2px 0 1px 0;
+      letter-spacing: 0.2px;
     }
-    .week-range {
-      font-size: 11px;
+    .doc-subtitle-fr {
+      font-size: 8.5px;
+      font-weight: 700;
+      color: #64748b;
+      letter-spacing: 0.5px;
+      margin-bottom: 2px;
+    }
+    .week-range-badge {
+      display: inline-block;
+      background: #064e3b;
+      color: #ffffff;
+      padding: 1.5px 12px;
+      border-radius: 9999px;
+      font-size: 10px;
       font-weight: 800;
-      color: #107a57;
+      margin-top: 1px;
     }
-    .header-grid {
+    .header-info-grid {
       display: grid;
       grid-template-columns: 1.2fr 1fr 1fr 1fr;
       gap: 6px;
       font-size: 10px;
+      color: #334155;
     }
-    .header-col strong {
+    .header-info-grid strong {
       color: #0f172a;
       font-weight: 800;
     }
+
+    /* ─── جدول المخطط الأسبوعي ─── */
     .weekly-table {
       width: 100%;
       border-collapse: collapse;
       border: 1.5px solid #0f172a;
-      margin-bottom: 8px;
+      table-layout: fixed;
+      margin-bottom: 4px;
     }
     .weekly-table th,
     .weekly-table td {
       border: 1px solid #94a3b8;
-      padding: 4px 6px;
       text-align: center;
       vertical-align: middle;
+      padding: 2.5px 3px;
     }
     .col-day-header {
-      background: #1e293b;
+      background: #0f172a;
       color: #ffffff;
-      font-weight: 800;
+      font-weight: 900;
       font-size: 10.5px;
-      width: 13%;
+      width: 12.5%;
     }
     .day-col-header {
-      background: #1e293b;
+      background: #0f172a;
       color: #ffffff;
-      font-weight: 800;
+      font-weight: 900;
       font-size: 10.5px;
     }
     .period-group {
-      font-weight: 900;
-      font-size: 10.5px;
       color: #ffffff;
-      padding: 3px !important;
+      font-weight: 900;
+      font-size: 10px;
+      padding: 2.5px 0 !important;
+      letter-spacing: 0.3px;
     }
     .morning-group {
-      background: #0369a1;
+      background: #1e3a5f;
     }
     .afternoon-group {
-      background: #7c2d12;
+      background: #134e4a;
     }
     .time-header {
-      font-size: 9.5px;
+      font-size: 9px;
       font-weight: 800;
       background: #f1f5f9;
-      color: #0f172a;
-      padding: 3px !important;
-    }
-    .cell-day {
-      background: #f8fafc;
-      font-weight: 800;
-    }
-    .day-name {
-      font-size: 11.5px;
-      font-weight: 900;
-      color: #0f172a;
-    }
-    .day-date {
-      font-size: 9.5px;
-      font-weight: 700;
-      color: #64748b;
-    }
-    .cell-time-side {
-      font-weight: 800;
-      font-size: 10px;
-      background: #f8fafc;
+      color: #1e293b;
+      padding: 2.5px 0 !important;
     }
     .morning-time {
       border-bottom: 2px solid #0284c7;
     }
     .afternoon-time {
-      border-bottom: 2px solid #b45309;
+      border-bottom: 2px solid #0d9488;
+    }
+    .cell-day {
+      background: #f8fafc;
+      padding: 3px !important;
+    }
+    .day-name {
+      font-size: 11px;
+      font-weight: 900;
+      color: #0f172a;
+    }
+    .day-date {
+      font-size: 9px;
+      font-weight: 700;
+      color: #64748b;
+    }
+    .cell-time-side {
+      font-weight: 800;
+      font-size: 9.5px;
+      background: #f8fafc;
+      padding: 2px !important;
     }
     .section-divider {
       font-weight: 900;
-      font-size: 10.5px;
+      font-size: 10px;
       color: #ffffff;
-      padding: 3px !important;
+      padding: 2.5px !important;
     }
     .morning-divider {
-      background: #0284c7;
+      background: #1e3a5f;
     }
     .afternoon-divider {
-      background: #b45309;
+      background: #134e4a;
     }
+
+    /* ─── خانة الحصة العادية والمملوءة ─── */
     .cell-slot {
-      height: 48px;
-      font-size: 10px;
-      padding: 3px 4px !important;
-    }
-    .empty-slot {
-      background: #ffffff;
-      color: #cbd5e1;
-    }
-    .empty-mark {
-      color: #cbd5e1;
-      font-size: 14px;
+      height: 44px;
+      padding: 2px 3px !important;
+      position: relative;
     }
     .active-slot {
       background: #f0fdf4;
     }
-    .slot-badge {
+    .slot-box {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 1px;
+      height: 100%;
+    }
+    .slot-head {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      margin-bottom: 1px;
+    }
+    .slot-class-badge {
       display: inline-block;
       color: #ffffff;
       font-weight: 900;
-      font-size: 9.5px;
-      padding: 1px 6px;
+      font-size: 9px;
+      padding: 1px 5px;
       border-radius: 4px;
-      margin-bottom: 2px;
+      line-height: 1.2;
     }
-    .slot-title {
+    .slot-memo-badge {
+      display: inline-block;
+      background: #0f172a;
+      color: #ffffff;
       font-weight: 800;
-      font-size: 10px;
+      font-size: 8px;
+      padding: 1px 4px;
+      border-radius: 3px;
+      line-height: 1.2;
+    }
+    .slot-lesson-title {
+      font-weight: 800;
+      font-size: 9px;
       color: #0f172a;
-      line-height: 1.25;
+      line-height: 1.2;
       overflow: hidden;
       display: -webkit-box;
       -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
+      word-break: break-word;
     }
-    .slot-type {
-      font-size: 8.5px;
+    .slot-session-type {
+      font-size: 7.5px;
       font-weight: 700;
       color: #6b21a8;
+      background: #f3e8ff;
+      border: 1px solid #d8b4fe;
+      padding: 0 3px;
+      border-radius: 3px;
       margin-top: 1px;
     }
+    .empty-slot {
+      background: #ffffff;
+    }
+    .empty-dash {
+      color: #cbd5e1;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    /* ─── خانة النموذج الفارغ للتدوين اليدوي ─── */
+    .blank-slot {
+      background: #ffffff;
+    }
+    .blank-slot-box {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      height: 100%;
+      padding: 1px 0;
+    }
+    .blank-head {
+      display: flex;
+      justify-content: space-between;
+      font-size: 8px;
+      font-weight: 800;
+      color: #475569;
+      border-bottom: 1px dashed #e2e8f0;
+      padding-bottom: 1px;
+    }
+    .blank-lines {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      margin-top: 2px;
+    }
+    .blank-dotted-line {
+      color: #cbd5e1;
+      font-size: 8px;
+      letter-spacing: 0.8px;
+      line-height: 1;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+
     .row-alt {
       background: #fafaf9;
     }
     .row-white {
       background: #ffffff;
     }
+
+    /* ─── شريط الملخص البيداغوجي ─── */
+    .summary-strip {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 3px 10px;
+      font-size: 9.5px;
+      margin-bottom: 4px;
+    }
+    .summary-title {
+      font-weight: 800;
+      color: #334155;
+    }
+    .summary-badge {
+      background: #0f172a;
+      color: #ffffff;
+      padding: 1.5px 8px;
+      border-radius: 4px;
+      font-weight: 800;
+      font-size: 9px;
+    }
+
+    /* ─── كتلة التأشيرات والتوقيعات ─── */
     .signatures-block {
       border: 1.5px solid #0f172a;
       border-radius: 6px;
-      padding: 6px 12px;
+      padding: 4px 10px;
       background: #f8fafc;
       page-break-inside: avoid;
     }
@@ -490,61 +687,93 @@ export function generateWeeklyDiaryHTML(options: WeeklyDiaryPdfOptions): string 
     }
     .signature-card {
       border: 1px dashed #94a3b8;
-      border-radius: 4px;
-      padding: 6px;
-      height: 45px;
+      border-radius: 5px;
+      padding: 4px 8px;
+      height: 42px;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
       background: #ffffff;
     }
-    .signature-card span {
-      font-size: 9.5px;
+    .signature-card .card-role {
+      font-size: 9px;
       font-weight: 800;
       color: #334155;
     }
-    .signature-card .signer-name {
-      font-size: 9px;
-      font-weight: 700;
+    .signature-card .card-signer {
+      font-size: 8.5px;
+      font-weight: 800;
       color: #0f172a;
     }
   </style>
-  <title>${options.docTitle || `المخطط_الأسبوعي_الدفتر_اليومي_من_${options.weekStartStr}_إلى_${options.weekEndStr}_الأستاذ_${(options.teacherName || "الأستاذ").trim().split(" ")[0]}`}</title>
 </head>
 <body>
   <div class="page-container">
+    <!-- الترويسة الوزارية الرسمية -->
     <header class="official-header">
       <div class="header-top">
-        <div class="republic">الجمهورية الجزائرية الديمقراطية الشعبية</div>
-        <div class="ministry">وزارة التربية الوطنية — مديرية التربية لولاية ${wilaya}</div>
-        <h1 class="main-title">${isBlank ? "المخطط الأسبوعي للدفتر اليومي — استمارة فارغة للتحضير والتخطيط اليدوي" : "المخطط الأسبوعي للدفتر اليومي البيداغوجي"}</h1>
-        <div class="week-range">الأسبوع: من ${formatArabicDate(options.weekStartStr)} إلى ${formatArabicDate(options.weekEndStr)}</div>
+        <p class="republic-text">الجمهورية الجزائرية الديمقراطية الشعبية</p>
+        <p class="ministry-text">وزارة التربية الوطنية — مديرية التربية لولاية ${wilaya}</p>
+        <h1 class="doc-main-title">
+          ${
+            isBlank
+              ? "المخطط الأسبوعي للدفتر اليومي — استمارة فارغة للتحضير والتخطيط اليدوي"
+              : "المخطط الأسبوعي للدفتر اليومي البيداغوجي"
+          }
+        </h1>
+        <p class="doc-subtitle-fr">
+          ${
+            isBlank
+              ? "PLANNING HEBDOMADAIRE DU CAHIER JOURNAL (MODÈLE VIERGE)"
+              : "PLANNING HEBDOMADAIRE DU CAHIER JOURNAL PÉDAGOGIQUE"
+          }
+        </p>
+        <div class="week-range-badge">
+          الأسبوع من: ${formatArabicDate(options.weekStartStr)} إلى: ${formatArabicDate(options.weekEndStr)} • الموسم الدراسي: ${academicYear}
+        </div>
       </div>
-      <div class="header-grid">
-        <div class="header-col"><span>المؤسسة: </span><strong>${school}</strong></div>
-        <div class="header-col"><span>الأستاذ(ة): </span><strong>${teacher}</strong></div>
-        <div class="header-col"><span>المادة: </span><strong>${subject}</strong></div>
-        <div class="header-col"><span>الموسم: </span><strong>${academicYear}</strong></div>
+      <div class="header-info-grid">
+        <div><span>المؤسسة: </span><strong>${school}</strong></div>
+        <div><span>الأستاذ(ة): </span><strong>${teacher}</strong></div>
+        <div><span>المادة: </span><strong>${subject}</strong></div>
+        <div><span>المقاطعة: </span><strong>مديرية التربية لولاية ${wilaya}</strong></div>
       </div>
     </header>
 
+    <!-- جدول المخطط الأسبوعي -->
     <main>
       ${tableHtml}
+
+      <!-- شريط الملخص البيداغوجي -->
+      <div class="summary-strip">
+        ${
+          isBlank
+            ? `
+              <span class="summary-title">✍️ مخطط أسبوعي شاغر مخصص للتخطيط المكتبي المسبق والتحضير بالقلم قبل إدراجه بالمنصة الرقمية.</span>
+              <span class="summary-badge">الحجم الساعي الأسبوعي: ....... سا</span>
+            `
+            : `
+              <span class="summary-title">📊 إجمالي الحصص المبرمجة لهذا الأسبوع: <strong>${totalSessionsCount} حصة</strong> ${classesList ? `(الأفواج: ${classesList})` : ""}</span>
+              <span class="summary-badge">وثيقة بيداغوجية أسبوعية معتمدة</span>
+            `
+        }
+      </div>
     </main>
 
+    <!-- كتلة التأشيرات الرسمية الثلاثية -->
     <footer class="signatures-block">
       <div class="signatures-grid">
         <div class="signature-card">
-          <span>إمضاء الأستاذ(ة)</span>
-          <span class="signer-name">${teacher}</span>
+          <span class="card-role">إمضاء وختم الأستاذ(ة)</span>
+          <span class="card-signer">${teacher}</span>
         </div>
         <div class="signature-card">
-          <span>تأشيرة السيد مدير المؤسسة</span>
-          <span class="signer-name">${principal}</span>
+          <span class="card-role">تأشيرة السيد مدير المؤسسة</span>
+          <span class="card-signer">${principal}</span>
         </div>
         <div class="signature-card">
-          <span>تأشيرة السيد مفتش التربية الوطنية</span>
-          <span class="signer-name">${inspector}</span>
+          <span class="card-role">تأشيرة السيد مفتش التربية الوطنية</span>
+          <span class="card-signer">${inspector}</span>
         </div>
       </div>
     </footer>
