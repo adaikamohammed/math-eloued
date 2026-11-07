@@ -307,6 +307,12 @@ export type Announcement = {
   pinned?: boolean; // هل الإعلان مثبت في الأعلى
   active?: boolean; // هل الإعلان ظاهر للزوار
   createdAt: string;
+  targetLevel?: string; // المستوى المستهدف ("all" أو "1am" أو "2am" أو "3am" أو "4am" أو اسم الفوج)
+  imageUrl?: string; // رابط أو بيانات الصورة المرفقة (Base64 / URL)
+  audioUrl?: string; // رابط أو بيانات التسجيل الصوتي المباشر للأستاذ (Base64 / URL)
+  audioDuration?: number; // مدة التسجيل الصوتي بالثواني
+  teacherId?: string; // معرّف الأستاذ لضمان العزل التام
+  teacherName?: string; // اسم الأستاذ الناشر
 };
 
 export type MessageCategory = "question" | "suggestion" | "criticism" | "other";

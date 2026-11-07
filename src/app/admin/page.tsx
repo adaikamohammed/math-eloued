@@ -71,6 +71,13 @@ import {
   Send,
   MessageCircle,
   WifiOff,
+  Mic,
+  MicOff,
+  Square,
+  Play,
+  Pause,
+  Volume2,
+  Image as ImageIcon,
 } from "lucide-react";
 import {
   LEVELS,
@@ -280,6 +287,17 @@ function Dashboard({
   const [annCategory, setAnnCategory] = useState<AnnouncementCategory>("general");
   const [annDate, setAnnDate] = useState("");
   const [annPinned, setAnnPinned] = useState(false);
+  const [annTargetLevel, setAnnTargetLevel] = useState<string>("all");
+  const [annImage, setAnnImage] = useState<string | null>(null);
+  const [annAudio, setAnnAudio] = useState<string | null>(null);
+  const [annAudioDuration, setAnnAudioDuration] = useState<number>(0);
+  const [isListeningTitle, setIsListeningTitle] = useState(false);
+  const [isListeningContent, setIsListeningContent] = useState(false);
+  const [isRecordingAudio, setIsRecordingAudio] = useState(false);
+  const [audioRecordDuration, setAudioRecordDuration] = useState(0);
+  const [mediaRecorderRef, setMediaRecorderRef] = useState<MediaRecorder | null>(null);
+  const [audioStreamRef, setAudioStreamRef] = useState<MediaStream | null>(null);
+  const [recordingIntervalRef, setRecordingIntervalRef] = useState<any>(null);
   const [editingAnnouncement, setEditingAnnouncement] = useState<Announcement | null>(null);
   const [deletingAnnouncement, setDeletingAnnouncement] = useState<Announcement | null>(null);
 
@@ -593,6 +611,191 @@ function Dashboard({
     }
   };
 
+  // ─── ميزات الصوت والصور للإعلانات ───
+  // 1. التدوين الصوتي السريع (تحويل الصوت إلى نص)
+  const toggleVoiceToText = (targetField: "title" | "content") => {
+    if (typeof window === "undefined") return;
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      showToast(
+        "error",
+        "ميزة تحويل الصوت إلى نص غير مدعومة في هذا المتصفح. ننصح باستخدام Google Chrome أو Microsoft Edge"
+      );
+      return;
+    }
+
+    const isListening = targetField === "title" ? isListeningTitle : isListeningContent;
+
+    if (isListening) {
+      const activeRec = (window as any).__activeSpeechRec;
+      if (activeRec) {
+        try {
+          activeRec.stop();
+        } catch {}
+      }
+      setIsListeningTitle(false);
+      setIsListeningContent(false);
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      (window as any).__activeSpeechRec = recognition;
+      recognition.lang = "ar-DZ";
+      recognition.continuous = true;
+      recognition.interimResults = true;
+
+      if (targetField === "title") {
+        setIsListeningTitle(true);
+        setIsListeningContent(false);
+      } else {
+        setIsListeningContent(true);
+        setIsListeningTitle(false);
+      }
+
+      recognition.onresult = (event: any) => {
+        let transcript = "";
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          if (event.results[i].isFinal) {
+            transcript += event.results[i][0].transcript + " ";
+          }
+        }
+        transcript = transcript.trim();
+        if (transcript) {
+          if (targetField === "title") {
+            setAnnTitle((prev) => (prev ? `${prev} ${transcript}` : transcript));
+          } else {
+            setAnnContent((prev) => (prev ? `${prev} ${transcript}` : transcript));
+          }
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        if (targetField === "title") setIsListeningTitle(false);
+        else setIsListeningContent(false);
+        if (event.error !== "no-speech") {
+          showToast("error", "تعذر الاستماع للصوت، تأكد من صلاحية الميكروفون");
+        }
+      };
+
+      recognition.onend = () => {
+        if (targetField === "title") setIsListeningTitle(false);
+        else setIsListeningContent(false);
+      };
+
+      recognition.start();
+      showToast("success", "🎙️ تحدث الآن وسيكتب صوتك تلقائياً...");
+    } catch {
+      showToast("error", "تعذر تشغيل الميكروفون للتدوين الصوتي");
+      if (targetField === "title") setIsListeningTitle(false);
+      else setIsListeningContent(false);
+    }
+  };
+
+  // 2. تسجيل ملاحظة صوتية مباشرة بصوت الأستاذ (MediaRecorder)
+  const startVoiceRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      const chunks: Blob[] = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) chunks.push(e.data);
+      };
+
+      recorder.onstop = () => {
+        const audioBlob = new Blob(chunks, { type: "audio/webm;codecs=opus" });
+        const reader = new FileReader();
+        reader.readAsDataURL(audioBlob);
+        reader.onloadend = () => {
+          setAnnAudio(reader.result as string);
+        };
+        stream.getTracks().forEach((track) => track.stop());
+      };
+
+      recorder.start();
+      setMediaRecorderRef(recorder);
+      setAudioStreamRef(stream);
+      setIsRecordingAudio(true);
+      setAudioRecordDuration(0);
+
+      const interval = setInterval(() => {
+        setAudioRecordDuration((prev) => prev + 1);
+      }, 1000);
+      setRecordingIntervalRef(interval);
+      showToast("success", "🎙️ بدأ تسجيل الملاحظة الصوتية...");
+    } catch {
+      showToast("error", "يرجى السماح بصلاحية الميكروفون لتسجيل الصوت");
+    }
+  };
+
+  const stopVoiceRecording = () => {
+    if (mediaRecorderRef && mediaRecorderRef.state !== "inactive") {
+      mediaRecorderRef.stop();
+    }
+    if (audioStreamRef) {
+      audioStreamRef.getTracks().forEach((t) => t.stop());
+    }
+    if (recordingIntervalRef) {
+      clearInterval(recordingIntervalRef);
+    }
+    setIsRecordingAudio(false);
+    setAnnAudioDuration(audioRecordDuration);
+    showToast("success", "✓ تم حفظ الملاحظة الصوتية بنجاح");
+  };
+
+  const cancelVoiceRecording = () => {
+    if (mediaRecorderRef && mediaRecorderRef.state !== "inactive") {
+      mediaRecorderRef.stop();
+    }
+    if (audioStreamRef) {
+      audioStreamRef.getTracks().forEach((t) => t.stop());
+    }
+    if (recordingIntervalRef) {
+      clearInterval(recordingIntervalRef);
+    }
+    setIsRecordingAudio(false);
+    setAnnAudio(null);
+    setAnnAudioDuration(0);
+  };
+
+  // 3. رفع صورة للإعلان وضغطها
+  const handleAnnouncementImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      showToast("error", "يرجى اختيار ملف صورة صالح (JPG, PNG, WebP)");
+      return;
+    }
+
+    try {
+      showToast("success", "جاري معالجة وضغط الصورة للإعلان...");
+      const compressed = await imageCompression(file, {
+        maxWidthOrHeight: 1200,
+        maxSizeMB: 0.25,
+        useWebWorker: true,
+        fileType: "image/jpeg",
+      });
+
+      const reader = new FileReader();
+      reader.readAsDataURL(compressed);
+      reader.onloadend = () => {
+        setAnnImage(reader.result as string);
+        showToast("success", "✓ تم إرفاق الصورة بالإعلان بنجاح!");
+      };
+    } catch {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onloadend = () => {
+        setAnnImage(reader.result as string);
+        showToast("success", "✓ تم إرفاق الصورة بالإعلان!");
+      };
+    }
+  };
+
   // حفظ أو تعديل إعلان
   const handleSaveAnnouncement = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -601,19 +804,41 @@ function Dashboard({
       return;
     }
 
+    if (isRecordingAudio) {
+      stopVoiceRecording();
+    }
+    if (isListeningTitle || isListeningContent) {
+      const activeRec = (window as any).__activeSpeechRec;
+      if (activeRec) {
+        try {
+          activeRec.stop();
+        } catch {}
+      }
+      setIsListeningTitle(false);
+      setIsListeningContent(false);
+    }
+
     setIsSubmitting(true);
     try {
+      const payload = {
+        title: annTitle.trim(),
+        content: annContent.trim(),
+        category: annCategory,
+        date: annDate.trim() || undefined,
+        pinned: annPinned,
+        targetLevel: annTargetLevel || "all",
+        imageUrl: annImage || undefined,
+        audioUrl: annAudio || undefined,
+        audioDuration: annAudioDuration || undefined,
+      };
+
       if (editingAnnouncement) {
         const res = await fetch("/api/announcements", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             id: editingAnnouncement.id,
-            title: annTitle.trim(),
-            content: annContent.trim(),
-            category: annCategory,
-            date: annDate.trim() || undefined,
-            pinned: annPinned,
+            ...payload,
           }),
         });
         if (res.ok) {
@@ -623,6 +848,10 @@ function Dashboard({
           setAnnContent("");
           setAnnDate("");
           setAnnPinned(false);
+          setAnnTargetLevel("all");
+          setAnnImage(null);
+          setAnnAudio(null);
+          setAnnAudioDuration(0);
           loadAnnouncements();
         } else {
           showToast("error", "فشل تعديل الإعلان");
@@ -631,20 +860,18 @@ function Dashboard({
         const res = await fetch("/api/announcements", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title: annTitle.trim(),
-            content: annContent.trim(),
-            category: annCategory,
-            date: annDate.trim() || undefined,
-            pinned: annPinned,
-          }),
+          body: JSON.stringify(payload),
         });
         if (res.ok) {
-          showToast("success", "تم نشر الإعلان بنجاح في الموقع");
+          showToast("success", "تم نشر الإعلان بنجاح في الموقع 📢");
           setAnnTitle("");
           setAnnContent("");
           setAnnDate("");
           setAnnPinned(false);
+          setAnnTargetLevel("all");
+          setAnnImage(null);
+          setAnnAudio(null);
+          setAnnAudioDuration(0);
           loadAnnouncements();
         } else {
           showToast("error", "فشل نشر الإعلان");
@@ -3827,6 +4054,10 @@ function Dashboard({
                     setAnnContent("");
                     setAnnDate("");
                     setAnnPinned(false);
+                    setAnnTargetLevel("all");
+                    setAnnImage(null);
+                    setAnnAudio(null);
+                    setAnnAudioDuration(0);
                   }}
                   className="text-[11px] font-bold text-red-600 hover:underline"
                 >
@@ -3865,11 +4096,52 @@ function Dashboard({
                 </div>
               </div>
 
-              {/* 2. عنوان الإعلان */}
+              {/* 2. المستوى أو الفوج المستهدف (التحكم أين يظهر الإعلان) */}
               <div>
                 <label className="text-xs font-bold text-slate-700 block mb-1">
-                  عنوان الإعلان: <span className="text-red-500">*</span>
+                  المستوى أو الفوج المستهدف (أين يظهر الإعلان؟): <span className="text-red-500">*</span>
                 </label>
+                <select
+                  value={annTargetLevel}
+                  onChange={(e) => setAnnTargetLevel(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 p-2.5 text-xs font-black text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition"
+                >
+                  <option value="all">📢 لجميع المستويات والأفواج (إعلان عام يظهر للكل)</option>
+                  <option value="1am">1 متوسط (1م) - موجه للسنة الأولى متوسط</option>
+                  <option value="2am">2 متوسط (2م) - موجه للسنة الثانية متوسط</option>
+                  <option value="3am">3 متوسط (3م) - موجه للسنة الثالثة متوسط</option>
+                  <option value="4am">4 متوسط (4م) - موجه للسنة الرابعة متوسط</option>
+                  {allAdminClasses.map((cls) => (
+                    <option key={cls} value={cls}>
+                      🎯 قسم محدد حصراً: {cls}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-slate-500 mt-1">
+                  يمكنك حصر الإعلان في صفحة مستوى معين لتجنب إرباك بقية المستويات، أو نشره للجميع.
+                </p>
+              </div>
+
+              {/* 3. عنوان الإعلان مع ميزة التدوين الصوتي السريع */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-bold text-slate-700">
+                    عنوان الإعلان: <span className="text-red-500">*</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => toggleVoiceToText("title")}
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-black transition cursor-pointer ${
+                      isListeningTitle
+                        ? "bg-red-500 text-white animate-pulse"
+                        : "bg-teal-50 text-teal-800 border border-teal-200 hover:bg-teal-100"
+                    }`}
+                    title="اضغط للتحدث وسيكتب الصوت تلقائياً"
+                  >
+                    {isListeningTitle ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5 text-teal-600" />}
+                    <span>{isListeningTitle ? "جاري الاستماع... اضغط للإيقاف" : "تدوين صوتي 🎙️"}</span>
+                  </button>
+                </div>
                 <input
                   type="text"
                   placeholder="مثال: تنبيه غياب الأستاذ يوم الأحد / تم رفع حلول الواجب 3 / إحضار الأدوات الهندسية غداً"
@@ -3880,7 +4152,7 @@ function Dashboard({
                 />
               </div>
 
-              {/* 3. تاريخ الإعلان أو اليوم المعني */}
+              {/* 4. تاريخ الإعلان أو اليوم المعني */}
               <div>
                 <label className="text-xs font-bold text-slate-700 block mb-1">
                   تاريخ اليوم المعني أو توقيت الإعلان (اختياري):
@@ -3894,14 +4166,29 @@ function Dashboard({
                 />
               </div>
 
-              {/* 4. تفاصيل ونَص الإعلان */}
+              {/* 5. تفاصيل ونَص الإعلان مع ميزة الإملاء الصوتي المباشر */}
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">
-                  نص الإعلان والتفاصيل: <span className="text-red-500">*</span>
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-bold text-slate-700">
+                    نص الإعلان والتفاصيل: <span className="text-red-500">*</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => toggleVoiceToText("content")}
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-black transition cursor-pointer ${
+                      isListeningContent
+                        ? "bg-red-500 text-white animate-pulse"
+                        : "bg-teal-50 text-teal-800 border border-teal-200 hover:bg-teal-100"
+                    }`}
+                    title="تحدث ليكتب نص الإعلان تلقائياً بالصوت"
+                  >
+                    {isListeningContent ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5 text-teal-600" />}
+                    <span>{isListeningContent ? "جاري الاستماع... اضغط للإيقاف" : "إملاء صوتي للنص 🎙️"}</span>
+                  </button>
+                </div>
                 <textarea
                   rows={4}
-                  placeholder="اكتب هنا التفاصيل الكاملة للإعلان أو الملاحظة أو التوجيهات التي تود توجيهها للتلاميذ وأوليائهم..."
+                  placeholder="اكتب هنا التفاصيل الكاملة للإعلان أو الملاحظة، أو اضغط زر الإملاء الصوتي للتحدث مباشرة..."
                   value={annContent}
                   onChange={(e) => setAnnContent(e.target.value)}
                   className="w-full rounded-xl border border-slate-200 p-3 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition leading-relaxed"
@@ -3909,7 +4196,114 @@ function Dashboard({
                 />
               </div>
 
-              {/* 5. خيار التثبيت في الأعلى */}
+              {/* 6. تسجيل ملاحظة صوتية مباشرة كمقطع صوتي للتلاميذ والأولياء */}
+              <div className="p-3.5 rounded-2xl bg-teal-50/60 border border-teal-200/80 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-teal-950 flex items-center gap-1.5">
+                    <Volume2 className="w-4 h-4 text-teal-700" />
+                    <span>تسجيل ملاحظة صوتية للأولياء والتلاميذ (اختياري)</span>
+                  </span>
+                  {annAudio && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAnnAudio(null);
+                        setAnnAudioDuration(0);
+                      }}
+                      className="text-[11px] font-bold text-red-600 hover:underline cursor-pointer"
+                    >
+                      حذف التسجيل ✕
+                    </button>
+                  )}
+                </div>
+
+                {isRecordingAudio ? (
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-red-50 border border-red-200">
+                    <div className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-full bg-red-600 animate-ping" />
+                      <span className="text-xs font-black text-red-700 font-mono">
+                        جاري التسجيل: {Math.floor(audioRecordDuration / 60)}:{(audioRecordDuration % 60).toString().padStart(2, "0")}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={stopVoiceRecording}
+                        className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-black hover:bg-red-700 transition flex items-center gap-1 cursor-pointer shadow-xs"
+                      >
+                        <Square className="w-3.5 h-3.5 fill-white" />
+                        <span>إيقاف وحفظ</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={cancelVoiceRecording}
+                        className="px-2.5 py-1.5 bg-slate-200 text-slate-700 rounded-lg text-xs font-bold hover:bg-slate-300 transition cursor-pointer"
+                      >
+                        إلغاء
+                      </button>
+                    </div>
+                  </div>
+                ) : annAudio ? (
+                  <div className="p-2.5 rounded-xl bg-white border border-teal-200 space-y-1">
+                    <div className="flex items-center justify-between text-[11px] text-teal-900 font-black">
+                      <span>✓ تم تسجيل الملاحظة الصوتية جاهزة للمشاركة</span>
+                      {annAudioDuration > 0 && <span>({annAudioDuration} ثانية)</span>}
+                    </div>
+                    <audio src={annAudio} controls className="w-full h-8" />
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={startVoiceRecording}
+                    className="w-full py-2.5 px-3 rounded-xl bg-white border border-teal-300 text-teal-900 text-xs font-black hover:bg-teal-100/60 flex items-center justify-center gap-2 transition cursor-pointer shadow-2xs"
+                  >
+                    <Mic className="w-4 h-4 text-teal-700" />
+                    <span>اضغط لبدء تسجيل ملاحظة صوتية بصوتك 🎙️</span>
+                  </button>
+                )}
+              </div>
+
+              {/* 7. إرفاق صورة مع الإعلان (صورة سبورة، تمرين، إشعار رسمي) */}
+              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                    <ImageIcon className="w-4 h-4 text-teal-600" />
+                    <span>إرفاق صورة مع الإعلان (سبورة، تمرين، وثيقة)</span>
+                  </span>
+                  {annImage && (
+                    <button
+                      type="button"
+                      onClick={() => setAnnImage(null)}
+                      className="text-[11px] font-bold text-red-600 hover:underline cursor-pointer"
+                    >
+                      حذف الصورة ✕
+                    </button>
+                  )}
+                </div>
+
+                {annImage ? (
+                  <div className="relative rounded-xl overflow-hidden border border-slate-200 bg-white p-1 max-w-sm">
+                    <img
+                      src={annImage}
+                      alt="الصورة المرفقة"
+                      className="w-full max-h-48 object-contain rounded-lg"
+                    />
+                  </div>
+                ) : (
+                  <label className="w-full py-2.5 px-3 rounded-xl bg-white border border-slate-300 text-slate-700 text-xs font-black hover:bg-slate-100 flex items-center justify-center gap-2 cursor-pointer transition shadow-2xs">
+                    <Upload className="w-4 h-4 text-slate-500" />
+                    <span>اختر صورة من الجهاز أو التقط بكاميرا الهاتف 📷</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleAnnouncementImageUpload}
+                    />
+                  </label>
+                )}
+              </div>
+
+              {/* 8. خيار التثبيت في الأعلى */}
               <label className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-50 border border-slate-200 cursor-pointer">
                 <input
                   type="checkbox"
@@ -3927,7 +4321,7 @@ function Dashboard({
               <button
                 type="submit"
                 disabled={isSubmitting || !annTitle.trim() || !annContent.trim()}
-                className="w-full py-2.5 px-4 rounded-xl bg-teal-600 text-white font-black text-xs hover:bg-teal-700 transition flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
+                className="w-full py-2.5 px-4 rounded-xl bg-teal-600 text-white font-black text-xs hover:bg-teal-700 transition flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 cursor-pointer"
               >
                 {isSubmitting ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -3948,7 +4342,7 @@ function Dashboard({
                 <span>سجل الإعلانات والتنبيهات ({announcementsList.length})</span>
               </span>
               <span className="text-[10px] text-slate-400 font-bold">
-                تظهر للزوار في الصفحة الرئيسية
+                تظهر للزوار في الصفحة الرئيسية وفضاء المستوى المحدد
               </span>
             </div>
 
@@ -3982,6 +4376,21 @@ function Dashboard({
                             ? "🔔 تحديث"
                             : "📢 عام"}
                         </span>
+                        {ann.targetLevel && (
+                          <span className="text-[9px] font-black px-2 py-0.5 rounded-full border bg-emerald-50 text-emerald-800 border-emerald-200">
+                            {ann.targetLevel === "all"
+                              ? "📢 عام للكل"
+                              : ann.targetLevel === "1am"
+                              ? "🎯 1 متوسط"
+                              : ann.targetLevel === "2am"
+                              ? "🎯 2 متوسط"
+                              : ann.targetLevel === "3am"
+                              ? "🎯 3 متوسط"
+                              : ann.targetLevel === "4am"
+                              ? "🎯 4 متوسط"
+                              : `🎯 ${ann.targetLevel}`}
+                          </span>
+                        )}
                         {ann.pinned && (
                           <span className="inline-flex items-center gap-0.5 text-[9px] font-black bg-amber-100 text-amber-900 border border-amber-300 px-1.5 py-0.5 rounded-full">
                             <Pin className="w-2.5 h-2.5 fill-amber-700 text-amber-700" /> مثبت
@@ -4002,7 +4411,7 @@ function Dashboard({
                         <button
                           onClick={() => handleTogglePinAnnouncement(ann)}
                           title={ann.pinned ? "إلغاء التثبيت" : "تثبيت في الأعلى"}
-                          className={`p-1.5 rounded-lg text-xs transition ${
+                          className={`p-1.5 rounded-lg text-xs transition cursor-pointer ${
                             ann.pinned
                               ? "bg-amber-100 text-amber-800"
                               : "text-slate-400 hover:bg-slate-100"
@@ -4013,7 +4422,7 @@ function Dashboard({
                         <button
                           onClick={() => handleToggleActiveAnnouncement(ann)}
                           title={ann.active === false ? "إظهار للزوار" : "إخفاء مؤقت"}
-                          className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 transition"
+                          className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 transition cursor-pointer"
                         >
                           {ann.active === false ? (
                             <EyeOff className="w-3.5 h-3.5 text-amber-600" />
@@ -4029,17 +4438,21 @@ function Dashboard({
                             setAnnCategory(ann.category);
                             setAnnDate(ann.date || "");
                             setAnnPinned(Boolean(ann.pinned));
+                            setAnnTargetLevel(ann.targetLevel || "all");
+                            setAnnImage(ann.imageUrl || null);
+                            setAnnAudio(ann.audioUrl || null);
+                            setAnnAudioDuration(ann.audioDuration || 0);
                             window.scrollTo({ top: 0, behavior: "smooth" });
                           }}
                           title="تعديل الإعلان"
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-teal-700 hover:bg-teal-50 transition"
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-teal-700 hover:bg-teal-50 transition cursor-pointer"
                         >
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => setDeletingAnnouncement(ann)}
                           title="حذف الإعلان"
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition"
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition cursor-pointer"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -4049,9 +4462,31 @@ function Dashboard({
                     <h4 className="text-xs font-black text-slate-900 mt-2">
                       {ann.title}
                     </h4>
-                    <p className="text-[11px] text-slate-700 mt-1 leading-relaxed whitespace-pre-line">
+                    <p className="text-[11px] text-slate-700 mt-1 leading-relaxed whitespace-pre-line font-medium">
                       {ann.content}
                     </p>
+
+                    {/* عرض التسجيل الصوتي المرفق إن وجد */}
+                    {ann.audioUrl && (
+                      <div className="mt-2.5 p-2 rounded-xl bg-teal-50/80 border border-teal-200 space-y-1">
+                        <div className="flex items-center gap-1.5 text-[10px] font-black text-teal-900">
+                          <Volume2 className="w-3.5 h-3.5 text-teal-700" />
+                          <span>ملاحظة صوتية مسجلة {ann.audioDuration ? `(${ann.audioDuration} ثانية)` : ""}</span>
+                        </div>
+                        <audio src={ann.audioUrl} controls className="w-full h-8" />
+                      </div>
+                    )}
+
+                    {/* عرض الصورة المرفقة إن وجدت */}
+                    {ann.imageUrl && (
+                      <div className="mt-2.5 rounded-xl overflow-hidden border border-slate-200 max-w-xs bg-slate-50 p-1">
+                        <img
+                          src={ann.imageUrl}
+                          alt={ann.title}
+                          className="w-full max-h-36 object-contain rounded"
+                        />
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

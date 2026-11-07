@@ -21,6 +21,8 @@ import {
   Quote,
   CheckCircle2,
   Lock,
+  Volume2,
+  Image as ImageIcon,
 } from "lucide-react";
 import { UserProfile, LEVELS, MIDDLE_SCHOOL_SUBJECTS } from "@/lib/types";
 import SaveToWalletButton from "@/components/SaveToWalletButton";
@@ -72,10 +74,26 @@ export default async function TeacherPublicSpace({ params, searchParams }: Teach
   // بيانات الأستاذ العامة: الدروس والإعلانات ولوحة الشرف
   const publicData = await readPublicTeacherData(supabase, profile.id).catch(() => normalizeData({}));
 
-  const announcements = (publicData.announcements ?? [])
-    .filter((a) => a.active !== false)
-    .sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)) || b.createdAt.localeCompare(a.createdAt))
-    .slice(0, 3);
+  const rawAnnouncements = (publicData.announcements ?? []).filter((a) => a.active !== false);
+  const announcements = (
+    isLockedToLevel && lockedLevel
+      ? rawAnnouncements.filter((a) => {
+          if (!a.targetLevel || a.targetLevel === "all") return true;
+          const target = a.targetLevel.toLowerCase();
+          return (
+            target.includes(`${lockedLevel}am`) ||
+            target.includes(`${lockedLevel}م`) ||
+            target.includes(String(lockedLevel))
+          );
+        })
+      : rawAnnouncements
+  )
+    .sort(
+      (a, b) =>
+        Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)) ||
+        b.createdAt.localeCompare(a.createdAt)
+    )
+    .slice(0, 6);
   const teacherLessons = publicData.lessons || [];
 
   // إعدادات وتخصيصات الفضاء البيداغوجي للأستاذ
@@ -505,10 +523,58 @@ export default async function TeacherPublicSpace({ params, searchParams }: Teach
               {announcements.map((a) => (
                 <div
                   key={a.id}
-                  className="p-4 bg-emerald-50/60 rounded-2xl border border-emerald-100 text-xs space-y-1.5"
+                  className="p-4 bg-emerald-50/70 rounded-2xl border border-emerald-200/80 text-xs space-y-2 shadow-2xs hover:shadow-xs transition"
                 >
-                  <p className="font-black text-slate-900 text-sm">{a.title}</p>
-                  <p className="text-slate-600 leading-relaxed whitespace-pre-wrap font-medium">{a.content}</p>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {a.targetLevel && (
+                      <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-white text-emerald-900 border border-emerald-200 shadow-2xs">
+                        {a.targetLevel === "all"
+                          ? "📢 عام للكل"
+                          : a.targetLevel === "1am"
+                          ? "🎯 1 متوسط"
+                          : a.targetLevel === "2am"
+                          ? "🎯 2 متوسط"
+                          : a.targetLevel === "3am"
+                          ? "🎯 3 متوسط"
+                          : a.targetLevel === "4am"
+                          ? "🎯 4 متوسط"
+                          : `🎯 ${a.targetLevel}`}
+                      </span>
+                    )}
+                    {a.date && (
+                      <span className="text-[10px] text-slate-500 mr-auto font-bold">{a.date}</span>
+                    )}
+                  </div>
+
+                  <p className="font-black text-slate-900 text-sm leading-snug">{a.title}</p>
+                  <p className="text-slate-700 leading-relaxed whitespace-pre-wrap font-medium">{a.content}</p>
+
+                  {/* ملاحظة صوتية مسجلة */}
+                  {a.audioUrl && (
+                    <div className="mt-2.5 p-2 rounded-xl bg-white/95 border border-emerald-200 space-y-1">
+                      <div className="flex items-center gap-1.5 text-[10px] font-black text-emerald-900">
+                        <Volume2 className="w-3.5 h-3.5 text-emerald-700" />
+                        <span>ملاحظة صوتية من الأستاذ 🎙️ {a.audioDuration ? `(${a.audioDuration} ثانية)` : ""}</span>
+                      </div>
+                      <audio src={a.audioUrl} controls className="w-full h-8" />
+                    </div>
+                  )}
+
+                  {/* صورة مرفقة */}
+                  {a.imageUrl && (
+                    <div className="mt-2 rounded-xl overflow-hidden border border-emerald-200 bg-white max-w-sm">
+                      <img
+                        src={a.imageUrl}
+                        alt={a.title}
+                        className="w-full max-h-48 object-contain bg-slate-50 hover:scale-101 transition-transform cursor-pointer"
+                        onClick={() => {
+                          if (typeof window !== "undefined") {
+                            window.open(a.imageUrl, "_blank");
+                          }
+                        }}
+                      />
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

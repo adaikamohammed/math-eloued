@@ -4,7 +4,8 @@ import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { useTeacherId, withTeacher, teacherHomeHref } from "@/lib/teacherParam";
 import { ChevronLeft, Image as ImageIcon, BookOpen, Layers, StickyNote, Sparkles, FileText } from "lucide-react";
-import { LEVELS, NOTEBOOKS, isPdfFile, type Lesson, type NotebookType } from "@/lib/types";
+import { LEVELS, NOTEBOOKS, isPdfFile, type Lesson, type NotebookType, type Announcement } from "@/lib/types";
+import HomeAnnouncements from "@/components/HomeAnnouncements";
 import { BackHeader, Loading, Empty } from "@/components/ui";
 
 export function YearLessons({ level }: { level: 1 | 2 | 3 | 4 }) {
@@ -13,6 +14,18 @@ export function YearLessons({ level }: { level: 1 | 2 | 3 | 4 }) {
   const [allLessons, setAllLessons] = useState<Lesson[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [levelAnnouncements, setLevelAnnouncements] = useState<Announcement[]>([]);
+
+  useEffect(() => {
+    fetch(withTeacher(`/api/announcements?level=${level}am&_t=${Date.now()}`), { cache: "no-store" })
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data.announcements)) {
+          setLevelAnnouncements(data.announcements.filter((a: any) => a.active !== false));
+        }
+      })
+      .catch(() => {});
+  }, [level]);
 
   useEffect(() => {
     setLoading(true);
@@ -92,6 +105,13 @@ export function YearLessons({ level }: { level: 1 | 2 | 3 | 4 }) {
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-20 space-y-5 fade-up font-sans" dir="rtl">
       <BackHeader href={teacherHomeHref(teacherId)} title={LEVELS[level].label} subtitle="اختر القسم لمشاهدة الدروس أو السلاسل والملخصات" />
+
+      {/* تنبيهات وإعلانات الأستاذ الموجهة لهذا المستوى */}
+      {levelAnnouncements.length > 0 && (
+        <div className="pt-1">
+          <HomeAnnouncements announcements={levelAnnouncements} />
+        </div>
+      )}
 
       {/* أزرار اختيار الأقسام الـ 4 (الدروس، الأعمال الموجهة، سلاسل التمارين، الملخصات) */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-white p-2 rounded-2xl border border-slate-100 shadow-2xs">

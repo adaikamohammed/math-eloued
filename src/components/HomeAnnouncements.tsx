@@ -11,8 +11,19 @@ import {
   ChevronUp,
   Sparkles,
   Calendar,
+  Volume2,
+  Image as ImageIcon,
 } from "lucide-react";
 import { Announcement, AnnouncementCategory } from "@/lib/types";
+
+function formatTargetLevel(lvl?: string) {
+  if (!lvl || lvl === "all") return "📢 عام لكافة المستويات";
+  if (lvl === "1am" || lvl === "1م") return "🎯 السنة 1 متوسط";
+  if (lvl === "2am" || lvl === "2م") return "🎯 السنة 2 متوسط";
+  if (lvl === "3am" || lvl === "3م") return "🎯 السنة 3 متوسط";
+  if (lvl === "4am" || lvl === "4م") return "🎯 السنة 4 متوسط";
+  return `🎯 قسم ${lvl}`;
+}
 
 const CATEGORY_STYLES: Record<
   AnnouncementCategory,
@@ -105,6 +116,12 @@ export default function HomeAnnouncements({
                 {mainStyle.badge}
               </span>
 
+              {mainItem.targetLevel && (
+                <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full border bg-white/80 text-emerald-900 border-emerald-300 shadow-2xs">
+                  {formatTargetLevel(mainItem.targetLevel)}
+                </span>
+              )}
+
               {mainItem.pinned && (
                 <span className="inline-flex items-center gap-1 text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-full">
                   <Pin className="w-2.5 h-2.5 fill-amber-700 text-amber-700" /> مثبت
@@ -126,6 +143,38 @@ export default function HomeAnnouncements({
             <p className="text-xs text-slate-700 mt-1.5 leading-relaxed font-medium whitespace-pre-line">
               {mainItem.content}
             </p>
+
+            {/* ملاحظة صوتية مسجلة للأستاذ */}
+            {mainItem.audioUrl && (
+              <div className="mt-3 p-2.5 rounded-2xl bg-white/90 border border-emerald-200/90 shadow-2xs space-y-1.5">
+                <div className="flex items-center gap-1.5 text-xs font-black text-emerald-900">
+                  <Volume2 className="w-4 h-4 text-emerald-700" />
+                  <span>استمع لملاحظة الأستاذ الصوتية 🎙️</span>
+                  {mainItem.audioDuration ? (
+                    <span className="text-[10px] font-normal text-slate-500">
+                      ({mainItem.audioDuration} ثانية)
+                    </span>
+                  ) : null}
+                </div>
+                <audio src={mainItem.audioUrl} controls className="w-full h-8" />
+              </div>
+            )}
+
+            {/* صورة مرفقة مع الإعلان */}
+            {mainItem.imageUrl && (
+              <div className="mt-3 rounded-2xl overflow-hidden border border-slate-200 bg-white max-w-md shadow-2xs">
+                <img
+                  src={mainItem.imageUrl}
+                  alt={mainItem.title}
+                  className="w-full max-h-72 object-contain bg-slate-50 hover:scale-101 transition-transform cursor-pointer"
+                  onClick={() => {
+                    if (typeof window !== "undefined") {
+                      window.open(mainItem.imageUrl, "_blank");
+                    }
+                  }}
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -156,6 +205,11 @@ export default function HomeAnnouncements({
                           >
                             {style.badge}
                           </span>
+                          {item.targetLevel && (
+                            <span className="text-[9px] font-black px-2 py-0.5 rounded-full border bg-white/80 text-emerald-900 border-emerald-300">
+                              {formatTargetLevel(item.targetLevel)}
+                            </span>
+                          )}
                           {item.pinned && (
                             <span className="inline-flex items-center gap-0.5 text-[9px] font-bold bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded">
                               <Pin className="w-2.5 h-2.5 fill-amber-700 text-amber-700" /> مثبت
@@ -170,9 +224,31 @@ export default function HomeAnnouncements({
                         <h4 className="text-xs font-black text-slate-900 mt-1">
                           {item.title}
                         </h4>
-                        <p className="text-[11px] text-slate-700 mt-1 leading-relaxed whitespace-pre-line">
+                        <p className="text-[11px] text-slate-700 mt-1 leading-relaxed whitespace-pre-line font-medium">
                           {item.content}
                         </p>
+
+                        {/* تسجيل صوتي مرافق */}
+                        {item.audioUrl && (
+                          <div className="mt-2 p-2 rounded-xl bg-white/90 border border-emerald-200/80 space-y-1">
+                            <div className="flex items-center gap-1.5 text-[10px] font-black text-emerald-900">
+                              <Volume2 className="w-3.5 h-3.5 text-emerald-700" />
+                              <span>ملاحظة صوتية</span>
+                            </div>
+                            <audio src={item.audioUrl} controls className="w-full h-8" />
+                          </div>
+                        )}
+
+                        {/* صورة مرافقة */}
+                        {item.imageUrl && (
+                          <div className="mt-2 rounded-xl overflow-hidden border border-slate-200 bg-white max-w-xs">
+                            <img
+                              src={item.imageUrl}
+                              alt={item.title}
+                              className="w-full max-h-48 object-contain bg-slate-50"
+                            />
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
