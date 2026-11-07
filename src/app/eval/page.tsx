@@ -28,6 +28,7 @@ import {
   Scale,
   Users,
   Plus,
+  Minus,
   Trash2,
   Printer,
   Search,
@@ -381,8 +382,10 @@ export default function GradebookEvaluationPage() {
           updatedAt: new Date().toISOString(),
         };
 
-        // إذا تم تعديل أحد عناصر التقويم أو رصيد الزيادة/النقصان، نحسب الإجمالي آلياً
-        if (
+        // إذا تم تعديل التقويم المستمر مباشرة أو أحد عناصر سلم التقويم الصفي
+        if (updates.continuousScore !== undefined) {
+          merged.continuousScore = Math.min(20, Math.max(0, Math.round(updates.continuousScore * 100) / 100));
+        } else if (
           updates.behaviorScore !== undefined ||
           updates.notebook1Score !== undefined ||
           updates.notebook2Score !== undefined ||
@@ -522,9 +525,9 @@ export default function GradebookEvaluationPage() {
   const handleTableKeyDown = (
     e: React.KeyboardEvent<HTMLInputElement>,
     rowIndex: number,
-    colName: "test1" | "exam" | "notes"
+    colName: "continuous" | "test1" | "exam" | "notes"
   ) => {
-    const cols: ("test1" | "exam" | "notes")[] = ["test1", "exam", "notes"];
+    const cols: ("continuous" | "test1" | "exam" | "notes")[] = ["continuous", "test1", "exam", "notes"];
     const colIdx = cols.indexOf(colName);
 
     if (e.key === "ArrowDown" || e.key === "Enter") {
@@ -566,8 +569,81 @@ export default function GradebookEvaluationPage() {
     }
   };
 
+  // تعديل سريع لأي علامة (+0.5 أو -0.5)
+  const adjustScore = useCallback(
+    (studentName: string, field: "continuousScore" | "test1Score" | "examScore", delta: number) => {
+      const rec = getRecordForStudent(studentName);
+      const cur = rec[field] ?? (field === "continuousScore" ? 20 : 0);
+      const nextVal = Math.min(20, Math.max(0, Math.round((cur + delta) * 2) / 2));
+      updateStudentField(studentName, { [field]: nextVal });
+    },
+    [getRecordForStudent, updateStudentField]
+  );
+
+  // إسناد علامة محددة لجميع تلاميذ الفوج في التقويم المستمر (مثل 20 أو 0)
+  const handleBatchContinuous = useCallback(
+    (score: number = 20) => {
+      filteredStudents.forEach((st) => {
+        updateStudentField(st.studentName, { continuousScore: score });
+      });
+      showToast("ok", `🌟 تم رصد علامة ${score} في التقويم المستمر لجميع تلاميذ الفوج المعروضين (${filteredStudents.length} تلميذ)`);
+    },
+    [filteredStudents, updateStudentField]
+  );
+
+  // مسح علامات الفرض للفوج المعروض
+  const handleClearAllTests = useCallback(() => {
+    if (!confirm("هل أنت متأكد من رغبتك في مسح علامات الفرض لجميع تلاميذ الفوج المعروضين؟")) return;
+    filteredStudents.forEach((st) => {
+      updateStudentField(st.studentName, { test1Score: undefined });
+    });
+    showToast("ok", "🧹 تم مسح علامات الفرض بنجاح.");
+  }, [filteredStudents, updateStudentField]);
+
+  // مسح علامات الاختبار للفوج المعروض
+  const handleClearAllExams = useCallback(() => {
+    if (!confirm("هل أنت متأكد من رغبتك في مسح علامات الاختبار لجميع تلاميذ الفوج المعروضين؟")) return;
+    filteredStudents.forEach((st) => {
+      updateStudentField(st.studentName, { examScore: undefined });
+    });
+    showToast("ok", "🧹 تم مسح علامات الاختبار بنجاح.");
+  }, [filteredStudents, updateStudentField]);
+
+  // توليد الملاحظات والتوجيهات البيداغوجية آلياً بناءً على المعدل
+  const autoGenerateRemarksForAll = useCallback(() => {
+    let count = 0;
+    filteredStudents.forEach((st) => {
+      const rec = getRecordForStudent(st.studentName);
+      const continuous = rec.continuousScore ?? 20;
+      const test = rec.test1Score;
+      const exam = rec.examScore;
+      if (test !== undefined && exam !== undefined) {
+        const monitoring = (continuous + test) / 2;
+        const avg = (monitoring + 2 * exam) / 3;
+        let note = "";
+        if (avg >= 18) note = "عمل ممتاز ونتائج مشرفة، واصل التألق 🌟";
+        else if (avg >= 15) note = "نتائج حسنة جداً، مزيداً من الجد والاجتهاد 🟢";
+        else if (avg >= 13) note = "مستوى حسن، قادر على تحقيق الأفضل بالإصرار 💪";
+        else if (avg >= 10) note = "نتائج مقبولة، يحتاج لمضاعفة التركيز والمراجعة 📝";
+        else if (avg >= 8) note = "تراجع طفيف، عليك مراجعة دروسك أولاً بأول ⚠️";
+        else note = "احذر التهاون والغيابات، مطلوب مضاعفة المجهودات والانضباط ❌";
+
+        if (!rec.notes || rec.notes.trim() === "") {
+          updateStudentField(st.studentName, { notes: note });
+          count++;
+        }
+      }
+    });
+    showToast("ok", `✨ تم اقتراح وتوليد الملاحظات البيداغوجية آلياً لـ ${count} تلميذ.`);
+  }, [filteredStudents, getRecordForStudent, updateStudentField]);
+
   // تشغيل الطباعة الأفقية الرسمية
   const handlePrintLandscape = () => {
+    const currentRecordsMap: Record<string, OfficialGradeRecord> = {};
+    classStudents.forEach((st) => {
+      currentRecordsMap[st.studentName] = getRecordForStudent(st.studentName);
+    });
+
     printGradebookReport({
       teacherName: profile?.fullName || "الأستاذ(ة)",
       schoolName: profile?.schoolCustomName || "المؤسسة التعليمية",
@@ -579,13 +655,18 @@ export default function GradebookEvaluationPage() {
       coefficient: activeCoefficient,
       trimester: selectedTrimester,
       students: classStudents,
-      records: gradeRecords,
+      records: currentRecordsMap,
       includeCriteriaBreakdown: false,
     });
   };
 
   // تشغيل حفظ وتحميل PDF أفقياً (معبأ أو نموذج فارغ للرصد اليدوي)
   const handleDownloadPDF = (isBlankTemplate: boolean = false) => {
+    const currentRecordsMap: Record<string, OfficialGradeRecord> = {};
+    classStudents.forEach((st) => {
+      currentRecordsMap[st.studentName] = getRecordForStudent(st.studentName);
+    });
+
     downloadGradebookPDF({
       teacherName: profile?.fullName || "الأستاذ(ة)",
       schoolName: profile?.schoolCustomName || "المؤسسة التعليمية",
@@ -597,7 +678,7 @@ export default function GradebookEvaluationPage() {
       coefficient: activeCoefficient,
       trimester: selectedTrimester,
       students: classStudents,
-      records: gradeRecords,
+      records: currentRecordsMap,
       includeCriteriaBreakdown: false,
       isBlankTemplate,
     });
@@ -704,70 +785,94 @@ export default function GradebookEvaluationPage() {
       <div className="max-w-7xl mx-auto space-y-5">
         {/* ─── شريط المسار وأزرار العمليات العلوية ─── */}
         <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
-          <div className="flex items-center gap-2 text-xs font-bold text-gray-500">
-            <Link href="/admin" className="hover:text-gray-900 transition flex items-center gap-1">
+          <div className="flex items-center gap-2 flex-wrap text-xs">
+            <Link href="/admin" className="text-gray-500 hover:text-gray-900 font-bold transition flex items-center gap-1">
               <ArrowRight className="w-3.5 h-3.5" />
               لوحة الأستاذ
             </Link>
-            <span>/</span>
+            <span className="text-gray-400">/</span>
             <span className="text-gray-900 font-black">سجل التنقيط والتقويم المستمر</span>
+            <button
+              type="button"
+              onClick={() => setIsSettingsModalOpen(true)}
+              className="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-800 px-2.5 py-0.5 rounded-full font-bold text-[11px] transition cursor-pointer"
+              title="تخصيص المادة والمعامل"
+            >
+              <span>{teacherSubject}</span>
+              <span className="text-emerald-700 font-black">• المعامل ×{activeCoefficient}</span>
+              <Settings className="w-3 h-3 text-slate-500" />
+            </button>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            <Link
-              href="/eval/continuous"
-              className="px-3.5 py-1.5 rounded-xl border border-emerald-400 bg-emerald-600 hover:bg-emerald-700 text-xs font-black text-white transition shadow-sm flex items-center gap-1.5"
-              title="فتح صفحة دفتر التقويم المستمر الصفي اليومي للتنقيط السريع من الهاتف"
-            >
-              <Smartphone className="w-3.5 h-3.5 text-emerald-100" />
-              <span>دفتر التقويم اليومي 📱</span>
-            </Link>
-            <button
-              onClick={() => setIsRubricModalOpen(true)}
-              type="button"
-              className="px-3 py-1.5 rounded-xl border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-xs font-black text-indigo-800 transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
-              title="تخصيص سلم التقويم المستمر وتوزيع النقاط على ذوق الأستاذ"
-            >
-              <Sliders className="w-3.5 h-3.5 text-indigo-600" />
-              <span>تخصيص سلم التنقيط ⚙️</span>
-            </button>
-            <button
-              onClick={handleExportCSV}
-              type="button"
-              className="px-3 py-1.5 rounded-xl border border-gray-300 bg-white hover:bg-gray-50 text-xs font-bold text-gray-700 transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
-              title="تصدير جدول النقاط إلى ملف Excel"
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-              <span>تصدير Excel 📊</span>
-            </button>
-            <button
-              onClick={() => handleDownloadPDF(false)}
-              type="button"
-              className="px-3.5 py-1.5 rounded-xl border border-[#107a57]/30 bg-[#e6f4ee] text-xs font-black text-[#107a57] hover:bg-[#d8efe5] transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
-              title="حفظ وتنزيل كراس التنقيط كملف PDF معبأ بالبيانات والنقاط المسجلة"
-            >
-              <Download className="w-3.5 h-3.5 text-[#107a57]" />
-              <span>حفظ PDF (معبأ) 📄</span>
-            </button>
-            <button
-              onClick={() => handleDownloadPDF(true)}
-              type="button"
-              className="px-3.5 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-black text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
-              title="تنزيل استمارة كراس التنقيط فارغة للرصد اليدوي بالقلم داخل القسم"
-            >
-              <ClipboardCheck className="w-3.5 h-3.5 text-slate-600" />
-              <span>✍️ نموذج فارغ للرصد</span>
-            </button>
+            {/* زر الحفظ ومؤشر الحالة */}
             <button
               onClick={handleSaveToServer}
               disabled={saving}
               type="button"
-              className={`btn-primary text-xs px-4 py-1.5 flex items-center gap-1.5 shadow-sm cursor-pointer ${
-                hasUnsavedChanges ? "animate-pulse" : ""
+              className={`py-1.5 px-3.5 rounded-xl text-xs font-black flex items-center gap-1.5 shadow-sm transition active:scale-95 cursor-pointer ${
+                hasUnsavedChanges
+                  ? "bg-amber-600 hover:bg-amber-700 text-white animate-pulse"
+                  : "bg-emerald-700 hover:bg-emerald-800 text-white"
               }`}
+              title={hasUnsavedChanges ? "توجد تغييرات غير محفوظة، انقر للحفظ الآن" : "تم الحفظ تلقائياً في جهازك"}
             >
               {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-              <span>{saving ? "جاري الحفظ..." : hasUnsavedChanges ? "حفظ التغييرات 💾 *" : "حفظ التغييرات 💾"}</span>
+              <span>{saving ? "جاري الحفظ..." : hasUnsavedChanges ? "حفظ التغييرات 💾 *" : "تم الحفظ تلقائياً"}</span>
+            </button>
+
+            {/* زر الانتقال لدفتر التقويم اليومي */}
+            <Link
+              href="/eval/continuous"
+              className="py-1.5 px-3 rounded-xl border border-emerald-400 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-black flex items-center gap-1.5 shadow-2xs transition active:scale-95"
+              title="الانتقال لدفتر التقويم الصفي للتنقيط الميداني السريع من الهاتف"
+            >
+              <Smartphone className="w-3.5 h-3.5 text-emerald-600" />
+              <span>دفتر التقويم الصفي 📱</span>
+            </Link>
+
+            {/* تخصيص السلم */}
+            <button
+              onClick={() => setIsRubricModalOpen(true)}
+              type="button"
+              className="py-1.5 px-3 rounded-xl border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 text-xs font-black flex items-center gap-1.5 shadow-2xs transition active:scale-95 cursor-pointer"
+              title="تخصيص سلم ومعايير التقويم المستمر"
+            >
+              <Sliders className="w-3.5 h-3.5 text-indigo-600" />
+              <span>تخصيص السلم ⚙️</span>
+            </button>
+
+            {/* حفظ PDF معبأ */}
+            <button
+              onClick={() => handleDownloadPDF(false)}
+              type="button"
+              className="py-1.5 px-3 rounded-xl border border-[#107a57]/30 bg-[#e6f4ee] hover:bg-[#d8efe5] text-[#107a57] text-xs font-black flex items-center gap-1.5 shadow-2xs transition active:scale-95 cursor-pointer"
+              title="حفظ وتصدير جدول رصد النقاط والمعدل كملف PDF معبأ بالبيانات"
+            >
+              <Download className="w-3.5 h-3.5 text-[#107a57]" />
+              <span>حفظ PDF (معبأ) 📄</span>
+            </button>
+
+            {/* نموذج فارغ للرصد */}
+            <button
+              onClick={() => handleDownloadPDF(true)}
+              type="button"
+              className="py-1.5 px-3 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-xs font-black flex items-center gap-1.5 shadow-2xs transition active:scale-95 cursor-pointer"
+              title="تنزيل نموذج فارغ للرصد اليدوي بالقلم"
+            >
+              <ClipboardCheck className="w-3.5 h-3.5 text-slate-600" />
+              <span>✍️ نموذج فارغ للرصد</span>
+            </button>
+
+            {/* تصدير Excel */}
+            <button
+              onClick={handleExportCSV}
+              type="button"
+              className="py-1.5 px-3 rounded-xl border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-xs font-bold flex items-center gap-1.5 shadow-2xs transition active:scale-95 cursor-pointer"
+              title="تصدير جدول النقاط إلى ملف Excel"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Excel 📊</span>
             </button>
           </div>
         </div>
@@ -800,58 +905,12 @@ export default function GradebookEvaluationPage() {
           </div>
         )}
 
-        {/* ─── بطاقة الترويسة الرئيسية + اختيار الفوج والفصل والمادة ─── */}
-        <div className="bg-white rounded-3xl p-5 sm:p-6 border border-[#e8e8e0] shadow-sm space-y-4 print:hidden">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100 pb-4">
-            <div className="space-y-1">
-              <div className="inline-flex items-center gap-2 bg-[#e6f4ee] text-[#107a57] border border-[#107a57]/20 px-3 py-0.5 rounded-full text-xs font-bold">
-                <ShieldCheck className="w-3.5 h-3.5" />
-                <span>سجل المتابعة والتنقيط الرسمي المعتمد للتثبيت والترسيم</span>
-              </div>
-              <h1 className="text-xl font-black text-gray-900">
-                جدول رصد النقاط والمعدل الفصلي للمادة
-              </h1>
-              <p className="text-xs text-gray-500 font-medium">
-                رصد علامات الفروض والاختبارات، مع استيراد تلقائي لنقاط التقويم المستمر من دفتر التقويم اليومي وحساب معدل المادة الفصلي آلياً.
-              </p>
-            </div>
-
-            {/* شارة المادة والمعامل وسلّم التقويم */}
-            <div className="flex items-center gap-3 shrink-0">
-              <div className="bg-slate-50 border border-slate-200 p-2.5 rounded-2xl text-right">
-                <div className="text-[11px] text-gray-500 font-medium">المادة والمعامل:</div>
-                <div className="text-xs font-black text-slate-800">
-                  {teacherSubject} • <span className="text-[#107a57]">المعامل ×{activeCoefficient}</span>
-                </div>
-              </div>
-
-              <div className="bg-indigo-50 border border-indigo-200 p-2.5 rounded-2xl text-right">
-                <div className="text-[11px] text-indigo-700 font-medium">سلم التقويم المستمر:</div>
-                <div className="text-xs font-black text-indigo-950">
-                  {rubricConfig.rubricType === "official_ministerial"
-                    ? "السلم الوزاري (20ن)"
-                    : rubricConfig.rubricType === "equal_four"
-                    ? "الأرباع (4×5=20ن)"
-                    : "سلم مخصص (20ن)"}
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setIsSettingsModalOpen(true)}
-                className="p-2.5 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-700 transition cursor-pointer"
-                title="تخصيص المادة والمعامل"
-              >
-                <Settings className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-
-          {/* تبويبات الأقسام والفصول والفوج الفرعي */}
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-            {/* 1. ألسنة الأقسام */}
+        {/* ─── بطاقة التصفية الموحدة والشريط الإحصائي المدمج (تصميم نظيف ومريح مثل دفتر التقويم الصفي) ─── */}
+        <div className="bg-white rounded-2xl p-3 sm:p-4 border border-slate-200 shadow-xs space-y-3 print:hidden">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            {/* 1. أزرار الأفواج */}
             <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-xs font-bold text-gray-500 ml-1">الفوج:</span>
+              <span className="text-xs font-bold text-slate-500 ml-1">اختر الفوج:</span>
               {customClasses.map((cls) => {
                 const isActive = selectedClass === cls;
                 return (
@@ -859,143 +918,136 @@ export default function GradebookEvaluationPage() {
                     key={cls}
                     type="button"
                     onClick={() => setSelectedClass(cls)}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition cursor-pointer flex items-center gap-1 ${
+                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition cursor-pointer ${
                       isActive
                         ? "bg-[#107a57] text-white shadow-sm"
-                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                        : "bg-slate-100 text-slate-700 hover:bg-slate-200"
                     }`}
                   >
-                    <span>{cls}</span>
+                    {cls}
                   </button>
                 );
               })}
             </div>
 
-            {/* 2. أزرار الفصول الثلاثة */}
-            <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-2xl">
-              <button
-                type="button"
-                onClick={() => setSelectedTrimester(1)}
-                className={`px-3 py-1 rounded-xl text-xs font-black transition cursor-pointer ${
-                  selectedTrimester === 1
-                    ? "bg-white text-amber-900 shadow-2xs font-black"
-                    : "text-gray-600 hover:text-gray-900"
-                }`}
-              >
-                الفصل الأول 🍂
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelectedTrimester(2)}
-                className={`px-3 py-1 rounded-xl text-xs font-black transition cursor-pointer ${
-                  selectedTrimester === 2
-                    ? "bg-white text-blue-900 shadow-2xs font-black"
-                    : "text-gray-600 hover:text-gray-900"
-                }`}
-              >
-                الفصل الثاني ❄️
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelectedTrimester(3)}
-                className={`px-3 py-1 rounded-xl text-xs font-black transition cursor-pointer ${
-                  selectedTrimester === 3
-                    ? "bg-white text-emerald-900 shadow-2xs font-black"
-                    : "text-gray-600 hover:text-gray-900"
-                }`}
-              >
-                الفصل الثالث 🌸
-              </button>
+            {/* 2. أزرار الفصول */}
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+              {[1, 2, 3].map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setSelectedTrimester(t as 1 | 2 | 3)}
+                  className={`px-3 py-1 rounded-lg text-xs font-black transition cursor-pointer ${
+                    selectedTrimester === t
+                      ? "bg-white text-emerald-900 shadow-xs font-black"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  ف{t}
+                </button>
+              ))}
             </div>
 
-            {/* 3. إجراءات سريعة */}
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleSetFullScoreForAll}
-                className="px-2.5 py-1.5 rounded-xl border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-xs font-bold text-emerald-800 transition cursor-pointer"
-                title="منح 20ن في التقويم المستمر لجميع تلاميذ الفوج"
-              >
-                <span>🌟 20ن للجميع</span>
-              </button>
+            {/* 3. فلتر التفويج الفرعي */}
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+              {["الكل", "فوج 1", "فوج 2"].map((grp) => (
+                <button
+                  key={grp}
+                  type="button"
+                  onClick={() => setSelectedGroupFilter(grp)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                    selectedGroupFilter === grp
+                      ? "bg-slate-800 text-white font-black shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  {grp === "الكل" ? "الكل" : grp === "فوج 1" ? "ف1" : "ف2"}
+                </button>
+              ))}
             </div>
-          </div>
-        </div>
 
-        {/* ─── شريط الإحصائيات الحية للفوج ─── */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 print:hidden">
-          <div className="bg-white rounded-2xl p-3 border border-gray-200 shadow-2xs">
-            <div className="text-[11px] text-gray-500 font-medium">تلاميذ الفوج:</div>
-            <div className="text-base font-black text-gray-900 mt-0.5">
-              {statistics.totalStudents} <span className="text-xs font-normal text-gray-400">تلميذ</span>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl p-3 border border-gray-200 shadow-2xs">
-            <div className="text-[11px] text-gray-500 font-medium">المكتمل رصدهم:</div>
-            <div className="text-base font-black text-slate-800 mt-0.5">
-              {statistics.gradedCount} / {statistics.totalStudents}
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl p-3 border border-gray-200 shadow-2xs">
-            <div className="text-[11px] text-gray-500 font-medium">معدل الفوج العام:</div>
-            <div className="text-base font-black text-[#107a57] mt-0.5">
-              {statistics.classAvg !== undefined ? `${statistics.classAvg.toFixed(2)} / 20` : "قيد الرصد"}
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl p-3 border border-gray-200 shadow-2xs">
-            <div className="text-[11px] text-gray-500 font-medium">نسبة الحاصلين على المعدل:</div>
-            <div className="text-base font-black text-blue-900 mt-0.5">
-              {statistics.passRate}% ({statistics.passCount})
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl p-3 border border-gray-200 shadow-2xs col-span-2 sm:col-span-1">
-            <div className="text-[11px] text-gray-500 font-medium">أعلى / أدنى علامة:</div>
-            <div className="text-xs font-black text-gray-800 mt-1">
-              {statistics.maxAvg !== undefined ? (
-                <>
-                  <span className="text-emerald-700">🔝 {statistics.maxAvg.toFixed(2)}</span> •{" "}
-                  <span className="text-rose-700">🔻 {statistics.minAvg?.toFixed(2)}</span>
-                </>
-              ) : (
-                "-"
+            {/* 4. مربع البحث السريع والذكي عن تلميذ */}
+            <div className="relative flex-1 sm:flex-initial sm:min-w-[240px]">
+              <input
+                type="text"
+                placeholder="ابحث عن تلميذ (اكتب حرفين)..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full py-2 pr-9 pl-8 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:border-emerald-500 rounded-xl text-xs font-bold transition focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 shadow-2xs"
+              />
+              <Search className="w-4 h-4 text-slate-400 absolute right-3 top-2.5 pointer-events-none" />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute left-2.5 top-2 w-5 h-5 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-600 flex items-center justify-center transition cursor-pointer"
+                  title="مسح البحث"
+                >
+                  <X className="w-3 h-3" />
+                </button>
               )}
             </div>
           </div>
-        </div>
 
-        {/* ─── فلتر البحث والتفويج ─── */}
-        <div className="bg-white rounded-2xl p-3 border border-gray-200 shadow-2xs flex flex-wrap items-center justify-between gap-3 print:hidden">
-          <div className="relative flex-1 min-w-[220px]">
-            <Search className="w-4 h-4 text-gray-400 absolute right-3 top-2.5" />
-            <input
-              type="text"
-              placeholder="ابحث عن اسم تلميذ في الفوج..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-3 pr-9 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-[#107a57] focus:outline-none transition"
-            />
-          </div>
+          {/* شريط الإحصائيات الحية والإجراءات السريعة للفوج */}
+          <div className="pt-2.5 border-t border-slate-100 flex flex-wrap items-center justify-between text-xs text-slate-600 gap-2">
+            <div className="flex items-center gap-3 flex-wrap font-medium">
+              <span>
+                عدد التلاميذ: <strong className="text-slate-900 font-bold">{statistics.totalStudents}</strong>
+              </span>
+              <span>•</span>
+              <span>
+                المكتمل رصدهم:{" "}
+                <strong className="text-slate-800 font-bold">
+                  {statistics.gradedCount} / {statistics.totalStudents}
+                </strong>
+              </span>
+              <span>•</span>
+              <span>
+                معدل الفوج:{" "}
+                <strong className="text-emerald-700 font-mono font-black text-sm">
+                  {statistics.classAvg !== undefined ? `${statistics.classAvg.toFixed(2)} / 20` : "قيد الرصد"}
+                </strong>
+              </span>
+              <span>•</span>
+              <span>
+                الحاصلون على ≥ 10:{" "}
+                <strong className="text-emerald-800 font-bold">
+                  {statistics.passCount} من {statistics.totalStudents} ({statistics.passRate}%)
+                </strong>
+              </span>
+              {statistics.maxAvg !== undefined && (
+                <>
+                  <span>•</span>
+                  <span className="text-slate-700 font-bold flex items-center gap-1.5">
+                    <span className="text-emerald-700 font-mono">🔝 {statistics.maxAvg.toFixed(2)}</span>
+                    <span className="text-slate-300">|</span>
+                    <span className="text-rose-700 font-mono">🔻 {statistics.minAvg?.toFixed(2)}</span>
+                  </span>
+                </>
+              )}
+            </div>
 
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs font-bold text-gray-500">التفويج:</span>
-            {["الكل", "فوج 1", "فوج 2"].map((grp) => (
+            {/* أزرار إجرائية سريعة للفوج */}
+            <div className="flex items-center gap-1.5 flex-wrap">
               <button
-                key={grp}
                 type="button"
-                onClick={() => setSelectedGroupFilter(grp)}
-                className={`px-3 py-1 rounded-xl text-xs font-bold transition cursor-pointer ${
-                  selectedGroupFilter === grp
-                    ? "bg-slate-800 text-white font-black"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }`}
+                onClick={() => handleBatchContinuous(20)}
+                className="px-2.5 py-1 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-xs font-bold text-emerald-800 transition cursor-pointer shadow-2xs flex items-center gap-1 active:scale-95"
+                title="منح 20ن كاملة في التقويم المستمر لجميع تلاميذ الفوج المعروضين"
               >
-                {grp}
+                <span>🌟 20ن للتقويم للجميع</span>
               </button>
-            ))}
+              <button
+                type="button"
+                onClick={autoGenerateRemarksForAll}
+                className="px-2.5 py-1 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-xs font-bold text-indigo-800 transition cursor-pointer shadow-2xs flex items-center gap-1 active:scale-95"
+                title="اقتراح ملاحظات بيداغوجية مناسبة تلقائياً بناءً على المعدل الفصلي"
+              >
+                <Sparkles className="w-3 h-3 text-indigo-600" />
+                <span>✨ اقتراح الملاحظات</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -1052,7 +1104,7 @@ export default function GradebookEvaluationPage() {
                   )}
                 </div>
 
-                {/* ── نمط البطاقات المخصصة للهاتف ── */}
+                {/* ── نمط البطاقات المخصصة للهاتف المحمول ── */}
                 {evalViewMode === "cards" && (
                   <div className="sm:hidden p-2.5 space-y-2.5 bg-slate-50">
                     {filteredStudents.map((st, idx) => {
@@ -1063,6 +1115,7 @@ export default function GradebookEvaluationPage() {
                       const exam = rec.examScore;
                       const subjectAvg =
                         monitoring !== undefined && exam !== undefined ? (monitoring + 2 * exam) / 3 : undefined;
+                      const weighted = subjectAvg !== undefined ? subjectAvg * activeCoefficient : undefined;
 
                       return (
                         <div
@@ -1083,318 +1136,565 @@ export default function GradebookEvaluationPage() {
                               <button
                                 type="button"
                                 onClick={() => setDetailStudentName(st.studentName)}
-                                className="p-1 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition"
-                                title="تفاصيل التقويم"
+                                className="p-1 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition cursor-pointer"
+                                title="تفاصيل معايير التقويم"
                               >
                                 <Sliders className="w-3.5 h-3.5" />
                               </button>
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-3 gap-2 text-center">
-                            <div className="bg-emerald-50/70 p-1.5 rounded-xl border border-emerald-100">
+                          {/* خلايا العلامات بالستيبّرات السهلة */}
+                          <div className="grid grid-cols-3 gap-2">
+                            {/* التقويم المستمر */}
+                            <div className="bg-emerald-50/60 p-2 rounded-xl border border-emerald-100 space-y-1 text-center">
                               <span className="text-[10px] text-emerald-900 font-bold block">ت. مستمر</span>
-                              <span className="font-mono font-black text-xs text-emerald-950">
-                                {continuous.toFixed(2)}
-                              </span>
+                              <div className="flex items-center justify-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => adjustScore(st.studentName, "continuousScore", -0.5)}
+                                  className="w-6 h-6 rounded-md bg-white border border-emerald-200 text-emerald-950 font-black text-xs flex items-center justify-center active:scale-95"
+                                >
+                                  -
+                                </button>
+                                <input
+                                  type="number"
+                                  dir="ltr"
+                                  step="0.25"
+                                  min="0"
+                                  max="20"
+                                  value={rec.continuousScore !== undefined ? rec.continuousScore : ""}
+                                  onChange={(e) => {
+                                    const val = e.target.value === "" ? undefined : parseFloat(e.target.value);
+                                    updateStudentField(st.studentName, {
+                                      continuousScore: val !== undefined ? Math.min(20, Math.max(0, val)) : undefined,
+                                    });
+                                  }}
+                                  className="w-12 text-center font-mono font-black text-xs bg-white border border-emerald-300 rounded-md py-0.5 text-emerald-950"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => adjustScore(st.studentName, "continuousScore", 0.5)}
+                                  className="w-6 h-6 rounded-md bg-white border border-emerald-200 text-emerald-950 font-black text-xs flex items-center justify-center active:scale-95"
+                                >
+                                  +
+                                </button>
+                              </div>
                             </div>
 
-                            <div className="bg-blue-50/70 p-1.5 rounded-xl border border-blue-200">
-                              <span className="text-[10px] text-blue-900 font-bold block">الفرض (20ن)</span>
-                              <input
-                                type="number"
-                                dir="ltr"
-                                step="0.25"
-                                min="0"
-                                max="20"
-                                placeholder="-"
-                                value={rec.test1Score !== undefined ? rec.test1Score : ""}
-                                onChange={(e) => {
-                                  const val = e.target.value === "" ? undefined : parseFloat(e.target.value);
-                                  updateStudentField(st.studentName, {
-                                    test1Score: val !== undefined ? Math.min(20, Math.max(0, val)) : undefined,
-                                  });
-                                }}
-                                className="w-full mt-0.5 py-1 text-center font-mono font-black text-xs bg-white border border-blue-300 rounded-lg text-blue-950"
-                              />
+                            {/* الفرض */}
+                            <div className="bg-blue-50/60 p-2 rounded-xl border border-blue-100 space-y-1 text-center">
+                              <span className="text-[10px] text-blue-900 font-bold block">الفرض</span>
+                              <div className="flex items-center justify-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => adjustScore(st.studentName, "test1Score", -0.5)}
+                                  className="w-6 h-6 rounded-md bg-white border border-blue-200 text-blue-950 font-black text-xs flex items-center justify-center active:scale-95"
+                                >
+                                  -
+                                </button>
+                                <input
+                                  type="number"
+                                  dir="ltr"
+                                  step="0.25"
+                                  min="0"
+                                  max="20"
+                                  placeholder="-"
+                                  value={rec.test1Score !== undefined ? rec.test1Score : ""}
+                                  onChange={(e) => {
+                                    const val = e.target.value === "" ? undefined : parseFloat(e.target.value);
+                                    updateStudentField(st.studentName, {
+                                      test1Score: val !== undefined ? Math.min(20, Math.max(0, val)) : undefined,
+                                    });
+                                  }}
+                                  className="w-12 text-center font-mono font-black text-xs bg-white border border-blue-300 rounded-md py-0.5 text-blue-950"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => adjustScore(st.studentName, "test1Score", 0.5)}
+                                  className="w-6 h-6 rounded-md bg-white border border-blue-200 text-blue-950 font-black text-xs flex items-center justify-center active:scale-95"
+                                >
+                                  +
+                                </button>
+                              </div>
                             </div>
 
-                            <div className="bg-amber-50/70 p-1.5 rounded-xl border border-amber-200">
-                              <span className="text-[10px] text-amber-900 font-bold block">الاختبار (20ن)</span>
-                              <input
-                                type="number"
-                                dir="ltr"
-                                step="0.25"
-                                min="0"
-                                max="20"
-                                placeholder="-"
-                                value={rec.examScore !== undefined ? rec.examScore : ""}
-                                onChange={(e) => {
-                                  const val = e.target.value === "" ? undefined : parseFloat(e.target.value);
-                                  updateStudentField(st.studentName, {
-                                    examScore: val !== undefined ? Math.min(20, Math.max(0, val)) : undefined,
-                                  });
-                                }}
-                                className="w-full mt-0.5 py-1 text-center font-mono font-black text-xs bg-white border border-amber-300 rounded-lg text-amber-950"
-                              />
+                            {/* الاختبار */}
+                            <div className="bg-amber-50/60 p-2 rounded-xl border border-amber-100 space-y-1 text-center">
+                              <span className="text-[10px] text-amber-900 font-bold block">الاختبار</span>
+                              <div className="flex items-center justify-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => adjustScore(st.studentName, "examScore", -0.5)}
+                                  className="w-6 h-6 rounded-md bg-white border border-amber-200 text-amber-950 font-black text-xs flex items-center justify-center active:scale-95"
+                                >
+                                  -
+                                </button>
+                                <input
+                                  type="number"
+                                  dir="ltr"
+                                  step="0.25"
+                                  min="0"
+                                  max="20"
+                                  placeholder="-"
+                                  value={rec.examScore !== undefined ? rec.examScore : ""}
+                                  onChange={(e) => {
+                                    const val = e.target.value === "" ? undefined : parseFloat(e.target.value);
+                                    updateStudentField(st.studentName, {
+                                      examScore: val !== undefined ? Math.min(20, Math.max(0, val)) : undefined,
+                                    });
+                                  }}
+                                  className="w-12 text-center font-mono font-black text-xs bg-white border border-amber-300 rounded-md py-0.5 text-amber-950"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => adjustScore(st.studentName, "examScore", 0.5)}
+                                  className="w-6 h-6 rounded-md bg-white border border-amber-200 text-amber-950 font-black text-xs flex items-center justify-center active:scale-95"
+                                >
+                                  +
+                                </button>
+                              </div>
                             </div>
                           </div>
 
-                          <div className="flex items-center justify-between text-xs bg-slate-50 p-2 rounded-xl border border-slate-200 font-bold">
+                          {/* ملخص النتائج المحسوبة */}
+                          <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-[11px] font-bold">
                             <div>
-                              <span className="text-slate-500 text-[10px]">م. المراقبة: </span>
-                              <span className="font-mono font-black text-slate-800">
+                              <span className="text-slate-500">المراقبة: </span>
+                              <span className="font-mono text-teal-800 font-black">
                                 {monitoring !== undefined ? monitoring.toFixed(2) : "-"}
                               </span>
                             </div>
+
                             <div>
-                              <span className="text-slate-500 text-[10px]">معدل المادة: </span>
+                              <span className="text-slate-500">معدل المادة: </span>
                               <span
                                 className={`font-mono font-black px-2 py-0.5 rounded-md ${
                                   subjectAvg !== undefined && subjectAvg >= 10
-                                    ? "bg-emerald-100 text-emerald-900"
+                                    ? "bg-emerald-100 text-emerald-950"
                                     : subjectAvg !== undefined
-                                    ? "bg-rose-100 text-rose-900"
+                                    ? "bg-rose-100 text-rose-950"
                                     : "text-slate-400"
-                                }`}
-                              >
-                                {subjectAvg !== undefined ? subjectAvg.toFixed(2) : "-"}
-                              </span>
-                            </div>
+                              }`}
+                            >
+                              {subjectAvg !== undefined ? subjectAvg.toFixed(2) : "-"}
+                            </span>
                           </div>
 
                           <div>
-                            <input
-                              type="text"
-                              placeholder="ملاحظة الأستاذ للتلميذ..."
-                              value={rec.notes || ""}
-                              onChange={(e) => updateStudentField(st.studentName, { notes: e.target.value })}
-                              className="w-full py-1 px-2.5 text-xs bg-white border border-slate-200 rounded-xl focus:border-emerald-500 focus:outline-none"
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* ── نمط الجدول العريض مع تجميد عمود الاسم للأجهزة ── */}
-                <div className={`overflow-x-auto relative ${evalViewMode === "cards" ? "hidden sm:block" : "block"}`}>
-                  <table ref={tableRef} className="w-full text-right border-collapse text-xs min-w-[880px]">
-                    <thead>
-                      <tr className="bg-slate-50 text-slate-800 font-black border-b border-gray-200">
-                        <th className="py-3 px-2 w-10 text-center sticky right-0 bg-slate-100 z-20">#</th>
-                        <th className="py-3 px-3 min-w-[170px] sticky right-10 bg-slate-100 z-20 border-l border-gray-200 shadow-xs">
-                          اسم ولقب التلميذ(ة)
-                        </th>
-                        <th className="py-3 px-2 w-16 text-center">الفوج</th>
-                      <th className="py-3 px-2 w-36 text-center bg-emerald-50 text-emerald-950 font-black border-l border-emerald-100">
-                        <div className="flex flex-col items-center gap-0.5">
-                          <div className="flex items-center gap-1">
-                            <span>التقويم المستمر (20ن)</span>
-                            <span title="العلامة مستوردة آلياً من دفتر التقويم المستمر وغير قابلة للتعديل هنا">🔒</span>
-                          </div>
-                          <Link
-                            href="/eval/continuous"
-                            className="text-[10px] text-emerald-700 hover:text-emerald-900 font-bold underline decoration-dotted"
-                            title="الانتقال لدفتر التقويم الصفي لتعديل جزئيات النقاط"
-                          >
-                            (تعديل بالدفتر 📱)
-                          </Link>
-                        </div>
-                      </th>
-                      <th className="py-3 px-2 w-24 text-center bg-blue-50/60 text-blue-950 font-black">
-                        الفرض (20ن)
-                      </th>
-                      <th className="py-3 px-2 w-24 text-center bg-teal-50 text-teal-950 font-black">
-                        م. المراقبة (20ن)
-                      </th>
-                      <th className="py-3 px-2 w-24 text-center bg-amber-50 text-amber-950 font-black">
-                        الاختبار (20ن)
-                      </th>
-                      <th className="py-3 px-2 w-28 text-center bg-emerald-100 text-emerald-950 font-black">
-                        معدل المادة (20ن)
-                      </th>
-                      <th className="py-3 px-2 w-24 text-center text-slate-700">
-                        المجموع (×{activeCoefficient})
-                      </th>
-                      <th className="py-3 px-3 min-w-[200px]">ملاحظات وتوجيهات الأستاذ</th>
-                    </tr>
-                  </thead>
-
-                  <tbody className="divide-y divide-gray-100">
-                    {filteredStudents.map((st, idx) => {
-                      const rec = getRecordForStudent(st.studentName);
-                      const continuous = rec.continuousScore ?? 20;
-                      const test1 = rec.test1Score;
-                      const monitoring = test1 !== undefined ? (continuous + test1) / 2 : undefined;
-                      const exam = rec.examScore;
-                      const subjectAvg =
-                        monitoring !== undefined && exam !== undefined ? (monitoring + 2 * exam) / 3 : undefined;
-                      const weighted = subjectAvg !== undefined ? subjectAvg * activeCoefficient : undefined;
-                      const bonus = rec.bonusPoints || 0;
-
-                      return (
-                        <tr key={st.studentName} className="hover:bg-slate-50/80 transition">
-                          {/* الرقم */}
-                          <td className="py-2.5 px-3 text-center text-slate-400 font-mono font-bold">
-                            {idx + 1 < 10 ? `0${idx + 1}` : idx + 1}
-                          </td>
-
-                          {/* اسم التلميذ */}
-                          <td className="py-2.5 px-3 font-bold text-slate-900">
-                            <div className="flex items-center justify-between">
-                              <span>{st.studentName}</span>
-                              <button
-                                type="button"
-                                onClick={() => setDetailStudentName(st.studentName)}
-                                className="opacity-40 hover:opacity-100 p-1 rounded hover:bg-indigo-50 text-indigo-700 transition"
-                                title="عرض وتعديل تفاصيل تقويم هذا التلميذ"
-                              >
-                                <Sliders className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </td>
-
-                          {/* الفوج الفرعي */}
-                          <td className="py-2.5 px-2 text-center">
-                            <span className="px-2 py-0.5 rounded-lg bg-slate-100 text-slate-600 text-[11px] font-bold">
-                              {st.groupName || "فوج 1"}
-                            </span>
-                          </td>
-
-                          {/* التقويم المستمر (20ن) غير قابل للتعديل المباشر هنا - يأتي من دفتر التقويم المستمر */}
-                          <td className="py-2.5 px-2 text-center bg-emerald-50/30 border-l border-emerald-100">
-                            <div className="inline-flex items-center justify-center gap-1.5">
-                              <span className="font-mono font-black text-xs text-emerald-950 bg-white border border-emerald-200 px-2.5 py-1 rounded-lg shadow-2xs">
-                                {continuous !== undefined ? Number(continuous).toFixed(2) : "20.00"}
-                              </span>
-                              <Link
-                                href="/eval/continuous"
-                                className="text-slate-400 hover:text-emerald-700 p-0.5 transition"
-                                title="العلامة مستوردة آلياً من دفتر التقويم الصفي — انقر لتعديلها في صفحة التقويم"
-                              >
-                                <Smartphone className="w-3.5 h-3.5 text-emerald-600" />
-                              </Link>
-                            </div>
-                          </td>
-
-                          {/* الفرض المحروس (20ن) */}
-                          <td className="py-2.5 px-2 text-center bg-blue-50/20">
-                            <input
-                              type="number"
-                              dir="ltr"
-                              step="0.25"
-                              min="0"
-                              max="20"
-                              placeholder="-"
-                              data-row={idx}
-                              data-col="test1"
-                              value={rec.test1Score !== undefined ? rec.test1Score : ""}
-                              onKeyDown={(e) => handleTableKeyDown(e, idx, "test1")}
-                              onChange={(e) => {
-                                const val = e.target.value === "" ? undefined : parseFloat(e.target.value);
-                                updateStudentField(st.studentName, {
-                                  test1Score: val !== undefined ? Math.min(20, Math.max(0, val)) : undefined,
-                                });
-                              }}
-                              className="w-16 py-1 px-1 text-center font-mono font-black text-xs bg-white border border-blue-200 rounded-lg focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600 shadow-2xs text-blue-950"
-                            />
-                          </td>
-
-                          {/* معدل المراقبة المستمرة = (التقويم + الفرض) ÷ 2 */}
-                          <td className="py-2.5 px-2 text-center bg-teal-50/20">
-                            <span className="font-mono font-bold text-xs text-teal-900 bg-teal-50 px-2 py-0.5 rounded-lg border border-teal-200">
-                              {monitoring !== undefined ? monitoring.toFixed(2) : "-"}
-                            </span>
-                          </td>
-
-                          {/* الاختبار الفصلي (20ن) */}
-                          <td className="py-2.5 px-2 text-center bg-amber-50/20">
-                            <input
-                              type="number"
-                              dir="ltr"
-                              step="0.25"
-                              min="0"
-                              max="20"
-                              placeholder="-"
-                              data-row={idx}
-                              data-col="exam"
-                              value={rec.examScore !== undefined ? rec.examScore : ""}
-                              onKeyDown={(e) => handleTableKeyDown(e, idx, "exam")}
-                              onChange={(e) => {
-                                const val = e.target.value === "" ? undefined : parseFloat(e.target.value);
-                                updateStudentField(st.studentName, {
-                                  examScore: val !== undefined ? Math.min(20, Math.max(0, val)) : undefined,
-                                });
-                              }}
-                              className="w-16 py-1 px-1 text-center font-mono font-black text-xs bg-white border border-amber-300 rounded-lg focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600 shadow-2xs text-amber-950"
-                            />
-                          </td>
-
-                          {/* معدل المادة الفصلي المعتمد وزارياً */}
-                          <td className="py-2.5 px-2 text-center bg-emerald-50/40">
-                            {subjectAvg !== undefined ? (
-                              <span
-                                className={`font-mono font-black text-xs px-2.5 py-1 rounded-xl border ${
-                                  subjectAvg >= 10
-                                    ? "bg-emerald-100 text-emerald-950 border-emerald-300 shadow-2xs"
-                                    : "bg-red-50 text-red-700 border-red-200"
-                                }`}
-                              >
-                                {subjectAvg.toFixed(2)}
-                              </span>
-                            ) : (
-                              <span className="text-slate-400 font-mono text-xs">-</span>
-                            )}
-                          </td>
-
-                          {/* المجموع الموزون (المعدل × المعامل) */}
-                          <td className="py-2.5 px-2 text-center">
-                            <span className="font-mono font-black text-xs text-slate-800 bg-slate-100 px-2 py-0.5 rounded-lg">
+                            <span className="text-slate-500">المجموع: </span>
+                            <span className="font-mono text-slate-700 font-black">
                               {weighted !== undefined ? weighted.toFixed(2) : "-"}
                             </span>
-                          </td>
+                          </div>
+                        </div>
 
-                          {/* ملاحظات وتوجيهات الأستاذ */}
-                          <td className="py-2.5 px-3">
-                            <div className="relative flex items-center gap-1.5">
-                              <input
-                                type="text"
-                                placeholder="أدخل ملاحظة للتلميذ..."
-                                data-row={idx}
-                                data-col="notes"
-                                value={rec.notes || ""}
-                                onKeyDown={(e) => handleTableKeyDown(e, idx, "notes")}
-                                onChange={(e) => updateStudentField(st.studentName, { notes: e.target.value })}
-                                className="w-full py-1 px-2 text-xs bg-white border border-gray-200 rounded-lg focus:border-[#107a57] focus:outline-none"
-                              />
-                              <select
-                                aria-label="ملاحظات سريعة جاهزة"
-                                value=""
-                                onChange={(e) => {
-                                  if (e.target.value) {
-                                    updateStudentField(st.studentName, { notes: e.target.value });
-                                  }
-                                }}
-                                className="w-6 h-7 p-0 opacity-40 hover:opacity-100 border border-gray-200 rounded text-[11px] bg-gray-50 cursor-pointer"
-                                title="اختر ملاحظة جاهزة بنقرة واحدة"
+                        {/* حقل الملاحظة */}
+                        <div>
+                          <input
+                            type="text"
+                            placeholder="ملاحظة الأستاذ للتلميذ..."
+                            value={rec.notes || ""}
+                            onChange={(e) => updateStudentField(st.studentName, { notes: e.target.value })}
+                            className="w-full py-1 px-2.5 text-xs bg-white border border-slate-200 rounded-xl focus:border-emerald-500 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+                {/* ── نمط الجدول العريض التفاعلي (نظيف وسهل الإضافة مثل سجل التنقيط) ── */}
+                <div className={`overflow-x-auto relative ${evalViewMode === "cards" ? "hidden sm:block" : "block"}`}>
+                  <table ref={tableRef} className="w-full text-right border-collapse text-xs min-w-[960px]">
+                    <thead>
+                      <tr className="bg-slate-100 text-slate-800 font-black border-b border-slate-200 text-center select-none">
+                        {/* الرقم والاسم */}
+                        <th className="py-3 px-2 w-10 sticky right-0 bg-slate-100/95 z-20">#</th>
+                        <th className="py-3 px-3 min-w-[190px] text-right sticky right-10 bg-slate-100/95 z-20 border-l border-slate-200 shadow-xs">
+                          اسم ولقب التلميذ(ة)
+                        </th>
+                        <th className="py-3 px-2 w-16">الفوج</th>
+
+                        {/* 1. التقويم المستمر (قابل للتعديل المباشر مع أزرار سريعة) */}
+                        <th className="py-2.5 px-2 w-48 bg-emerald-50 text-emerald-950 border-l border-emerald-100">
+                          <div className="flex flex-col items-center gap-1">
+                            <span className="font-black text-xs">التقويم المستمر (20ن)</span>
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleBatchContinuous(20)}
+                                className="text-[10px] bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-2 py-0.5 rounded-md transition shadow-2xs cursor-pointer active:scale-95"
+                                title="منح 20 كاملة لجميع تلاميذ الفوج المعروضين"
                               >
-                                <option value="">...</option>
-                                {PRESET_REMARKS.map((rem, rIdx) => (
-                                  <option key={rIdx} value={rem}>
-                                    {rem}
-                                  </option>
-                                ))}
-                              </select>
+                                ✓ 20 للكل
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleBatchContinuous(0)}
+                                className="text-[10px] bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold px-1.5 py-0.5 rounded-md transition cursor-pointer active:scale-95"
+                                title="تصفير التقويم للجميع"
+                              >
+                                0
+                              </button>
                             </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                          </div>
+                        </th>
+
+                        {/* 2. الفرض (20ن) */}
+                        <th className="py-2.5 px-2 w-40 bg-blue-50/70 text-blue-950 border-l border-blue-100">
+                          <div className="flex flex-col items-center gap-1">
+                            <span className="font-black text-xs">الفرض (20ن)</span>
+                            <button
+                              type="button"
+                              onClick={handleClearAllTests}
+                              className="text-[10px] bg-slate-200 hover:bg-rose-100 hover:text-rose-700 text-slate-600 font-bold px-1.5 py-0.5 rounded-md transition cursor-pointer active:scale-95"
+                              title="مسح الفرض للجميع"
+                            >
+                              مسح
+                            </button>
+                          </div>
+                        </th>
+
+                        {/* 3. معدل المراقبة المستمرة */}
+                        <th className="py-2.5 px-2 w-28 bg-teal-50 text-teal-950 border-l border-teal-100">
+                          <div className="flex flex-col items-center gap-0.5">
+                            <span className="font-black text-xs">م. المراقبة (20ن)</span>
+                            <span className="text-[10px] text-teal-700 font-medium">(مستمر + فرض) ÷ 2</span>
+                          </div>
+                        </th>
+
+                        {/* 4. الاختبار (20ن) */}
+                        <th className="py-2.5 px-2 w-40 bg-amber-50 text-amber-950 border-l border-amber-100">
+                          <div className="flex flex-col items-center gap-1">
+                            <span className="font-black text-xs">الاختبار (20ن)</span>
+                            <button
+                              type="button"
+                              onClick={handleClearAllExams}
+                              className="text-[10px] bg-slate-200 hover:bg-rose-100 hover:text-rose-700 text-slate-600 font-bold px-1.5 py-0.5 rounded-md transition cursor-pointer active:scale-95"
+                              title="مسح الاختبار للجميع"
+                            >
+                              مسح
+                            </button>
+                          </div>
+                        </th>
+
+                        {/* 5. معدل المادة الفصلي المعتمد */}
+                        <th className="py-2.5 px-2 w-32 bg-emerald-100 text-emerald-950 border-l border-emerald-200">
+                          <div className="flex flex-col items-center gap-0.5">
+                            <span className="font-black text-xs">معدل المادة (20ن)</span>
+                            <span className="text-[10px] text-emerald-800 font-medium">(مراقبة + 2×اختبار) ÷ 3</span>
+                          </div>
+                        </th>
+
+                        {/* 6. المجموع الموزون */}
+                        <th className="py-2.5 px-2 w-24 text-slate-700 border-l border-slate-200">
+                          <div className="flex flex-col items-center gap-0.5">
+                            <span className="font-bold text-xs">المجموع</span>
+                            <span className="text-[10px] text-slate-500 font-mono font-bold">(×{activeCoefficient})</span>
+                          </div>
+                        </th>
+
+                        {/* 7. ملاحظات وتوجيهات الأستاذ */}
+                        <th className="py-2.5 px-3 min-w-[210px] text-right">
+                          <div className="flex items-center justify-between">
+                            <span className="font-black text-xs">ملاحظات وتوجيهات الأستاذ</span>
+                            <button
+                              type="button"
+                              onClick={autoGenerateRemarksForAll}
+                              className="text-[10px] bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold px-2 py-0.5 rounded-md border border-indigo-200 transition cursor-pointer active:scale-95"
+                              title="اقتراح آلي للملاحظات الشاغرة بناءً على المعدل"
+                            >
+                              ✨ اقتراح آلي
+                            </button>
+                          </div>
+                        </th>
+                      </tr>
+                    </thead>
+
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredStudents.map((st, idx) => {
+                        const rec = getRecordForStudent(st.studentName);
+                        const continuous = rec.continuousScore ?? 20;
+                        const test1 = rec.test1Score;
+                        const monitoring = test1 !== undefined ? (continuous + test1) / 2 : undefined;
+                        const exam = rec.examScore;
+                        const subjectAvg =
+                          monitoring !== undefined && exam !== undefined ? (monitoring + 2 * exam) / 3 : undefined;
+                        const weighted = subjectAvg !== undefined ? subjectAvg * activeCoefficient : undefined;
+
+                        return (
+                          <tr key={st.studentName} className="hover:bg-slate-50/90 transition duration-150">
+                            {/* الرقم */}
+                            <td className="py-2 px-2 text-center text-slate-400 font-mono font-bold sticky right-0 bg-white group-hover:bg-slate-50">
+                              {idx + 1 < 10 ? `0${idx + 1}` : idx + 1}
+                            </td>
+
+                            {/* اسم التلميذ */}
+                            <td className="py-2 px-3 font-bold text-slate-900 sticky right-10 bg-white group-hover:bg-slate-50 border-l border-slate-200 shadow-xs">
+                              <div className="flex items-center justify-between gap-1.5">
+                                <span className="truncate">{st.studentName}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setDetailStudentName(st.studentName)}
+                                  className="opacity-40 hover:opacity-100 p-1 rounded-md hover:bg-indigo-50 text-indigo-700 transition cursor-pointer"
+                                  title="عرض وتعديل تفاصيل المعايير لهذا التلميذ"
+                                >
+                                  <Sliders className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </td>
+
+                            {/* الفوج الفرعي */}
+                            <td className="py-2 px-2 text-center">
+                              <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[11px] font-bold">
+                                {st.groupName || "فوج 1"}
+                              </span>
+                            </td>
+
+                            {/* التقويم المستمر (20ن) - قابل للتعديل المباشر مع أزرار +/- وسريع 20 */}
+                            <td className="py-2 px-2 text-center bg-emerald-50/30 border-l border-emerald-100">
+                              <div className="inline-flex items-center justify-center gap-1">
+                                {/* زر خصم -0.5 */}
+                                <button
+                                  type="button"
+                                  onClick={() => adjustScore(st.studentName, "continuousScore", -0.5)}
+                                  className="w-6 h-6 rounded-md bg-slate-100 hover:bg-rose-100 text-slate-700 hover:text-rose-800 font-black text-xs flex items-center justify-center transition cursor-pointer active:scale-95"
+                                  title="إنقاص -0.5"
+                                >
+                                  -
+                                </button>
+
+                                {/* حقل الإدخال */}
+                                <input
+                                  type="number"
+                                  dir="ltr"
+                                  step="0.25"
+                                  min="0"
+                                  max="20"
+                                  placeholder="20"
+                                  data-row={idx}
+                                  data-col="continuous"
+                                  value={rec.continuousScore !== undefined ? rec.continuousScore : ""}
+                                  onKeyDown={(e) => handleTableKeyDown(e, idx, "continuous")}
+                                  onChange={(e) => {
+                                    const val = e.target.value === "" ? undefined : parseFloat(e.target.value);
+                                    updateStudentField(st.studentName, {
+                                      continuousScore: val !== undefined ? Math.min(20, Math.max(0, val)) : undefined,
+                                    });
+                                  }}
+                                  className="w-14 py-1 text-center font-mono font-black text-xs bg-white border border-emerald-300 rounded-lg focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600 shadow-2xs text-emerald-950"
+                                />
+
+                                {/* زر زيادة +0.5 */}
+                                <button
+                                  type="button"
+                                  onClick={() => adjustScore(st.studentName, "continuousScore", 0.5)}
+                                  className="w-6 h-6 rounded-md bg-slate-100 hover:bg-emerald-100 text-slate-700 hover:text-emerald-800 font-black text-xs flex items-center justify-center transition cursor-pointer active:scale-95"
+                                  title="زيادة +0.5"
+                                >
+                                  +
+                                </button>
+
+                                {/* زر سريع 20 */}
+                                <button
+                                  type="button"
+                                  onClick={() => updateStudentField(st.studentName, { continuousScore: 20 })}
+                                  className={`px-1.5 py-0.5 rounded text-[10px] font-black transition cursor-pointer active:scale-95 ${
+                                    continuous === 20
+                                      ? "bg-emerald-600 text-white shadow-2xs"
+                                      : "bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200"
+                                  }`}
+                                  title="إعطاء 20 كاملة"
+                                >
+                                  20
+                                </button>
+                              </div>
+                            </td>
+
+                            {/* الفرض (20ن) */}
+                            <td className="py-2 px-2 text-center bg-blue-50/20 border-l border-blue-100">
+                              <div className="inline-flex items-center justify-center gap-1">
+                                {/* زر خصم -0.5 */}
+                                <button
+                                  type="button"
+                                  onClick={() => adjustScore(st.studentName, "test1Score", -0.5)}
+                                  className="w-6 h-6 rounded-md bg-slate-100 hover:bg-rose-100 text-slate-700 hover:text-rose-800 font-black text-xs flex items-center justify-center transition cursor-pointer active:scale-95"
+                                  title="إنقاص -0.5"
+                                >
+                                  -
+                                </button>
+
+                                {/* حقل الإدخال */}
+                                <input
+                                  type="number"
+                                  dir="ltr"
+                                  step="0.25"
+                                  min="0"
+                                  max="20"
+                                  placeholder="-"
+                                  data-row={idx}
+                                  data-col="test1"
+                                  value={rec.test1Score !== undefined ? rec.test1Score : ""}
+                                  onKeyDown={(e) => handleTableKeyDown(e, idx, "test1")}
+                                  onChange={(e) => {
+                                    const val = e.target.value === "" ? undefined : parseFloat(e.target.value);
+                                    updateStudentField(st.studentName, {
+                                      test1Score: val !== undefined ? Math.min(20, Math.max(0, val)) : undefined,
+                                    });
+                                  }}
+                                  className="w-14 py-1 text-center font-mono font-black text-xs bg-white border border-blue-200 rounded-lg focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600 shadow-2xs text-blue-950"
+                                />
+
+                                {/* زر زيادة +0.5 */}
+                                <button
+                                  type="button"
+                                  onClick={() => adjustScore(st.studentName, "test1Score", 0.5)}
+                                  className="w-6 h-6 rounded-md bg-slate-100 hover:bg-blue-100 text-slate-700 hover:text-blue-800 font-black text-xs flex items-center justify-center transition cursor-pointer active:scale-95"
+                                  title="زيادة +0.5"
+                                >
+                                  +
+                                </button>
+
+                                {/* زر سريع 20 */}
+                                <button
+                                  type="button"
+                                  onClick={() => updateStudentField(st.studentName, { test1Score: 20 })}
+                                  className="px-1.5 py-0.5 rounded text-[10px] font-black bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 transition cursor-pointer active:scale-95"
+                                  title="20 كاملة"
+                                >
+                                  20
+                                </button>
+                              </div>
+                            </td>
+
+                            {/* معدل المراقبة المستمرة */}
+                            <td className="py-2 px-2 text-center bg-teal-50/20 border-l border-teal-100">
+                              <span className="font-mono font-black text-xs text-teal-900 bg-teal-50/90 px-2.5 py-1 rounded-lg border border-teal-200 shadow-2xs inline-block min-w-[50px]">
+                                {monitoring !== undefined ? monitoring.toFixed(2) : "-"}
+                              </span>
+                            </td>
+
+                            {/* الاختبار (20ن) */}
+                            <td className="py-2 px-2 text-center bg-amber-50/20 border-l border-amber-100">
+                              <div className="inline-flex items-center justify-center gap-1">
+                                {/* زر خصم -0.5 */}
+                                <button
+                                  type="button"
+                                  onClick={() => adjustScore(st.studentName, "examScore", -0.5)}
+                                  className="w-6 h-6 rounded-md bg-slate-100 hover:bg-rose-100 text-slate-700 hover:text-rose-800 font-black text-xs flex items-center justify-center transition cursor-pointer active:scale-95"
+                                  title="إنقاص -0.5"
+                                >
+                                  -
+                                </button>
+
+                                {/* حقل الإدخال */}
+                                <input
+                                  type="number"
+                                  dir="ltr"
+                                  step="0.25"
+                                  min="0"
+                                  max="20"
+                                  placeholder="-"
+                                  data-row={idx}
+                                  data-col="exam"
+                                  value={rec.examScore !== undefined ? rec.examScore : ""}
+                                  onKeyDown={(e) => handleTableKeyDown(e, idx, "exam")}
+                                  onChange={(e) => {
+                                    const val = e.target.value === "" ? undefined : parseFloat(e.target.value);
+                                    updateStudentField(st.studentName, {
+                                      examScore: val !== undefined ? Math.min(20, Math.max(0, val)) : undefined,
+                                    });
+                                  }}
+                                  className="w-14 py-1 text-center font-mono font-black text-xs bg-white border border-amber-300 rounded-lg focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600 shadow-2xs text-amber-950"
+                                />
+
+                                {/* زر زيادة +0.5 */}
+                                <button
+                                  type="button"
+                                  onClick={() => adjustScore(st.studentName, "examScore", 0.5)}
+                                  className="w-6 h-6 rounded-md bg-slate-100 hover:bg-amber-100 text-slate-700 hover:text-amber-800 font-black text-xs flex items-center justify-center transition cursor-pointer active:scale-95"
+                                  title="زيادة +0.5"
+                                >
+                                  +
+                                </button>
+
+                                {/* زر سريع 20 */}
+                                <button
+                                  type="button"
+                                  onClick={() => updateStudentField(st.studentName, { examScore: 20 })}
+                                  className="px-1.5 py-0.5 rounded text-[10px] font-black bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 transition cursor-pointer active:scale-95"
+                                  title="20 كاملة"
+                                >
+                                  20
+                                </button>
+                              </div>
+                            </td>
+
+                            {/* معدل المادة الفصلي المعتمد وزارياً */}
+                            <td className="py-2 px-2 text-center bg-emerald-50/40 border-l border-emerald-200">
+                              {subjectAvg !== undefined ? (
+                                <span
+                                  className={`inline-block font-mono font-black text-xs px-2.5 py-1 rounded-xl border shadow-2xs min-w-[54px] ${
+                                    subjectAvg >= 10
+                                      ? "bg-emerald-100 text-emerald-950 border-emerald-300"
+                                      : "bg-rose-100 text-rose-950 border-rose-300"
+                                  }`}
+                                >
+                                  {subjectAvg.toFixed(2)}
+                                </span>
+                              ) : (
+                                <span className="text-slate-400 font-mono text-xs font-bold">-</span>
+                              )}
+                            </td>
+
+                            {/* المجموع الموزون (المعدل × المعامل) */}
+                            <td className="py-2 px-2 text-center border-l border-slate-200">
+                              <span className="font-mono font-bold text-xs text-slate-700 bg-slate-100 px-2 py-0.5 rounded-lg inline-block min-w-[45px]">
+                                {weighted !== undefined ? weighted.toFixed(2) : "-"}
+                              </span>
+                            </td>
+
+                            {/* ملاحظات وتوجيهات الأستاذ */}
+                            <td className="py-2 px-3">
+                              <div className="relative flex items-center gap-1.5">
+                                <input
+                                  type="text"
+                                  placeholder="أدخل ملاحظة للتلميذ..."
+                                  data-row={idx}
+                                  data-col="notes"
+                                  value={rec.notes || ""}
+                                  onKeyDown={(e) => handleTableKeyDown(e, idx, "notes")}
+                                  onChange={(e) => updateStudentField(st.studentName, { notes: e.target.value })}
+                                  className="w-full py-1 px-2.5 text-xs bg-white border border-slate-200 rounded-lg focus:border-emerald-500 focus:outline-none transition shadow-2xs"
+                                />
+                                <select
+                                  aria-label="ملاحظات سريعة جاهزة"
+                                  value=""
+                                  onChange={(e) => {
+                                    if (e.target.value) {
+                                      updateStudentField(st.studentName, { notes: e.target.value });
+                                    }
+                                  }}
+                                  className="w-6 h-7 p-0 opacity-40 hover:opacity-100 border border-slate-200 rounded text-[11px] bg-slate-50 cursor-pointer"
+                                  title="اختر ملاحظة جاهزة بنقرة واحدة"
+                                >
+                                  <option value="">...</option>
+                                  {PRESET_REMARKS.map((rem, rIdx) => (
+                                    <option key={rIdx} value={rem}>
+                                      {rem}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
             </div>
           )}
         </div>
