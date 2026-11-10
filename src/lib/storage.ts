@@ -13,22 +13,28 @@ export function getBlobToken(): string | undefined {
   return process.env.BLOB_READ_WRITE_TOKEN;
 }
 
-// مزامنة تامة ومتبادلة بين قائمة تلاميذ القسم (studentRoster) وسجلات التقويم (evaluations)
+// مزامنة موجهة: قائمة تلاميذ القسم (studentRoster) هي المرجع الأساسي المعتمد الوحيد
+// وسجلات التقويم (evaluations) تتبعها دوماً (تنشأ للتلاميذ الجدد وتُحذف للتلاميذ المحذوفين)
 export function synchronizeStudents(data: LessonsData): LessonsData {
   if (!data.studentRoster) data.studentRoster = [];
   if (!data.evaluations) data.evaluations = [];
+
+  const rosterKeys = new Set<string>();
 
   // 1. كل تلميذ في studentRoster ينعكس تلقائياً في evaluations
   for (const r of data.studentRoster) {
     const rName = (r.studentName || "").trim();
     if (!rName) continue;
     const rCls = (r.className || "").replace(/\s+/g, "");
-    const exists = data.evaluations.some(
+    const key = `${rCls}__${rName.toLowerCase()}`;
+    rosterKeys.add(key);
+
+    const existing = data.evaluations.find(
       (e) =>
         (e.studentName || "").trim().toLowerCase() === rName.toLowerCase() &&
         (e.className || "").replace(/\s+/g, "") === rCls
     );
-    if (!exists) {
+    if (!existing) {
       data.evaluations.push({
         id: `eval_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
         studentName: rName,
@@ -46,28 +52,22 @@ export function synchronizeStudents(data: LessonsData): LessonsData {
         ratingColor: "emerald",
         updatedAt: new Date().toISOString(),
       });
+    } else {
+      if (r.groupName && existing.groupName !== r.groupName) {
+        existing.groupName = r.groupName as "فوج 1" | "فوج 2" | "القسم كامل";
+      }
+      if (r.className && existing.className !== r.className) {
+        existing.className = r.className;
+      }
     }
   }
 
-  // 2. كل تلميذ في evaluations ينعكس تلقائياً في studentRoster
-  for (const e of data.evaluations) {
-    const eName = (e.studentName || "").trim();
-    if (!eName) continue;
+  // 2. تنقية evaluations: أي تقويم لتلميذ لم يعد موجوداً في studentRoster يُحذف نهائياً لمنع عودته
+  data.evaluations = data.evaluations.filter((e) => {
+    const eName = (e.studentName || "").trim().toLowerCase();
     const eCls = (e.className || "").replace(/\s+/g, "");
-    const exists = data.studentRoster.some(
-      (r) =>
-        (r.studentName || "").trim().toLowerCase() === eName.toLowerCase() &&
-        (r.className || "").replace(/\s+/g, "") === eCls
-    );
-    if (!exists) {
-      data.studentRoster.push({
-        id: `rst_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-        studentName: eName,
-        className: e.className,
-        groupName: e.groupName || "فوج 1",
-      });
-    }
-  }
+    return rosterKeys.has(`${eCls}__${eName}`);
+  });
 
   return data;
 }
@@ -91,7 +91,17 @@ export function normalizeData(json: any): LessonsData {
     gradebookRecords: Array.isArray(json?.gradebookRecords) ? json.gradebookRecords : [],
     continuousEvalConfig: json?.continuousEvalConfig && typeof json.continuousEvalConfig === "object" ? json.continuousEvalConfig : undefined,
     inspectionSessions: Array.isArray(json?.inspectionSessions) ? json.inspectionSessions : [],
-    studentRoster: Array.isArray(json?.studentRoster) ? json.studentRoster : [],
+    studentRoster: Array.isArray(json?.studentRoster)
+      ? json.studentRoster
+      : json?.studentRoster === undefined && Array.isArray(json?.evaluations) && json.evaluations.length > 0
+      ? json.evaluations.map((ev: any) => ({
+          id: ev.id || `rst_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+          studentName: ev.studentName,
+          className: ev.className,
+          groupName: ev.groupName || "فوج 1",
+          createdAt: ev.updatedAt || new Date().toISOString(),
+        }))
+      : [],
     announcements: Array.isArray(json?.announcements) ? json.announcements : [],
     anonymousMessages: Array.isArray(json?.anonymousMessages) ? json.anonymousMessages : [],
     parentInquiries: Array.isArray(json?.parentInquiries) ? json.parentInquiries : [],
@@ -154,6 +164,28 @@ export function removeStudent(data: LessonsData, studentName: string, className:
       if (key.trim().toLowerCase() === name) delete session.records[key];
     }
   }
+}
+
+// حذف قسم وتلاميذه وتقييماته من كل القوائم معاً
+export function removeClass(data: LessonsData, className: string) {
+  const cls = className.replace(/\s+/g, "");
+  if (data.customClasses) {
+    data.customClasses = data.customClasses.filter((c) => c.replace(/\s+/g, "") !== cls);
+  }
+  data.studentRoster = (data.studentRoster || []).filter(
+    (s) => (s.className || "").replace(/\s+/g, "") !== cls
+  );
+  data.evaluations = (data.evaluations || []).filter(
+    (e) => (e.className || "").replace(/\s+/g, "") !== cls
+  );
+  for (const session of data.inspectionSessions || []) {
+    if ((session.className || "").replace(/\s+/g, "") === cls) {
+      session.records = {};
+    }
+  }
+  data.inspectionSessions = (data.inspectionSessions || []).filter(
+    (s) => (s.className || "").replace(/\s+/g, "") !== cls
+  );
 }
 
 // ----------------- ترحيل بيانات الموقع القديم (lessons-db.json) لمرة واحدة -----------------

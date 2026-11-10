@@ -119,6 +119,28 @@ export async function POST(req: NextRequest) {
         createdItems.push(newEval);
       }
 
+      if (!data.studentRoster) data.studentRoster = [];
+      for (const item of createdItems) {
+        const iName = item.studentName.trim().toLowerCase();
+        const iCls = item.className.replace(/\s+/g, "");
+        const existingRoster = data.studentRoster.find(
+          (r) =>
+            (r.studentName || "").trim().toLowerCase() === iName &&
+            (r.className || "").replace(/\s+/g, "") === iCls
+        );
+        if (!existingRoster) {
+          data.studentRoster.push({
+            id: item.id || `st_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+            studentName: item.studentName,
+            className: item.className,
+            groupName: item.groupName || "فوج 1",
+            createdAt: item.updatedAt || new Date().toISOString(),
+          });
+        } else if (item.groupName) {
+          existingRoster.groupName = item.groupName;
+        }
+      }
+
       await saveLessonsData(ctx, data);
       return NextResponse.json({ success: true, count: createdItems.length, evaluations: createdItems });
     }
@@ -166,6 +188,27 @@ export async function POST(req: NextRequest) {
     };
 
     data.evaluations.push(newEval);
+
+    if (!data.studentRoster) data.studentRoster = [];
+    const sName = newEval.studentName.trim().toLowerCase();
+    const sCls = newEval.className.replace(/\s+/g, "");
+    const existingRoster = data.studentRoster.find(
+      (r) =>
+        (r.studentName || "").trim().toLowerCase() === sName &&
+        (r.className || "").replace(/\s+/g, "") === sCls
+    );
+    if (!existingRoster) {
+      data.studentRoster.push({
+        id: newEval.id || `st_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        studentName: newEval.studentName,
+        className: newEval.className,
+        groupName: newEval.groupName || "فوج 1",
+        createdAt: newEval.updatedAt || new Date().toISOString(),
+      });
+    } else if (newEval.groupName) {
+      existingRoster.groupName = newEval.groupName;
+    }
+
     await saveLessonsData(ctx, data);
 
     return NextResponse.json({ success: true, evaluation: newEval });
@@ -192,9 +235,26 @@ export async function PUT(req: NextRequest) {
     const item = data.evaluations.find((e) => e.id === id);
     if (!item) return NextResponse.json({ error: "التلميذ غير موجود في القائمة" }, { status: 404 });
 
+    const oldName = item.studentName;
+    const oldCls = item.className;
+
     if (body.studentName !== undefined) item.studentName = String(body.studentName).trim();
     if (body.className !== undefined) item.className = String(body.className).trim();
     if (body.groupName !== undefined) item.groupName = body.groupName;
+
+    if (data.studentRoster) {
+      const rosterItem = data.studentRoster.find(
+        (r) =>
+          r.id === item.id ||
+          ((r.studentName || "").trim().toLowerCase() === oldName.trim().toLowerCase() &&
+           (r.className || "").replace(/\s+/g, "") === oldCls.replace(/\s+/g, ""))
+      );
+      if (rosterItem) {
+        if (body.studentName !== undefined) rosterItem.studentName = item.studentName;
+        if (body.className !== undefined) rosterItem.className = item.className;
+        if (body.groupName !== undefined) rosterItem.groupName = item.groupName;
+      }
+    }
 
     // تحديث الدرجات الجزئية
     if (body.notebookScore !== undefined) {
@@ -250,16 +310,23 @@ export async function DELETE(req: NextRequest) {
 
   if (clearAll) {
     data.evaluations = [];
+    data.studentRoster = [];
     await saveLessonsData(ctx, data);
-    return NextResponse.json({ success: true, message: "تم مسح كافة التقييمات" });
+    return NextResponse.json({ success: true, message: "تم مسح كافة التقييمات وقائمة التلاميذ" });
   }
 
   if (clearClass) {
+    const cls = clearClass.replace(/\s+/g, "");
     data.evaluations = data.evaluations.filter(
-      (e) => (e.className || "").replace(/\s+/g, "") !== clearClass.replace(/\s+/g, "")
+      (e) => (e.className || "").replace(/\s+/g, "") !== cls
     );
+    if (data.studentRoster) {
+      data.studentRoster = data.studentRoster.filter(
+        (s) => (s.className || "").replace(/\s+/g, "") !== cls
+      );
+    }
     await saveLessonsData(ctx, data);
-    return NextResponse.json({ success: true, message: `تم مسح تقييمات قسم ${clearClass}` });
+    return NextResponse.json({ success: true, message: `تم مسح تقييمات وتلاميذ قسم ${clearClass}` });
   }
 
   if (id) {

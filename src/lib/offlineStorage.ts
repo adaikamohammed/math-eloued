@@ -95,6 +95,7 @@ export function saveTeacherOfflineData(
     ...existing,
     ...updates,
   };
+  pruneEvaluationsToRoster(merged);
 
   try {
     // 1. حفظ البيانات المدمجة في ملف التخزين المحلي المحمي للأستاذ
@@ -143,6 +144,7 @@ export function cacheServerDataLocally(teacherId: string, serverData: LessonsDat
     ...serverData,
     ...(pending || {}),
   };
+  pruneEvaluationsToRoster(safeMerged);
 
   try {
     localStorage.setItem(STORAGE_KEY(teacherId), JSON.stringify(safeMerged));
@@ -261,4 +263,19 @@ export function setupAutoSync(
     window.removeEventListener("online", handleOnline);
     window.removeEventListener("focus", handleFocus);
   };
+}
+
+function pruneEvaluationsToRoster(data: LessonsData): void {
+  if (Array.isArray(data.studentRoster) && Array.isArray(data.evaluations)) {
+    const validKeys = new Set(
+      data.studentRoster
+        .filter((s) => s && s.studentName && s.className)
+        .map((s) => `${(s.className || "").replace(/\s+/g, "")}__${(s.studentName || "").trim().toLowerCase()}`)
+    );
+    data.evaluations = data.evaluations.filter((e) => {
+      const eName = (e.studentName || "").trim().toLowerCase();
+      const eCls = (e.className || "").replace(/\s+/g, "");
+      return validKeys.has(`${eCls}__${eName}`);
+    });
+  }
 }

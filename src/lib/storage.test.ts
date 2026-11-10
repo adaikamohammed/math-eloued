@@ -74,3 +74,38 @@ test("deletes stick, and a write that lands between read and save is never erase
   await assert.rejects(saveLessonsData(ctx, stale), ConflictError);
   assert.equal((await getLessonsData(ctx)).anonymousMessages!.length, 1);
 });
+
+
+test("deleting students from studentRoster permanently removes their evaluations and prevents resurrection", async () => {
+  const db = fakeDb();
+  const ctx = { supabase: db, teacherId: TEACHER, mode: "owner" } as unknown as TeacherContext;
+
+  let data = await getLessonsData(ctx);
+  data.studentRoster = [
+    { id: "s1", studentName: "تلميذ 1", className: "2م3", groupName: "فوج 1" },
+    { id: "s2", studentName: "تلميذ 2", className: "2م3", groupName: "فوج 2" },
+  ];
+  await saveLessonsData(ctx, data);
+
+  let check = await getLessonsData(ctx);
+  assert.equal(check.studentRoster!.length, 2);
+  assert.equal(check.evaluations!.length, 2);
+
+  // حذف تلميذ 1 من القائمة
+  check.studentRoster = check.studentRoster!.filter((s) => s.studentName !== "تلميذ 1");
+  await saveLessonsData(ctx, check);
+
+  const afterOne = await getLessonsData(ctx);
+  assert.equal(afterOne.studentRoster!.length, 1);
+  assert.equal(afterOne.studentRoster![0].studentName, "تلميذ 2");
+  assert.equal(afterOne.evaluations!.length, 1);
+  assert.equal(afterOne.evaluations![0].studentName, "تلميذ 2");
+
+  // حذف كافة التلاميذ (تفريغ الفوج مثل حذف 81 تلميذ)
+  afterOne.studentRoster = [];
+  await saveLessonsData(ctx, afterOne);
+
+  const afterAll = await getLessonsData(ctx);
+  assert.equal(afterAll.studentRoster!.length, 0);
+  assert.equal(afterAll.evaluations!.length, 0);
+});

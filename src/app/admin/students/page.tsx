@@ -489,11 +489,13 @@ export default function StudentsManagementPage() {
       .filter((r) => r.studentName.length >= 2);
 
     if (validRows.length === 0) {
-      setMessage({
-        type: "err",
-        text: "يرجى كتابة اسم تلميذ واحد على الأقل في أسطر الجدول قبل الحفظ",
-      });
-      return;
+      if (
+        !confirm(
+          `لم يتم إدخال أي تلميذ في هذا الفوج (${selectedClass}). هل تريد تفريغ وحذف جميع تلاميذ هذا الفوج؟`
+        )
+      ) {
+        return;
+      }
     }
 
     // ترتيب أبجدي آلي لجميع الأسماء المعتمدة
@@ -526,7 +528,10 @@ export default function StudentsManagementPage() {
 
     setMessage({
       type: "ok",
-      text: `تم حفظ (${newClassStudents.length}) تلميذ في فوج ${selectedClass} وترتيبهم أبجدياً بنجاح 💾✨`,
+      text:
+        validRows.length > 0
+          ? `تم حفظ (${newClassStudents.length}) تلميذ في فوج ${selectedClass} وترتيبهم أبجدياً بنجاح 💾✨`
+          : `تم تفريغ وحذف جميع تلاميذ فوج ${selectedClass} بنجاح 🗑️`,
     });
   };
 
@@ -583,17 +588,25 @@ export default function StudentsManagementPage() {
     if (selectedIds.size === 0) return;
     if (!confirm(`هل أنت متأكد من حذف (${selectedIds.size}) تلميذ محدد من القائمة؟`)) return;
 
+    const count = selectedIds.size;
+    const updated = students.filter((s) => !selectedIds.has(s.id));
+    setStudents(updated);
+
     if (isGridMode) {
-      setGridRows((prev) => prev.filter((r) => !selectedIds.has(r.id)));
-      setSelectedIds(new Set());
-      setMessage({ type: "ok", text: `تم حذف الأسطر المحددة من الجدول` });
-    } else {
-      const updated = students.filter((s) => !selectedIds.has(s.id));
-      setStudents(updated);
-      setSelectedIds(new Set());
-      await persistChanges(updated, customClasses);
-      setMessage({ type: "ok", text: `تم حذف التلاميذ المحددين بنجاح 🗑️` });
+      const remainingRows = gridRows.filter((r) => !selectedIds.has(r.id));
+      setGridRows(
+        remainingRows.length > 0
+          ? remainingRows
+          : [
+              createEmptyRow(undefined, "فوج 1"),
+              createEmptyRow(undefined, "فوج 2"),
+            ]
+      );
     }
+
+    setSelectedIds(new Set());
+    await persistChanges(updated, customClasses);
+    setMessage({ type: "ok", text: `تم حذف (${count}) تلميذ بنجاح وحفظ التغييرات 🗑️` });
   };
 
   const handleBulkSetGroup = async (targetGroup: "فوج 1" | "فوج 2") => {
@@ -781,6 +794,12 @@ export default function StudentsManagementPage() {
     if (!confirm(`هل أنت متأكد من حذف التلميذ "${name}" من القائمة؟`)) return;
     const updated = students.filter((s) => s.id !== id);
     setStudents(updated);
+    if (isGridMode) {
+      setGridRows((prev) => {
+        const remaining = prev.filter((r) => r.id !== id);
+        return remaining.length > 0 ? remaining : [createEmptyRow(undefined, "فوج 1")];
+      });
+    }
     await persistChanges(updated, customClasses);
   };
 
@@ -812,12 +831,14 @@ export default function StudentsManagementPage() {
     )
       return;
 
+    const updatedStudents = students.filter((s) => s.className !== clsToDelete);
+    setStudents(updatedStudents);
     const updatedClasses = customClasses.filter((c) => c !== clsToDelete);
     setCustomClasses(updatedClasses);
     if (selectedClass === clsToDelete) {
       setSelectedClass(updatedClasses[0] || "all");
     }
-    await persistChanges(students, updatedClasses);
+    await persistChanges(updatedStudents, updatedClasses);
   };
 
   // ترتيب الأفواج تلقائياً حسب المستوى ورقم الفوج (1م1، 1م2، 1م3... ثم 2م...)
