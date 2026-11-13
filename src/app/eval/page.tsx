@@ -62,6 +62,7 @@ import {
   Layers,
   Smartphone,
   Lock,
+  BarChart3,
 } from "lucide-react";
 
 const getScopedGradebookKey = (teacherId: string) => `jusoor_gradebook_${teacherId}`;
@@ -831,6 +832,16 @@ export default function GradebookEvaluationPage() {
               <span>دفتر التقويم الصفي 📱</span>
             </Link>
 
+            {/* مركز الإحصائيات والتحليل البياني */}
+            <Link
+              href={`/eval/stats?class=${encodeURIComponent(selectedClass)}&trimester=${selectedTrimester}`}
+              className="py-1.5 px-3 rounded-xl border border-emerald-500 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black flex items-center gap-1.5 shadow-sm transition active:scale-95 cursor-pointer"
+              title="عرض الإحصائيات والرسوم البيانية ومقارنة الأفواج وحفظ صورة للأولياء"
+            >
+              <BarChart3 className="w-3.5 h-3.5 text-white" />
+              <span>📊 مركز الإحصائيات البيانية</span>
+            </Link>
+
             {/* تخصيص السلم */}
             <button
               onClick={() => setIsRubricModalOpen(true)}
@@ -1026,6 +1037,14 @@ export default function GradebookEvaluationPage() {
                   </span>
                 </>
               )}
+              <span>•</span>
+              <Link
+                href={`/eval/stats?class=${encodeURIComponent(selectedClass)}&trimester=${selectedTrimester}`}
+                className="text-xs font-black text-emerald-800 hover:text-emerald-950 underline flex items-center gap-1"
+                title="عرض الإحصائيات والرسوم البيانية الكاملة"
+              >
+                <span>رسوم بيانية ومقارنة ↗</span>
+              </Link>
             </div>
 
             {/* أزرار إجرائية سريعة للفوج */}
