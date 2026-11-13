@@ -78,6 +78,32 @@ export function normalizeArabicText(text: string): string {
 }
 
 /**
+ * مطابقة ذكية للاسم واللقب بأي ترتيب:
+ * مثل "محمد عدايكة" تطابق "عدايكة محمد"، كما تقبل الاسم وحده أو اللقب وحده
+ */
+export function matchesStudentName(studentFullName: string, queryName: string): boolean {
+  if (!queryName || !queryName.trim()) return true;
+  const sNorm = normalizeArabicText(studentFullName);
+  const qNorm = normalizeArabicText(queryName);
+
+  if (sNorm === qNorm || sNorm.includes(qNorm) || qNorm.includes(sNorm)) return true;
+
+  const qWords = qNorm.split(/\s+/).filter((w) => w.length > 1);
+  const sWords = sNorm.split(/\s+/).filter((w) => w.length > 1);
+
+  if (qWords.length === 0) return true;
+
+  // فحص ما إذا كانت جميع كلمات البحث موجودة ضمن اسم التلميذ بأي ترتيب
+  const allWordsMatched = qWords.every((qw) =>
+    sWords.some((sw) => sw.includes(qw) || qw.includes(sw))
+  );
+  if (allWordsMatched) return true;
+
+  // أو فحص تطابق أي كلمة رئيسية طولها 3 أحرف فأكثر
+  return qWords.some((qw) => qw.length >= 3 && sWords.includes(qw));
+}
+
+/**
  * بناء فهرس تقارير الأولياء المفهرس بتاريخ الميلاد
  */
 export function buildParentGradebookLookup(

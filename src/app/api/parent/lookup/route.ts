@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/auth";
 import {
-  buildParentGradebookLookup,
-  normalizeArabicText,
+  matchesStudentName,
   ParentStudentReport,
 } from "@/lib/parentLookupHelper";
 
@@ -33,47 +32,49 @@ export async function GET(req: NextRequest) {
     const normalizedCode = code.replace(/\//g, "-").trim();
     const supabase = await createSupabaseServerClient();
 
-    // البحث في البيانات العامة لجميع الأساتذة
-    const { data: rows, error } = await supabase
-      .from("teacher_public_data")
-      .select("teacher_id, data");
+    // 1. جلب قائمة حسابات الأساتذة
+    const { data: teachers, error: tErr } = await supabase
+      .from("profiles")
+      .select("id, full_name")
+      .eq("role", "teacher");
 
-    if (error) {
-      return NextResponse.json({ success: false, error: "خطأ في الاتصال بالخادم" }, { status: 500 });
+    if (tErr || !Array.isArray(teachers) || teachers.length === 0) {
+      return NextResponse.json(
+        { success: false, error: "خطأ في الاتصال بالخادم، يرجى المحاولة لاحقاً" },
+        { status: 500 }
+      );
     }
 
     let matchingReports: ParentStudentReport[] = [];
 
-    if (Array.isArray(rows)) {
-      for (const row of rows) {
-        const d = row.data as any;
-        if (!d) continue;
+    // 2. البحث في البيانات العامة لكل أستاذ عبر دالة get_teacher_public_data المتاحة للعامة
+    for (const teacher of teachers) {
+      try {
+        const { data: pubData, error: rpcErr } = await supabase.rpc(
+          "get_teacher_public_data",
+          { p_teacher_id: teacher.id }
+        );
 
-        // 1. الفحص في الفهرس الجاهز
-        if (d.parentGradebookLookup && typeof d.parentGradebookLookup === "object") {
-          const found = d.parentGradebookLookup[normalizedCode];
+        if (rpcErr || !pubData) continue;
+
+        if (
+          pubData.parentGradebookLookup &&
+          typeof pubData.parentGradebookLookup === "object"
+        ) {
+          const found = pubData.parentGradebookLookup[normalizedCode];
           if (Array.isArray(found) && found.length > 0) {
-            matchingReports.push(...found);
-            continue;
+            const enriched = found.map((rep: any) => ({
+              ...rep,
+              teacherName:
+                rep.teacherName && rep.teacherName !== "الأستاذ"
+                  ? rep.teacherName
+                  : teacher.full_name || "الأستاذ",
+            }));
+            matchingReports.push(...enriched);
           }
         }
-
-        // 2. الفحص في مسرد التلاميذ كاحتياط
-        const roster = Array.isArray(d.studentRoster) ? d.studentRoster : [];
-        const hasMatchingStudent = roster.some((s: any) => {
-          const b = (s.birthDate || "").replace(/\//g, "-").trim();
-          return b === normalizedCode;
-        });
-
-        if (hasMatchingStudent) {
-          const generatedLookup = buildParentGradebookLookup(roster, d.gradebookRecords || [], {
-            subjectName: typeof d.subject === "string" ? d.subject : d.subject?.name || "الرياضيات",
-          });
-          const found = generatedLookup[normalizedCode];
-          if (Array.isArray(found)) {
-            matchingReports.push(...found);
-          }
-        }
+      } catch (err) {
+        console.warn("Error looking up teacher public data:", teacher.id, err);
       }
     }
 
@@ -81,36 +82,35 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: "لم يتم العثور على أي نتائج مسجلة بهذا التاريخ. يرجى التأكد من كتابة تاريخ الميلاد بالشكل الصحيح (مثال: 2013-07-10) أو التواصل مع الأستاذ.",
+          error: `لم يتم العثور على أي نتائج مسجلة بتاريخ الميلاد (${normalizedCode}). يرجى التأكد من كتابة التاريخ بالشكل الصحيح أو التواصل مع الأستاذ.`,
         },
         { status: 404 }
       );
     }
 
-    // إذا تم تمرير اسم أو لقب، نقوم بمطابقته بدقة وحفظ الخصوصية
+    // 3. مطابقة الاسم إن وُجد (اختياري)
     if (nameQuery) {
-      const normQ = normalizeArabicText(nameQuery);
-      matchingReports = matchingReports.filter((rep) => {
-        const normName = normalizeArabicText(rep.studentName);
-        return normName.includes(normQ);
-      });
+      const filtered = matchingReports.filter((rep) =>
+        matchesStudentName(rep.studentName, nameQuery)
+      );
 
-      if (matchingReports.length === 0) {
+      if (filtered.length === 0) {
         return NextResponse.json(
           {
             success: false,
-            error: `لم يتم العثور على تلميذ باسم أو لقب "${nameQuery}" يحمل تاريخ الميلاد ${normalizedCode}. يرجى التحقق من الاسم وتاريخ الميلاد.`,
+            error: `لم يتم العثور على تلميذ باسم أو لقب "${nameQuery}" يحمل تاريخ الميلاد (${normalizedCode}). يرجى التأكد من الاسم وتاريخ الميلاد.`,
           },
           { status: 404 }
         );
       }
+      matchingReports = filtered;
     } else if (matchingReports.length > 1) {
-      // حالة توأم أو تشابه في تاريخ الميلاد دون إدخال الاسم
+      // فقط في حال تشابه التواريخ (توأم) ولم يكتب الولي الاسم
       return NextResponse.json(
         {
           success: false,
           requireName: true,
-          error: "يوجد أكثر من تلميذ مسجل بهذا التاريخ (توأم أو تشابه تواريخ). حفاظاً على السرية التامة، يرجى كتابة اسم أو لقب التلميذ أيضاً.",
+          error: "يوجد أكثر من تلميذ بنفس تاريخ الميلاد (توأم أو تشابه تواريخ). يرجى كتابة اسم أو لقب التلميذ أيضاً لفتح كشفه فقط.",
         },
         { status: 400 }
       );

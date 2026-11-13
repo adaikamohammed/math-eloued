@@ -225,7 +225,7 @@ function ParentContent() {
               اطلاع الولي على نقاط وتقويم التلميذ
             </h2>
             <p className="text-xs sm:text-sm text-slate-500 max-w-lg mx-auto">
-              أدخل تاريخ ميلاد ابنك واسمه للاطلاع على علاماته الكاملة وترتيبه في الفوج وملاحظات أستاذه بسرية تامة
+              أدخل تاريخ ميلاد ابنك للاطلاع الفوري على علاماته الكاملة وترتيبه في الفوج وملاحظات أستاذه
             </p>
           </div>
 
@@ -238,47 +238,47 @@ function ParentContent() {
             className="max-w-md mx-auto space-y-3 pt-2 text-right"
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              {/* حقل تاريخ الميلاد */}
+              {/* حقل تاريخ الميلاد - الأساسي والإجباري */}
               <div className="space-y-1">
                 <label className="text-xs font-black text-slate-700 flex items-center gap-1">
                   <Calendar className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>تاريخ الميلاد 🎂 <span className="text-rose-500">*</span></span>
+                  <span>تاريخ ميلاد التلميذ 🎂 <span className="text-rose-500">*</span></span>
                 </label>
                 <div className="relative">
                   <input
                     type="text"
                     value={inputCode}
                     onChange={(e) => setInputCode(e.target.value)}
-                    placeholder="2013-07-10"
+                    placeholder="مثال: 2016-03-22"
                     className="w-full py-2.5 px-3 rounded-xl border-2 border-emerald-500/40 focus:border-emerald-600 bg-slate-50 hover:bg-white focus:bg-white text-sm font-mono font-black text-center text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 transition shadow-inner"
                   />
                 </div>
               </div>
 
-              {/* حقل اسم أو لقب التلميذ */}
+              {/* حقل اسم أو لقب التلميذ - اختياري فقط */}
               <div className="space-y-1">
                 <label className="text-xs font-black text-slate-700 flex items-center gap-1">
-                  <User className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>اسم أو لقب التلميذ 👤</span>
+                  <User className="w-3.5 h-3.5 text-slate-500" />
+                  <span className="text-slate-600">اسم أو لقب التلميذ 👤 <span className="text-[10px] text-slate-400 font-normal">(اختياري)</span></span>
                 </label>
                 <div className="relative">
                   <input
                     type="text"
                     value={inputName}
                     onChange={(e) => setInputName(e.target.value)}
-                    placeholder="مثال: محمد أو بن علي"
+                    placeholder="جوايحية إلين أو إلين"
                     className={`w-full py-2.5 px-3 rounded-xl border-2 ${
                       requireNameNotice
                         ? "border-amber-500 bg-amber-50 focus:border-amber-600 ring-2 ring-amber-400/20"
-                        : "border-emerald-500/40 focus:border-emerald-600 bg-slate-50 hover:bg-white focus:bg-white"
+                        : "border-slate-200 focus:border-emerald-600 bg-slate-50 hover:bg-white focus:bg-white"
                     } text-sm font-bold text-center text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 transition shadow-inner`}
                   />
                 </div>
               </div>
             </div>
 
-            <p className="text-[11px] text-slate-400 text-center">
-              💡 كتابة اسم التلميذ تضمن السرية التامة وتمنع أي تداخل بين الإخوة أو التوائم المشتركين في نفس تاريخ الميلاد.
+            <p className="text-[11px] text-slate-400 text-center leading-relaxed">
+              💡 البحث يتم مباشرة بتاريخ الميلاد. خانة الاسم اختيارية (سواء كتبت الاسم أولاً أو اللقب أولاً) وتُطلب فقط في حال وجود توأم يشتركان في نفس تاريخ الميلاد.
             </p>
 
             <button
@@ -439,115 +439,195 @@ function ParentContent() {
                 </div>
               )}
 
-              {/* ─── جدول علامات الفروض والاختبارات الرسمية (من صفحة /eval) ─── */}
-              <div className="space-y-2">
-                <h4 className="text-xs font-black text-slate-800 flex items-center gap-1.5">
-                  <BookOpen className="w-4 h-4 text-emerald-700" />
-                  <span>علامات التقويم الفصلي والامتحانات الرسمية:</span>
-                </h4>
+              {/* ════════════════════════════════════════════════════════════════════
+                  جدول كشف النقاط والتقويم المستمر المفصل للتلميذ (كما طلب المستخدم)
+              ════════════════════════════════════════════════════════════════════ */}
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-black text-slate-900 flex items-center gap-1.5">
+                    <BookOpen className="w-4 h-4 text-emerald-700" />
+                    <span>جدول تفصيل نقاط التقويم المستمر والامتحانات الرسمية:</span>
+                  </h4>
+                  <span className="text-[11px] font-bold text-slate-500">
+                    خاص بالتلميذ: <span className="text-emerald-800 font-black">{currentReport.studentName}</span>
+                  </span>
+                </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-center">
-                  {/* التقويم المستمر */}
-                  <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200">
-                    <p className="text-[11px] text-slate-500 font-bold">التقويم المستمر</p>
-                    <p className="text-xl font-mono font-black text-slate-900 mt-1">
-                      {currentSummary?.continuousScore !== undefined ? `${currentSummary.continuousScore} ن` : "--"}
-                    </p>
-                    <span className="text-[10px] text-slate-400">من 20</span>
-                  </div>
+                <div className="overflow-hidden rounded-2xl border border-slate-200 shadow-xs bg-white">
+                  <table className="w-full text-right text-xs">
+                    <thead>
+                      <tr className="bg-slate-100/90 text-slate-700 border-b border-slate-200 font-black">
+                        <th className="py-2.5 px-3">العنصر / المعيار التقييمي</th>
+                        <th className="py-2.5 px-3 text-center">النقطة المحصل عليها</th>
+                        <th className="py-2.5 px-3 text-center">السلم</th>
+                        <th className="py-2.5 px-3">الملاحظة والتقييم البيداغوجي</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-medium">
+                      {/* السلوك والانضباط */}
+                      <tr className="hover:bg-slate-50/50">
+                        <td className="py-2.5 px-3 font-bold text-slate-900 flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+                          <span>المشاركة والانضباط والسلوك داخل القسم</span>
+                        </td>
+                        <td className="py-2.5 px-3 text-center font-mono font-black text-slate-900 text-sm">
+                          {currentSummary?.behaviorScore !== undefined ? `${currentSummary.behaviorScore} ن` : "--"}
+                        </td>
+                        <td className="py-2.5 px-3 text-center font-mono text-slate-400">/ 04</td>
+                        <td className="py-2.5 px-3 text-slate-600">
+                          {currentSummary?.behaviorScore !== undefined && currentSummary.behaviorScore >= 3.5
+                            ? "سلوك ممتاز ومشاركة نشطة 🌟"
+                            : currentSummary?.behaviorScore !== undefined && currentSummary.behaviorScore >= 2
+                            ? "انضباط مقبول"
+                            : "يحتاج لمزيد من الانضباط والتفاعل"}
+                        </td>
+                      </tr>
 
-                  {/* الفرض الأول */}
-                  <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200">
-                    <p className="text-[11px] text-slate-500 font-bold">الفرض الأول</p>
-                    <p className="text-xl font-mono font-black text-emerald-700 mt-1">
-                      {currentSummary?.test1Score !== undefined ? `${currentSummary.test1Score} ن` : "قيد الرصد"}
-                    </p>
-                    <span className="text-[10px] text-slate-400">من 20</span>
-                  </div>
+                      {/* كراس الدروس */}
+                      <tr className="hover:bg-slate-50/50">
+                        <td className="py-2.5 px-3 font-bold text-slate-900 flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0"></span>
+                          <span>كراس الدروس والأنشطة والعناية به</span>
+                        </td>
+                        <td className="py-2.5 px-3 text-center font-mono font-black text-slate-900 text-sm">
+                          {currentSummary?.notebook1Score !== undefined
+                            ? `${currentSummary.notebook1Score + (currentSummary.notebook2Score || 0)} ن`
+                            : "--"}
+                        </td>
+                        <td className="py-2.5 px-3 text-center font-mono text-slate-400">/ 04</td>
+                        <td className="py-2.5 px-3 text-slate-600">
+                          {currentSummary?.notebook1Score !== undefined && (currentSummary.notebook1Score + (currentSummary.notebook2Score || 0)) >= 3
+                            ? "كراس منظم ومكتمل 👏"
+                            : "ينبغي استكمال الدروس وتنظيم الخط"}
+                        </td>
+                      </tr>
 
-                  {/* الاختبار الفصلي */}
-                  <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200">
-                    <p className="text-[11px] text-slate-500 font-bold">الاختبار الفصلي</p>
-                    <p className="text-xl font-mono font-black text-indigo-700 mt-1">
-                      {currentSummary?.examScore !== undefined ? `${currentSummary.examScore} ن` : "قيد الرصد"}
-                    </p>
-                    <span className="text-[10px] text-slate-400">من 20</span>
-                  </div>
+                      {/* الواجبات والمهام المنزلية */}
+                      <tr className="hover:bg-slate-50/50">
+                        <td className="py-2.5 px-3 font-bold text-slate-900 flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0"></span>
+                          <span>حل الواجبات والمهام المنزلية</span>
+                        </td>
+                        <td className="py-2.5 px-3 text-center font-mono font-black text-slate-900 text-sm">
+                          {currentSummary?.homework1Score !== undefined
+                            ? `${currentSummary.homework1Score + (currentSummary.homework2Score || 0)} ن`
+                            : "--"}
+                        </td>
+                        <td className="py-2.5 px-3 text-center font-mono text-slate-400">/ 04</td>
+                        <td className="py-2.5 px-3 text-slate-600">
+                          {currentSummary?.homework1Score !== undefined && (currentSummary.homework1Score + (currentSummary.homework2Score || 0)) >= 3
+                            ? "مواظبة جيدة على إنجاز الواجبات 📝"
+                            : "الحرص على عدم إهمال الواجبات المنزلية"}
+                        </td>
+                      </tr>
 
-                  {/* المعدل الفصلي */}
-                  <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-300">
-                    <p className="text-[11px] text-emerald-800 font-bold">المعدل الفصلي للمادة</p>
-                    <p className="text-2xl font-mono font-black text-emerald-900 mt-0.5">
-                      {currentSummary?.termAverage !== undefined
-                        ? `${currentSummary.termAverage.toFixed(2)}`
-                        : currentSummary?.monitoringAverage !== undefined
-                        ? `${currentSummary.monitoringAverage.toFixed(2)}*`
-                        : "--"}
-                    </p>
-                    <span className="text-[10px] text-emerald-700 font-bold">
-                      {currentSummary?.termAverage !== undefined ? "المعدل النهائي (من 20)" : "معدل المراقبة"}
-                    </span>
-                  </div>
+                      {/* الاستجوابات السريعة */}
+                      <tr className="hover:bg-slate-50/50">
+                        <td className="py-2.5 px-3 font-bold text-slate-900 flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-purple-500 shrink-0"></span>
+                          <span>الاستجوابات والتقويمات الفجائية والمستمرة</span>
+                        </td>
+                        <td className="py-2.5 px-3 text-center font-mono font-black text-slate-900 text-sm">
+                          {currentSummary?.quiz1Score !== undefined
+                            ? `${currentSummary.quiz1Score + (currentSummary.quiz2Score || 0)} ن`
+                            : "--"}
+                        </td>
+                        <td className="py-2.5 px-3 text-center font-mono text-slate-400">/ 08</td>
+                        <td className="py-2.5 px-3 text-slate-600">
+                          {currentSummary?.quiz1Score !== undefined && (currentSummary.quiz1Score + (currentSummary.quiz2Score || 0)) >= 5
+                            ? "استيعاب ومراجعة مستمرة للدروس 🎯"
+                            : "مراجعة القواعد والتمارين بانتظام"}
+                        </td>
+                      </tr>
+
+                      {/* نقاط الزيادة والمكافآت إن وجدت */}
+                      {currentSummary?.bonusPoints !== undefined && currentSummary.bonusPoints !== 0 && (
+                        <tr className="bg-emerald-50/40">
+                          <td className="py-2.5 px-3 font-bold text-emerald-900 flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-emerald-600 shrink-0"></span>
+                            <span>رصيد نقاط الزيادة والتحفيز (Bonus)</span>
+                          </td>
+                          <td className="py-2.5 px-3 text-center font-mono font-black text-emerald-800 text-sm">
+                            {currentSummary.bonusPoints > 0 ? `+${currentSummary.bonusPoints}` : currentSummary.bonusPoints}
+                          </td>
+                          <td className="py-2.5 px-3 text-center font-mono text-emerald-700">حافز</td>
+                          <td className="py-2.5 px-3 text-emerald-800 font-bold">
+                            نقاط إضافية مكافأة على المبادرة والمشاركة الإيجابية
+                          </td>
+                        </tr>
+                      )}
+
+                      {/* المجموع الإجمالي لنقطة التقويم المستمر */}
+                      <tr className="bg-slate-50 font-black border-t-2 border-slate-200">
+                        <td className="py-3 px-3 text-slate-900">
+                          📌 علامة التقويم المستمر الإجمالية (المسجلة في الرقمنة)
+                        </td>
+                        <td className="py-3 px-3 text-center font-mono text-base text-emerald-800">
+                          {currentSummary?.continuousScore !== undefined ? `${currentSummary.continuousScore} ن` : "--"}
+                        </td>
+                        <td className="py-3 px-3 text-center font-mono text-slate-500">/ 20</td>
+                        <td className="py-3 px-3 text-emerald-900 font-bold">
+                          المحصلة النهائية لنشاط ومردود التلميذ
+                        </td>
+                      </tr>
+
+                      {/* الفرض الأول */}
+                      <tr className="hover:bg-slate-50/50">
+                        <td className="py-2.5 px-3 font-bold text-slate-900">
+                          📝 نقطة الفرض المحروس (الفصل {selectedTrimester})
+                        </td>
+                        <td className="py-2.5 px-3 text-center font-mono font-black text-indigo-700 text-sm">
+                          {currentSummary?.test1Score !== undefined ? `${currentSummary.test1Score} ن` : "قيد الرصد"}
+                        </td>
+                        <td className="py-2.5 px-3 text-center font-mono text-slate-400">/ 20</td>
+                        <td className="py-2.5 px-3 text-slate-600">
+                          {currentSummary?.test1Score !== undefined && currentSummary.test1Score >= 10
+                            ? "فوق المعدل 🟢"
+                            : currentSummary?.test1Score !== undefined
+                            ? "دون المعدل ⚠️"
+                            : "قيد التسجيل والتدقيق"}
+                        </td>
+                      </tr>
+
+                      {/* الاختبار الفصلي */}
+                      <tr className="hover:bg-slate-50/50">
+                        <td className="py-2.5 px-3 font-bold text-slate-900">
+                          📋 نقطة الاختبار الفصلي الرسمي
+                        </td>
+                        <td className="py-2.5 px-3 text-center font-mono font-black text-purple-700 text-sm">
+                          {currentSummary?.examScore !== undefined ? `${currentSummary.examScore} ن` : "قيد الرصد"}
+                        </td>
+                        <td className="py-2.5 px-3 text-center font-mono text-slate-400">/ 20</td>
+                        <td className="py-2.5 px-3 text-slate-600">
+                          {currentSummary?.examScore !== undefined && currentSummary.examScore >= 10
+                            ? "فوق المعدل 🟢"
+                            : currentSummary?.examScore !== undefined
+                            ? "دون المعدل ⚠️"
+                            : "قيد التسجيل والتدقيق"}
+                        </td>
+                      </tr>
+
+                      {/* المعدل الفصلي للمادة */}
+                      <tr className="bg-emerald-100/70 border-t-2 border-emerald-300 font-black">
+                        <td className="py-3.5 px-3 text-emerald-950 text-sm">
+                          🎯 المعدل الفصلي لمادة {currentReport.subjectName || "الرياضيات"}
+                        </td>
+                        <td className="py-3.5 px-3 text-center font-mono text-lg text-emerald-950">
+                          {currentSummary?.termAverage !== undefined
+                            ? `${currentSummary.termAverage.toFixed(2)}`
+                            : currentSummary?.monitoringAverage !== undefined
+                            ? `${currentSummary.monitoringAverage.toFixed(2)}`
+                            : "--"}
+                        </td>
+                        <td className="py-3.5 px-3 text-center font-mono text-emerald-800">/ 20</td>
+                        <td className="py-3.5 px-3 text-emerald-950 font-bold">
+                          {currentSummary?.appreciation || "قيد الرصد والتقييم"}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
               </div>
-
-              {/* ─── تفاصيل بنود التقويم المستمر (من صفحة /eval/continuous) ─── */}
-              {currentSummary && (
-                <div className="space-y-2 pt-2 border-t border-slate-100">
-                  <h4 className="text-xs font-black text-slate-800 flex items-center gap-1.5">
-                    <Sparkles className="w-4 h-4 text-indigo-600" />
-                    <span>التفصيل البيداغوجي لعناصر التقويم المستمر داخل القسم:</span>
-                  </h4>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between">
-                      <span className="text-slate-600 font-bold">المشاركة والسلوك:</span>
-                      <strong className="font-mono text-slate-900">
-                        {currentSummary.behaviorScore !== undefined ? `${currentSummary.behaviorScore} ن` : "--"}
-                      </strong>
-                    </div>
-
-                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between">
-                      <span className="text-slate-600 font-bold">كراس الدروس:</span>
-                      <strong className="font-mono text-slate-900">
-                        {currentSummary.notebook1Score !== undefined
-                          ? `${currentSummary.notebook1Score + (currentSummary.notebook2Score || 0)} ن`
-                          : "--"}
-                      </strong>
-                    </div>
-
-                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between">
-                      <span className="text-slate-600 font-bold">الواجبات والأنشطة:</span>
-                      <strong className="font-mono text-slate-900">
-                        {currentSummary.homework1Score !== undefined
-                          ? `${currentSummary.homework1Score + (currentSummary.homework2Score || 0)} ن`
-                          : "--"}
-                      </strong>
-                    </div>
-
-                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between">
-                      <span className="text-slate-600 font-bold">الاستجوابات الدورية:</span>
-                      <strong className="font-mono text-slate-900">
-                        {currentSummary.quiz1Score !== undefined
-                          ? `${currentSummary.quiz1Score + (currentSummary.quiz2Score || 0)} ن`
-                          : "--"}
-                      </strong>
-                    </div>
-                  </div>
-
-                  {/* رصيد نقاط الزيادة والمكافآت */}
-                  {currentSummary.bonusPoints !== undefined && currentSummary.bonusPoints !== 0 && (
-                    <div className="p-2.5 rounded-xl bg-emerald-50/60 border border-emerald-200 text-xs flex items-center justify-between">
-                      <span className="text-emerald-900 font-bold flex items-center gap-1.5">
-                        <span>🌟 رصيد نقاط الزيادة والتفاعل الصفي:</span>
-                      </span>
-                      <strong className="font-mono font-black text-emerald-800 text-sm">
-                        {currentSummary.bonusPoints > 0 ? `+${currentSummary.bonusPoints}` : currentSummary.bonusPoints} نقطة
-                      </strong>
-                    </div>
-                  )}
-                </div>
-              )}
 
               {/* ─── ملاحظات وتوجيهات الأستاذ ─── */}
               {currentSummary?.notes && (
