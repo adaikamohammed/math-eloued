@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getLessonsData, saveLessonsData, deleteImageFile } from "@/lib/storage";
 import { requireTeacher, resolveReader } from "@/lib/auth";
 import { Lesson, NotebookType, hideUnpublishedSolution, sortClasses } from "@/lib/types";
+import { buildParentGradebookLookup } from "@/lib/parentLookupHelper";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -179,6 +180,24 @@ export async function PUT(req: NextRequest) {
       if (body.customNotebooks !== undefined) data.customNotebooks = body.customNotebooks;
       if (body.boardNomenclature !== undefined) data.boardNomenclature = body.boardNomenclature;
       if (body.featureFlags !== undefined) data.featureFlags = body.featureFlags;
+
+      // تحديث تلقائي لفهرس كشوفات الأولياء المفهرس بتاريخ الميلاد
+      if (body.studentRoster !== undefined || body.gradebookRecords !== undefined) {
+        try {
+          const lookup = buildParentGradebookLookup(
+            data.studentRoster || [],
+            data.gradebookRecords || [],
+            {
+              teacherName: typeof data.subject === "object" ? (data.subject as any)?.teacherName : undefined,
+              subjectName: typeof data.subject === "string" ? data.subject : (data.subject as any)?.name || "الرياضيات",
+            }
+          );
+          data.parentGradebookLookup = lookup;
+        } catch (e) {
+          console.warn("Failed to build parent lookup index:", e);
+        }
+      }
+
       await saveLessonsData(ctx, data);
       return NextResponse.json({
         success: true,

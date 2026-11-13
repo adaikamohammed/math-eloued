@@ -77,7 +77,7 @@ export function synchronizeStudents(data: LessonsData): LessonsData {
 // ==========================================================
 
 // ما يراه الأولياء والتلاميذ
-const PUBLIC_KEYS = ["lessons", "honors", "announcements", "summons", "featureFlags", "subject", "customClasses", "timetable", "customNotebooks", "boardNomenclature", "publicInquiries"] as const;
+const PUBLIC_KEYS = ["lessons", "honors", "announcements", "summons", "featureFlags", "subject", "customClasses", "timetable", "customNotebooks", "boardNomenclature", "publicInquiries", "parentGradebookLookup"] as const;
 // ما يبقى خاصاً بالأستاذ وحده
 const PRIVATE_KEYS = ["evaluations", "gradebookRecords", "continuousEvalConfig", "penalties", "inspectionSessions", "studentRoster", "anonymousMessages", "parentInquiries", "diaryEntries", "cahierTextesEntries", "specialDays", "diaryDayTitles"] as const;
 
@@ -116,6 +116,7 @@ export function normalizeData(json: any): LessonsData {
     diaryDayTitles: json?.diaryDayTitles && typeof json.diaryDayTitles === "object" ? json.diaryDayTitles : {},
     customNotebooks: Array.isArray(json?.customNotebooks) ? json.customNotebooks : undefined,
     boardNomenclature: json?.boardNomenclature || undefined,
+    parentGradebookLookup: json?.parentGradebookLookup && typeof json.parentGradebookLookup === "object" ? json.parentGradebookLookup : {},
   };
 }
 

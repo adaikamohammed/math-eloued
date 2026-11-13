@@ -45,6 +45,7 @@ import {
   setupAutoSync,
 } from "@/lib/offlineStorage";
 import { StudentRosterItem, LessonsData, sortClasses } from "@/lib/types";
+import { buildParentGradebookLookup } from "@/lib/parentLookupHelper";
 
 const getScopedClassesKey = (teacherId: string) => `jusoor_classes_${teacherId}`;
 const getScopedStudentsKey = (teacherId: string) => `jusoor_students_${teacherId}`;
@@ -52,6 +53,7 @@ const getScopedStudentsKey = (teacherId: string) => `jusoor_students_${teacherId
 interface GridRow {
   id: string;
   studentName: string;
+  birthDate: string; // صيغة YYYY-MM-DD وتستخدم ككود سري لدخول الولي
   gender: "ذكر" | "أنثى";
   groupName: "فوج 1" | "فوج 2";
   isRepeater: boolean;
@@ -62,6 +64,7 @@ interface GridRow {
 const createEmptyRow = (customId?: string, defaultGroup: "فوج 1" | "فوج 2" = "فوج 1"): GridRow => ({
   id: customId || `new_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
   studentName: "",
+  birthDate: "",
   gender: "ذكر",
   groupName: defaultGroup,
   isRepeater: false,
@@ -269,6 +272,7 @@ export default function StudentsManagementPage() {
         classStudents.map((s) => ({
           id: s.id,
           studentName: s.studentName,
+          birthDate: s.birthDate || "",
           gender: s.gender || "ذكر",
           groupName: (s.groupName === "فوج 2" ? "فوج 2" : "فوج 1") as "فوج 1" | "فوج 2",
           isRepeater: Boolean(s.isRepeater),
@@ -483,6 +487,7 @@ export default function StudentsManagementPage() {
       .map((r) => ({
         ...r,
         studentName: r.studentName.trim(),
+        birthDate: r.birthDate ? r.birthDate.trim().replace(/\//g, "-") : "",
         parentPhone: r.parentPhone.trim(),
         notes: r.notes.trim(),
       }))
@@ -509,6 +514,7 @@ export default function StudentsManagementPage() {
         ? `st_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 6)}`
         : r.id,
       studentName: r.studentName,
+      birthDate: r.birthDate || undefined,
       className: selectedClass,
       gender: r.gender,
       groupName: r.groupName,
@@ -543,6 +549,7 @@ export default function StudentsManagementPage() {
       ...classStudents.map((s) => ({
         id: s.id,
         studentName: s.studentName,
+        birthDate: s.birthDate || "",
         gender: s.gender || "ذكر",
         groupName: (s.groupName === "فوج 2" ? "فوج 2" : "فوج 1") as "فوج 1" | "فوج 2",
         isRepeater: Boolean(s.isRepeater),
@@ -706,6 +713,7 @@ export default function StudentsManagementPage() {
         ...newClassStudents.map((s) => ({
           id: s.id,
           studentName: s.studentName,
+          birthDate: s.birthDate || "",
           gender: s.gender || "ذكر",
           groupName: (s.groupName === "فوج 2" ? "فوج 2" : "فوج 1") as "فوج 1" | "فوج 2",
           isRepeater: Boolean(s.isRepeater),
@@ -1514,6 +1522,9 @@ export default function StudentsManagementPage() {
                       <th className="py-2.5 px-2 w-28 min-w-[110px] text-center">الجنس</th>
                       <th className="py-2.5 px-2 w-32 min-w-[125px] text-center">الفوج</th>
                       <th className="py-2.5 px-2 w-32 min-w-[125px] text-center">معيد؟</th>
+                      <th className="py-2.5 px-3 w-40 min-w-[150px] text-center bg-amber-50/70 text-amber-950 font-black border-x border-amber-200">
+                        🎂 تاريخ الميلاد (كود الولي 🔑)
+                      </th>
                       <th className="py-2.5 px-3 w-36">هاتف الولي (اختياري)</th>
                       <th className="py-2.5 px-3 min-w-[160px]">ملاحظات الأستاذ</th>
                       <th className="py-2.5 px-2 w-12 text-center">حذف</th>
@@ -1615,6 +1626,18 @@ export default function StudentsManagementPage() {
                               <option value="no">لا (جديد)</option>
                               <option value="yes">نعم (معيد)</option>
                             </select>
+                          </td>
+
+                          {/* تاريخ الميلاد (كود الولي 🔑) */}
+                          <td className="py-2 px-2 text-center bg-amber-50/20 border-x border-amber-100">
+                            <input
+                              type="text"
+                              value={row.birthDate}
+                              onChange={(e) => handleUpdateRow(idx, "birthDate", e.target.value)}
+                              placeholder="2013-07-10"
+                              className="w-full px-2 py-1.5 rounded-lg bg-white border border-amber-300 text-xs font-mono font-black text-center text-amber-950 placeholder-amber-300 focus:outline-none focus:ring-2 focus:ring-amber-500/30 transition shadow-2xs"
+                              title="تاريخ ميلاد التلميذ بصيغة YYYY-MM-DD (مثال: 2013-07-10) ويستخدم ككود سري لدخول الولي"
+                            />
                           </td>
 
                           {/* هاتف الولي (Col 4) */}
@@ -1758,6 +1781,9 @@ export default function StudentsManagementPage() {
                         <th className="py-3 px-3 text-center">الجنس</th>
                         <th className="py-3 px-3 text-center">الفوج الفرعي</th>
                         <th className="py-3 px-3 text-center">معيد للسنة</th>
+                        <th className="py-3 px-3 text-center bg-amber-50/70 text-amber-950 font-black border-x border-amber-200">
+                          كود الولي (تاريخ الميلاد) 🔑
+                        </th>
                         <th className="py-3 px-4">هاتف ولي الأمر</th>
                         <th className="py-3 px-4">ملاحظات الأستاذ</th>
                         <th className="py-3 px-3 w-20 text-center">حذف</th>
@@ -1836,6 +1862,17 @@ export default function StudentsManagementPage() {
                                 <span className="font-bold bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded-lg border border-emerald-300 text-[11px]">
                                   جديد
                                 </span>
+                              )}
+                            </td>
+
+                            {/* كود الولي (تاريخ الميلاد) */}
+                            <td className="py-3 px-3 text-center bg-amber-50/20 border-x border-amber-100">
+                              {st.birthDate ? (
+                                <span className="inline-flex items-center gap-1 font-mono font-black text-amber-950 bg-amber-100/80 px-2 py-0.5 rounded-md border border-amber-300 text-xs shadow-2xs">
+                                  <span>🔑 {st.birthDate}</span>
+                                </span>
+                              ) : (
+                                <span className="text-gray-300 text-xs">غير محدد</span>
                               )}
                             </td>
 

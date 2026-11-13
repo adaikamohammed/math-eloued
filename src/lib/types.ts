@@ -611,6 +611,7 @@ export type LessonsData = {
   boardNomenclature?: BoardNomenclature;
   evaluationSettings?: Record<string, ClassEvaluationSettings>;
   continuousEvalConfig?: Record<string, ContinuousEvalConfig>;
+  parentGradebookLookup?: Record<string, any>; // كشوفات الأولياء المفهرسة بتاريخ الميلاد
 };
 
 export const LEVELS = {
