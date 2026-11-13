@@ -48,7 +48,7 @@ function ParentContent() {
 
   const reportCardRef = useRef<HTMLDivElement | null>(null);
 
-  // جلب كود وتاريخ واسم التلميذ من الرابط تلقائياً
+  // جلب كود وتاريخ واسم التلميذ من الرابط في حال تم تمريرها فقط
   useEffect(() => {
     const codeFromUrl =
       searchParams.get("code") ||
@@ -63,14 +63,6 @@ function ParentContent() {
       setInputCode(cleanCode);
       if (cleanName) setInputName(cleanName);
       performLookup(cleanCode, cleanName);
-    } else {
-      // محاولة استرجاع آخر تلميذ تم البحث عنه في هذا الجهاز
-      try {
-        const savedCode = localStorage.getItem("jusoor_parent_last_code");
-        const savedName = localStorage.getItem("jusoor_parent_last_name");
-        if (savedCode) setInputCode(savedCode);
-        if (savedName) setInputName(savedName);
-      } catch {}
     }
   }, [searchParams]);
 
@@ -158,6 +150,31 @@ function ParentContent() {
   const currentReport = reports[selectedStudentIndex] || null;
   const currentSummary: StudentTrimesterGradeSummary | undefined =
     currentReport?.trimesters?.[selectedTrimester];
+
+  // دالة فحص حالة كل معيار من معايير التقويم المستمر الثمانية
+  const getColStatus = (colId: string, maxScore: number) => {
+    const isEvaluatedInClass = currentSummary?.evaluatedColumns?.[colId];
+    const val = currentSummary?.customScores?.[colId];
+
+    if (!isEvaluatedInClass || val === undefined || val === null) {
+      return {
+        isPending: true,
+        text: "لم يتم التقييم بعد",
+        note: "في انتظار إنجاز وتقييم هذا النشاط ⏳",
+      };
+    }
+
+    return {
+      isPending: false,
+      text: `${val} ن`,
+      note:
+        val >= maxScore * 0.75
+          ? "مردود ممتاز 🌟"
+          : val >= maxScore * 0.5
+          ? "مقبول ومستحسن 👍"
+          : "يحتاج لمزيد من الاجتهاد والتركيز ⚠️",
+    };
+  };
 
   // تصدير كشف النقاط كصورة PNG
   const handleDownloadImage = async () => {
@@ -249,7 +266,7 @@ function ParentContent() {
                     type="text"
                     value={inputCode}
                     onChange={(e) => setInputCode(e.target.value)}
-                    placeholder="مثال: 2016-03-22"
+                    placeholder="سنة-شهر-يوم (مثال: 2013-05-15)"
                     className="w-full py-2.5 px-3 rounded-xl border-2 border-emerald-500/40 focus:border-emerald-600 bg-slate-50 hover:bg-white focus:bg-white text-sm font-mono font-black text-center text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 transition shadow-inner"
                   />
                 </div>
@@ -266,7 +283,7 @@ function ParentContent() {
                     type="text"
                     value={inputName}
                     onChange={(e) => setInputName(e.target.value)}
-                    placeholder="جوايحية إلين أو إلين"
+                    placeholder="الاسم أو اللقب (اختياري)"
                     className={`w-full py-2.5 px-3 rounded-xl border-2 ${
                       requireNameNotice
                         ? "border-amber-500 bg-amber-50 focus:border-amber-600 ring-2 ring-amber-400/20"
@@ -414,7 +431,7 @@ function ParentContent() {
                 </div>
               </div>
 
-              {/* ─── الرتبة البيداغوجية في الفوج (كما طلب المستخدم بالضبط) ─── */}
+              {/* ─── الرتبة البيداغوجية في الفوج ─── */}
               {currentSummary && (
                 <div className="bg-gradient-to-r from-amber-500 via-amber-600 to-yellow-600 text-white rounded-2xl p-4 sm:p-5 shadow-md flex flex-wrap items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
@@ -422,7 +439,11 @@ function ParentContent() {
                       🏆
                     </div>
                     <div>
-                      <p className="text-xs text-amber-100 font-bold">الترتيب والتحصيل في الفوج التربوي:</p>
+                      <p className="text-xs text-amber-100 font-bold">
+                        {currentSummary.examScore !== undefined
+                          ? "الترتيب والتحصيل في الفوج التربوي:"
+                          : "الترتيب المرحلي في المراقبة المستمرة (قبل الاختبار):"}
+                      </p>
                       <h4 className="text-lg sm:text-2xl font-black flex items-center gap-2 mt-0.5">
                         <span>المرتبة {currentSummary.rank}</span>
                         <span className="text-xs font-normal text-amber-100">
@@ -440,7 +461,7 @@ function ParentContent() {
               )}
 
               {/* ════════════════════════════════════════════════════════════════════
-                  جدول كشف النقاط والتقويم المستمر المفصل للتلميذ (كما طلب المستخدم)
+                  جدول كشف النقاط والتقويم المستمر المفصل للتلميذ (وفق أعمدة الأستاذ)
               ════════════════════════════════════════════════════════════════════ */}
               <div className="space-y-3 pt-2">
                 <div className="flex items-center justify-between">
@@ -464,164 +485,299 @@ function ParentContent() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 font-medium">
-                      {/* السلوك والانضباط */}
+                      {/* 1. كراس 1 */}
+                      {(() => {
+                        const st = getColStatus("col_nb1", 2);
+                        return (
+                          <tr className="hover:bg-slate-50/50">
+                            <td className="py-2.5 px-3 font-bold text-slate-900 flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0"></span>
+                              <span>كراس 1 (الدروس والمحاولات)</span>
+                            </td>
+                            <td className="py-2.5 px-3 text-center">
+                              {st.isPending ? (
+                                <span className="text-slate-400 font-bold text-[11px] bg-slate-100 px-2 py-0.5 rounded-md">
+                                  لم يتم التقييم بعد
+                                </span>
+                              ) : (
+                                <span className="font-mono font-black text-slate-900 text-sm">{st.text}</span>
+                              )}
+                            </td>
+                            <td className="py-2.5 px-3 text-center font-mono text-slate-400">/ 02</td>
+                            <td className="py-2.5 px-3 text-slate-600">{st.note}</td>
+                          </tr>
+                        );
+                      })()}
+
+                      {/* 2. كراس 2 */}
+                      {(() => {
+                        const st = getColStatus("col_nb2", 2);
+                        return (
+                          <tr className="hover:bg-slate-50/50">
+                            <td className="py-2.5 px-3 font-bold text-slate-900 flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0"></span>
+                              <span>كراس 2 (المتابعة الإضافية)</span>
+                            </td>
+                            <td className="py-2.5 px-3 text-center">
+                              {st.isPending ? (
+                                <span className="text-slate-400 font-bold text-[11px] bg-slate-100 px-2 py-0.5 rounded-md">
+                                  لم يتم التقييم بعد
+                                </span>
+                              ) : (
+                                <span className="font-mono font-black text-slate-900 text-sm">{st.text}</span>
+                              )}
+                            </td>
+                            <td className="py-2.5 px-3 text-center font-mono text-slate-400">/ 02</td>
+                            <td className="py-2.5 px-3 text-slate-600">{st.note}</td>
+                          </tr>
+                        );
+                      })()}
+
+                      {/* 3. وظيفة 1 */}
+                      {(() => {
+                        const st = getColStatus("col_hw1", 2);
+                        return (
+                          <tr className="hover:bg-slate-50/50">
+                            <td className="py-2.5 px-3 font-bold text-slate-900 flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0"></span>
+                              <span>وظيفة 1 (الواجب المنزلي الأول)</span>
+                            </td>
+                            <td className="py-2.5 px-3 text-center">
+                              {st.isPending ? (
+                                <span className="text-slate-400 font-bold text-[11px] bg-slate-100 px-2 py-0.5 rounded-md">
+                                  لم يتم التقييم بعد
+                                </span>
+                              ) : (
+                                <span className="font-mono font-black text-slate-900 text-sm">{st.text}</span>
+                              )}
+                            </td>
+                            <td className="py-2.5 px-3 text-center font-mono text-slate-400">/ 02</td>
+                            <td className="py-2.5 px-3 text-slate-600">{st.note}</td>
+                          </tr>
+                        );
+                      })()}
+
+                      {/* 4. وظيفة 2 */}
+                      {(() => {
+                        const st = getColStatus("col_hw2", 2);
+                        return (
+                          <tr className="hover:bg-slate-50/50">
+                            <td className="py-2.5 px-3 font-bold text-slate-900 flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full bg-indigo-600 shrink-0"></span>
+                              <span>وظيفة 2 (الواجب المنزلي الثاني)</span>
+                            </td>
+                            <td className="py-2.5 px-3 text-center">
+                              {st.isPending ? (
+                                <span className="text-slate-400 font-bold text-[11px] bg-slate-100 px-2 py-0.5 rounded-md">
+                                  لم يتم التقييم بعد
+                                </span>
+                              ) : (
+                                <span className="font-mono font-black text-slate-900 text-sm">{st.text}</span>
+                              )}
+                            </td>
+                            <td className="py-2.5 px-3 text-center font-mono text-slate-400">/ 02</td>
+                            <td className="py-2.5 px-3 text-slate-600">{st.note}</td>
+                          </tr>
+                        );
+                      })()}
+
+                      {/* 5. استجواب 1 */}
+                      {(() => {
+                        const st = getColStatus("col_q1", 4);
+                        return (
+                          <tr className="hover:bg-slate-50/50">
+                            <td className="py-2.5 px-3 font-bold text-slate-900 flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full bg-purple-500 shrink-0"></span>
+                              <span>استجواب 1 (التقويم السريع الأول)</span>
+                            </td>
+                            <td className="py-2.5 px-3 text-center">
+                              {st.isPending ? (
+                                <span className="text-slate-400 font-bold text-[11px] bg-slate-100 px-2 py-0.5 rounded-md">
+                                  لم يتم التقييم بعد
+                                </span>
+                              ) : (
+                                <span className="font-mono font-black text-slate-900 text-sm">{st.text}</span>
+                              )}
+                            </td>
+                            <td className="py-2.5 px-3 text-center font-mono text-slate-400">/ 04</td>
+                            <td className="py-2.5 px-3 text-slate-600">{st.note}</td>
+                          </tr>
+                        );
+                      })()}
+
+                      {/* 6. استجواب 2 */}
+                      {(() => {
+                        const st = getColStatus("col_q2", 4);
+                        return (
+                          <tr className="hover:bg-slate-50/50">
+                            <td className="py-2.5 px-3 font-bold text-slate-900 flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full bg-purple-600 shrink-0"></span>
+                              <span>استجواب 2 (التقويم السريع الثاني)</span>
+                            </td>
+                            <td className="py-2.5 px-3 text-center">
+                              {st.isPending ? (
+                                <span className="text-slate-400 font-bold text-[11px] bg-slate-100 px-2 py-0.5 rounded-md">
+                                  لم يتم التقييم بعد
+                                </span>
+                              ) : (
+                                <span className="font-mono font-black text-slate-900 text-sm">{st.text}</span>
+                              )}
+                            </td>
+                            <td className="py-2.5 px-3 text-center font-mono text-slate-400">/ 04</td>
+                            <td className="py-2.5 px-3 text-slate-600">{st.note}</td>
+                          </tr>
+                        );
+                      })()}
+
+                      {/* 7. المشاركة والسلوك */}
+                      {(() => {
+                        const st = getColStatus("col_behavior", 4);
+                        return (
+                          <tr className="hover:bg-slate-50/50">
+                            <td className="py-2.5 px-3 font-bold text-slate-900 flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+                              <span>المشاركة والانضباط والسلوك داخل القسم</span>
+                            </td>
+                            <td className="py-2.5 px-3 text-center">
+                              {st.isPending ? (
+                                <span className="text-slate-400 font-bold text-[11px] bg-slate-100 px-2 py-0.5 rounded-md">
+                                  لم يتم التقييم بعد
+                                </span>
+                              ) : (
+                                <span className="font-mono font-black text-slate-900 text-sm">{st.text}</span>
+                              )}
+                            </td>
+                            <td className="py-2.5 px-3 text-center font-mono text-slate-400">/ 04</td>
+                            <td className="py-2.5 px-3 text-slate-600">{st.note}</td>
+                          </tr>
+                        );
+                      })()}
+
+                      {/* 8. نقاط إضافية (حافز) */}
                       <tr className="hover:bg-slate-50/50">
                         <td className="py-2.5 px-3 font-bold text-slate-900 flex items-center gap-1.5">
-                          <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
-                          <span>المشاركة والانضباط والسلوك داخل القسم</span>
+                          <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
+                          <span>نقاط إضافية (حافز وتفاعل إيجابي)</span>
                         </td>
-                        <td className="py-2.5 px-3 text-center font-mono font-black text-slate-900 text-sm">
-                          {currentSummary?.behaviorScore !== undefined ? `${currentSummary.behaviorScore} ن` : "--"}
+                        <td className="py-2.5 px-3 text-center">
+                          {currentSummary?.bonusPoints !== undefined && currentSummary.bonusPoints !== 0 ? (
+                            <span className="font-mono font-black text-amber-700 text-sm">
+                              {currentSummary.bonusPoints > 0 ? `+${currentSummary.bonusPoints}` : currentSummary.bonusPoints}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 text-[11px]">0</span>
+                          )}
                         </td>
-                        <td className="py-2.5 px-3 text-center font-mono text-slate-400">/ 04</td>
+                        <td className="py-2.5 px-3 text-center font-mono text-slate-400">حافز</td>
                         <td className="py-2.5 px-3 text-slate-600">
-                          {currentSummary?.behaviorScore !== undefined && currentSummary.behaviorScore >= 3.5
-                            ? "سلوك ممتاز ومشاركة نشطة 🌟"
-                            : currentSummary?.behaviorScore !== undefined && currentSummary.behaviorScore >= 2
-                            ? "انضباط مقبول"
-                            : "يحتاج لمزيد من الانضباط والتفاعل"}
+                          {currentSummary?.bonusPoints !== undefined && currentSummary.bonusPoints > 0
+                            ? "مكافأة على المبادرة والحلول المتميزة 🌟"
+                            : "رصيد الحوافز الإضافية"}
                         </td>
                       </tr>
 
-                      {/* كراس الدروس */}
-                      <tr className="hover:bg-slate-50/50">
-                        <td className="py-2.5 px-3 font-bold text-slate-900 flex items-center gap-1.5">
-                          <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0"></span>
-                          <span>كراس الدروس والأنشطة والعناية به</span>
-                        </td>
-                        <td className="py-2.5 px-3 text-center font-mono font-black text-slate-900 text-sm">
-                          {currentSummary?.notebook1Score !== undefined
-                            ? `${currentSummary.notebook1Score + (currentSummary.notebook2Score || 0)} ن`
-                            : "--"}
-                        </td>
-                        <td className="py-2.5 px-3 text-center font-mono text-slate-400">/ 04</td>
-                        <td className="py-2.5 px-3 text-slate-600">
-                          {currentSummary?.notebook1Score !== undefined && (currentSummary.notebook1Score + (currentSummary.notebook2Score || 0)) >= 3
-                            ? "كراس منظم ومكتمل 👏"
-                            : "ينبغي استكمال الدروس وتنظيم الخط"}
-                        </td>
-                      </tr>
-
-                      {/* الواجبات والمهام المنزلية */}
-                      <tr className="hover:bg-slate-50/50">
-                        <td className="py-2.5 px-3 font-bold text-slate-900 flex items-center gap-1.5">
-                          <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0"></span>
-                          <span>حل الواجبات والمهام المنزلية</span>
-                        </td>
-                        <td className="py-2.5 px-3 text-center font-mono font-black text-slate-900 text-sm">
-                          {currentSummary?.homework1Score !== undefined
-                            ? `${currentSummary.homework1Score + (currentSummary.homework2Score || 0)} ن`
-                            : "--"}
-                        </td>
-                        <td className="py-2.5 px-3 text-center font-mono text-slate-400">/ 04</td>
-                        <td className="py-2.5 px-3 text-slate-600">
-                          {currentSummary?.homework1Score !== undefined && (currentSummary.homework1Score + (currentSummary.homework2Score || 0)) >= 3
-                            ? "مواظبة جيدة على إنجاز الواجبات 📝"
-                            : "الحرص على عدم إهمال الواجبات المنزلية"}
-                        </td>
-                      </tr>
-
-                      {/* الاستجوابات السريعة */}
-                      <tr className="hover:bg-slate-50/50">
-                        <td className="py-2.5 px-3 font-bold text-slate-900 flex items-center gap-1.5">
-                          <span className="w-2 h-2 rounded-full bg-purple-500 shrink-0"></span>
-                          <span>الاستجوابات والتقويمات الفجائية والمستمرة</span>
-                        </td>
-                        <td className="py-2.5 px-3 text-center font-mono font-black text-slate-900 text-sm">
-                          {currentSummary?.quiz1Score !== undefined
-                            ? `${currentSummary.quiz1Score + (currentSummary.quiz2Score || 0)} ن`
-                            : "--"}
-                        </td>
-                        <td className="py-2.5 px-3 text-center font-mono text-slate-400">/ 08</td>
-                        <td className="py-2.5 px-3 text-slate-600">
-                          {currentSummary?.quiz1Score !== undefined && (currentSummary.quiz1Score + (currentSummary.quiz2Score || 0)) >= 5
-                            ? "استيعاب ومراجعة مستمرة للدروس 🎯"
-                            : "مراجعة القواعد والتمارين بانتظام"}
-                        </td>
-                      </tr>
-
-                      {/* نقاط الزيادة والمكافآت إن وجدت */}
-                      {currentSummary?.bonusPoints !== undefined && currentSummary.bonusPoints !== 0 && (
-                        <tr className="bg-emerald-50/40">
-                          <td className="py-2.5 px-3 font-bold text-emerald-900 flex items-center gap-1.5">
-                            <span className="w-2 h-2 rounded-full bg-emerald-600 shrink-0"></span>
-                            <span>رصيد نقاط الزيادة والتحفيز (Bonus)</span>
-                          </td>
-                          <td className="py-2.5 px-3 text-center font-mono font-black text-emerald-800 text-sm">
-                            {currentSummary.bonusPoints > 0 ? `+${currentSummary.bonusPoints}` : currentSummary.bonusPoints}
-                          </td>
-                          <td className="py-2.5 px-3 text-center font-mono text-emerald-700">حافز</td>
-                          <td className="py-2.5 px-3 text-emerald-800 font-bold">
-                            نقاط إضافية مكافأة على المبادرة والمشاركة الإيجابية
-                          </td>
-                        </tr>
-                      )}
-
-                      {/* المجموع الإجمالي لنقطة التقويم المستمر */}
+                      {/* 9. مجموع نقطة التقويم المستمر الإجمالي */}
                       <tr className="bg-slate-50 font-black border-t-2 border-slate-200">
                         <td className="py-3 px-3 text-slate-900">
-                          📌 علامة التقويم المستمر الإجمالية (المسجلة في الرقمنة)
+                          📌 مجموع نقطة التقويم المستمر (المسجلة في الرقمنة)
                         </td>
                         <td className="py-3 px-3 text-center font-mono text-base text-emerald-800">
                           {currentSummary?.continuousScore !== undefined ? `${currentSummary.continuousScore} ن` : "--"}
                         </td>
                         <td className="py-3 px-3 text-center font-mono text-slate-500">/ 20</td>
                         <td className="py-3 px-3 text-emerald-900 font-bold">
-                          المحصلة النهائية لنشاط ومردود التلميذ
+                          المحصلة الممنوحة للتقويم المستمر
                         </td>
                       </tr>
 
-                      {/* الفرض الأول */}
+                      {/* 10. الفرض الأول */}
                       <tr className="hover:bg-slate-50/50">
                         <td className="py-2.5 px-3 font-bold text-slate-900">
-                          📝 نقطة الفرض المحروس (الفصل {selectedTrimester})
+                          📝 نقطة الفرض الأول (الفصل {selectedTrimester})
                         </td>
-                        <td className="py-2.5 px-3 text-center font-mono font-black text-indigo-700 text-sm">
-                          {currentSummary?.test1Score !== undefined ? `${currentSummary.test1Score} ن` : "قيد الرصد"}
+                        <td className="py-2.5 px-3 text-center">
+                          {currentSummary?.test1Score !== undefined ? (
+                            <span className="font-mono font-black text-indigo-700 text-sm">
+                              {currentSummary.test1Score} ن
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 font-bold text-[11px] bg-slate-100 px-2 py-0.5 rounded-md">
+                              لم يُجرَ بعد (قيد الرصد)
+                            </span>
+                          )}
                         </td>
                         <td className="py-2.5 px-3 text-center font-mono text-slate-400">/ 20</td>
                         <td className="py-2.5 px-3 text-slate-600">
-                          {currentSummary?.test1Score !== undefined && currentSummary.test1Score >= 10
-                            ? "فوق المعدل 🟢"
-                            : currentSummary?.test1Score !== undefined
-                            ? "دون المعدل ⚠️"
-                            : "قيد التسجيل والتدقيق"}
+                          {currentSummary?.test1Score !== undefined
+                            ? currentSummary.test1Score >= 10
+                              ? "فوق المعدل 🟢"
+                              : "دون المعدل ⚠️"
+                            : "في انتظار رصد الفرض"}
                         </td>
                       </tr>
 
-                      {/* الاختبار الفصلي */}
+                      {/* 11. الاختبار الفصلي */}
                       <tr className="hover:bg-slate-50/50">
                         <td className="py-2.5 px-3 font-bold text-slate-900">
                           📋 نقطة الاختبار الفصلي الرسمي
                         </td>
-                        <td className="py-2.5 px-3 text-center font-mono font-black text-purple-700 text-sm">
-                          {currentSummary?.examScore !== undefined ? `${currentSummary.examScore} ن` : "قيد الرصد"}
+                        <td className="py-2.5 px-3 text-center">
+                          {currentSummary?.examScore !== undefined ? (
+                            <span className="font-mono font-black text-purple-700 text-sm">
+                              {currentSummary.examScore} ن
+                            </span>
+                          ) : (
+                            <span className="text-amber-800 font-bold text-[11px] bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
+                              لم يُجرَ بعد (قيد الرصد) ⏳
+                            </span>
+                          )}
                         </td>
                         <td className="py-2.5 px-3 text-center font-mono text-slate-400">/ 20</td>
                         <td className="py-2.5 px-3 text-slate-600">
-                          {currentSummary?.examScore !== undefined && currentSummary.examScore >= 10
-                            ? "فوق المعدل 🟢"
-                            : currentSummary?.examScore !== undefined
-                            ? "دون المعدل ⚠️"
-                            : "قيد التسجيل والتدقيق"}
+                          {currentSummary?.examScore !== undefined
+                            ? currentSummary.examScore >= 10
+                              ? "فوق المعدل 🟢"
+                              : "دون المعدل ⚠️"
+                            : "في انتظار فترة الاختبارات الرسمية"}
                         </td>
                       </tr>
 
-                      {/* المعدل الفصلي للمادة */}
-                      <tr className="bg-emerald-100/70 border-t-2 border-emerald-300 font-black">
-                        <td className="py-3.5 px-3 text-emerald-950 text-sm">
+                      {/* 12. المعدل الفصلي للمادة */}
+                      <tr
+                        className={`${
+                          currentSummary?.termAverage !== undefined
+                            ? "bg-emerald-100/70 border-t-2 border-emerald-300 font-black"
+                            : "bg-slate-50 border-t-2 border-slate-200 font-bold"
+                        }`}
+                      >
+                        <td className="py-3.5 px-3 text-slate-900 text-sm">
                           🎯 المعدل الفصلي لمادة {currentReport.subjectName || "الرياضيات"}
                         </td>
-                        <td className="py-3.5 px-3 text-center font-mono text-lg text-emerald-950">
-                          {currentSummary?.termAverage !== undefined
-                            ? `${currentSummary.termAverage.toFixed(2)}`
-                            : currentSummary?.monitoringAverage !== undefined
-                            ? `${currentSummary.monitoringAverage.toFixed(2)}`
-                            : "--"}
+                        <td className="py-3.5 px-3 text-center">
+                          {currentSummary?.termAverage !== undefined ? (
+                            <span className="font-mono text-lg font-black text-emerald-950">
+                              {currentSummary.termAverage.toFixed(2)}
+                            </span>
+                          ) : (
+                            <span className="text-slate-600 font-bold text-[11px] bg-white border border-slate-200 px-2.5 py-1 rounded-lg">
+                              يُحسب بعد الاختبار الفصلي ⏳
+                            </span>
+                          )}
                         </td>
-                        <td className="py-3.5 px-3 text-center font-mono text-emerald-800">/ 20</td>
-                        <td className="py-3.5 px-3 text-emerald-950 font-bold">
-                          {currentSummary?.appreciation || "قيد الرصد والتقييم"}
+                        <td className="py-3.5 px-3 text-center font-mono text-slate-500">/ 20</td>
+                        <td className="py-3.5 px-3 text-slate-700">
+                          {currentSummary?.termAverage !== undefined ? (
+                            <span className="font-black text-emerald-950">{currentSummary.appreciation}</span>
+                          ) : (
+                            <span className="text-xs text-slate-500">
+                              المعدل النهائي لا يُحسب إلا بعد الاختبار. معدل المراقبة الحالي (التقويم + الفرض):{" "}
+                              <strong className="text-slate-900 font-mono">
+                                {currentSummary?.monitoringAverage !== undefined
+                                  ? `${currentSummary.monitoringAverage.toFixed(2)} / 20`
+                                  : "--"}
+                              </strong>
+                            </span>
+                          )}
                         </td>
                       </tr>
                     </tbody>

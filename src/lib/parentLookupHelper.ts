@@ -31,6 +31,7 @@ export interface StudentTrimesterGradeSummary {
   bonusPoints?: number;
   notes?: string;
   customScores?: Record<string, number>;
+  evaluatedColumns?: Record<string, boolean>;
 }
 
 export interface ParentStudentReport {
@@ -241,20 +242,43 @@ export function buildParentGradebookLookup(
       let termAvg: number | undefined;
 
       if (rec) {
-        const cont = rec.continuousScore ?? 20;
+        const cont = rec.continuousScore;
         const t1 = rec.test1Score;
         const ex = rec.examScore;
 
-        if (t1 !== undefined) {
+        if (cont !== undefined && t1 !== undefined) {
           monitoringAvg = Math.round(((cont + t1) / 2) * 100) / 100;
         }
-        if (t1 !== undefined && ex !== undefined) {
+        // المعدل الفصلي للمادة لا يحسب مطلقاً إلا إذا رصدت نقطة الاختبار الفصلي ونقطة الفرض
+        if (cont !== undefined && t1 !== undefined && ex !== undefined) {
           termAvg = Math.round(((((cont + t1) / 2) + 2 * ex) / 3) * 100) / 100;
           latestActiveTrim = trim;
-        } else if (t1 !== undefined) {
+        } else if (t1 !== undefined || cont !== undefined) {
           latestActiveTrim = trim;
         }
       }
+
+      // فحص الأعمدة التي بدأ الأستاذ بتقييمها فعلياً في القسم
+      const evaluatedCols: Record<string, boolean> = {
+        col_nb1: false,
+        col_nb2: false,
+        col_hw1: false,
+        col_hw2: false,
+        col_q1: false,
+        col_q2: false,
+        col_behavior: false,
+      };
+
+      (classStudentsMap[st.className] || []).forEach((other) => {
+        const otherRec = recordsMap[`${st.className}_${other.studentName}_T${trim}`];
+        if (otherRec?.customScores) {
+          Object.keys(evaluatedCols).forEach((k) => {
+            if (typeof otherRec.customScores?.[k] === "number" && otherRec.customScores[k] > 0) {
+              evaluatedCols[k] = true;
+            }
+          });
+        }
+      });
 
       trimesters[trim] = {
         trimester: trim,
@@ -269,7 +293,10 @@ export function buildParentGradebookLookup(
         classAvg: stats?.classAvg || 0,
         highestAvg: stats?.highestAvg || 0,
         lowestAvg: stats?.lowestAvg || 0,
-        appreciation: computeAppreciation(termAvg ?? studentAvg),
+        appreciation:
+          termAvg !== undefined
+            ? computeAppreciation(termAvg)
+            : "قيد المتابعة والتقويم (في انتظار الاختبار الفصلي) ⏳",
         behaviorScore: rec?.behaviorScore,
         notebook1Score: rec?.notebook1Score,
         notebook2Score: rec?.notebook2Score,
@@ -280,6 +307,7 @@ export function buildParentGradebookLookup(
         bonusPoints: rec?.bonusPoints,
         notes: rec?.notes,
         customScores: rec?.customScores,
+        evaluatedColumns: evaluatedCols,
       };
     });
 
