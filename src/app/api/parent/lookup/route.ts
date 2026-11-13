@@ -1,13 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/auth";
-import { buildParentGradebookLookup, ParentStudentReport } from "@/lib/parentLookupHelper";
+import {
+  buildParentGradebookLookup,
+  normalizeArabicText,
+  ParentStudentReport,
+} from "@/lib/parentLookupHelper";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const code = (searchParams.get("code") || searchParams.get("birthDate") || searchParams.get("birth") || "").trim();
+    const code = (
+      searchParams.get("code") ||
+      searchParams.get("birthDate") ||
+      searchParams.get("birth") ||
+      ""
+    ).trim();
+    const nameQuery = (
+      searchParams.get("name") ||
+      searchParams.get("studentName") ||
+      ""
+    ).trim();
 
     if (!code) {
       return NextResponse.json(
@@ -73,6 +87,35 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    // إذا تم تمرير اسم أو لقب، نقوم بمطابقته بدقة وحفظ الخصوصية
+    if (nameQuery) {
+      const normQ = normalizeArabicText(nameQuery);
+      matchingReports = matchingReports.filter((rep) => {
+        const normName = normalizeArabicText(rep.studentName);
+        return normName.includes(normQ);
+      });
+
+      if (matchingReports.length === 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `لم يتم العثور على تلميذ باسم أو لقب "${nameQuery}" يحمل تاريخ الميلاد ${normalizedCode}. يرجى التحقق من الاسم وتاريخ الميلاد.`,
+          },
+          { status: 404 }
+        );
+      }
+    } else if (matchingReports.length > 1) {
+      // حالة توأم أو تشابه في تاريخ الميلاد دون إدخال الاسم
+      return NextResponse.json(
+        {
+          success: false,
+          requireName: true,
+          error: "يوجد أكثر من تلميذ مسجل بهذا التاريخ (توأم أو تشابه تواريخ). حفاظاً على السرية التامة، يرجى كتابة اسم أو لقب التلميذ أيضاً.",
+        },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json({
       success: true,
       reports: matchingReports,
@@ -86,6 +129,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
     const code = (body.code || body.birthDate || "").trim();
+    const name = (body.name || body.studentName || "").trim();
 
     if (!code) {
       return NextResponse.json(
@@ -94,7 +138,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const fakeReq = new NextRequest(new URL(`/api/parent/lookup?code=${encodeURIComponent(code)}`, req.url));
+    const url = new URL(`/api/parent/lookup`, req.url);
+    url.searchParams.set("code", code);
+    if (name) url.searchParams.set("name", name);
+
+    const fakeReq = new NextRequest(url);
     return GET(fakeReq);
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });

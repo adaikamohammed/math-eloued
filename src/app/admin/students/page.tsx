@@ -31,6 +31,7 @@ import {
   QrCode,
   Download,
   ClipboardCheck,
+  Copy,
 } from "lucide-react";
 import { LoginRequired } from "@/components/LoginRequired";
 import { PageExplainer } from "@/components/PageExplainer";
@@ -1865,12 +1866,32 @@ export default function StudentsManagementPage() {
                               )}
                             </td>
 
-                            {/* كود الولي (تاريخ الميلاد) */}
+                            {/* كود الولي (تاريخ الميلاد + رابط مباشر) */}
                             <td className="py-3 px-3 text-center bg-amber-50/20 border-x border-amber-100">
                               {st.birthDate ? (
-                                <span className="inline-flex items-center gap-1 font-mono font-black text-amber-950 bg-amber-100/80 px-2 py-0.5 rounded-md border border-amber-300 text-xs shadow-2xs">
-                                  <span>🔑 {st.birthDate}</span>
-                                </span>
+                                <div className="inline-flex items-center gap-1.5 flex-wrap justify-center">
+                                  <span className="font-mono font-black text-amber-950 bg-amber-100/80 px-2 py-0.5 rounded-md border border-amber-300 text-xs shadow-2xs">
+                                    🔑 {st.birthDate}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    title="نسخ رابط الولي المباشر لإرساله عبر واتساب أو رسالة"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const origin = typeof window !== "undefined" ? window.location.origin : "https://jusoor-dz.vercel.app";
+                                      const link = `${origin}/parent?code=${encodeURIComponent(st.birthDate!)}&name=${encodeURIComponent(st.studentName)}`;
+                                      navigator.clipboard?.writeText(link);
+                                      setMessage({
+                                        type: "ok",
+                                        text: `تم نسخ رابط الولي المباشر للتلميذ (${st.studentName}) بنجاح 📋🔗`,
+                                      });
+                                    }}
+                                    className="px-1.5 py-0.5 rounded-md bg-white border border-amber-300 text-amber-900 hover:bg-amber-100 transition cursor-pointer text-[10px] font-bold flex items-center gap-1 shadow-2xs"
+                                  >
+                                    <Copy className="w-3 h-3 text-amber-700" />
+                                    <span>نسخ الرابط</span>
+                                  </button>
+                                </div>
                               ) : (
                                 <span className="text-gray-300 text-xs">غير محدد</span>
                               )}

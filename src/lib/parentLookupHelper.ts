@@ -62,6 +62,22 @@ export function computeAppreciation(avg?: number): string {
 }
 
 /**
+ * دالة توحيد وتطبيع النصوص العربية لمطابقة الأسماء والألقاب بدقة وتسامح
+ */
+export function normalizeArabicText(text: string): string {
+  if (!text) return "";
+  return text
+    .trim()
+    .toLowerCase()
+    .replace(/[\u064B-\u0652\u0670]/g, "") // إزالة التشكيل والحركات
+    .replace(/\u0640/g, "") // إزالة التطويل
+    .replace(/[أإآء]/g, "ا") // توحيد الهمزات للألف
+    .replace(/ة/g, "ه") // توحيد التاء المربوطة والهاء
+    .replace(/ى/g, "ي") // توحيد الألف المقصورة والياء
+    .replace(/\s+/g, " ");
+}
+
+/**
  * بناء فهرس تقارير الأولياء المفهرس بتاريخ الميلاد
  */
 export function buildParentGradebookLookup(

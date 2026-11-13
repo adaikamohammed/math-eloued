@@ -18,6 +18,7 @@ import {
   BookOpen,
   Check,
   UserCheck,
+  User,
   Sparkles,
   Trophy,
   ArrowRight,
@@ -26,14 +27,20 @@ import {
   Loader2,
   ExternalLink,
 } from "lucide-react";
-import { ParentStudentReport, StudentTrimesterGradeSummary } from "@/lib/parentLookupHelper";
+import {
+  ParentStudentReport,
+  StudentTrimesterGradeSummary,
+  normalizeArabicText,
+} from "@/lib/parentLookupHelper";
 
 function ParentContent() {
   const searchParams = useSearchParams();
 
   const [inputCode, setInputCode] = useState("");
+  const [inputName, setInputName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [requireNameNotice, setRequireNameNotice] = useState(false);
   const [reports, setReports] = useState<ParentStudentReport[]>([]);
   const [selectedStudentIndex, setSelectedStudentIndex] = useState(0);
   const [selectedTrimester, setSelectedTrimester] = useState<1 | 2 | 3>(1);
@@ -41,34 +48,47 @@ function ParentContent() {
 
   const reportCardRef = useRef<HTMLDivElement | null>(null);
 
-  // جلب كود التلميذ من الرابط تلقائياً
+  // جلب كود وتاريخ واسم التلميذ من الرابط تلقائياً
   useEffect(() => {
-    const codeFromUrl = searchParams.get("code") || searchParams.get("birth") || searchParams.get("birthDate");
+    const codeFromUrl =
+      searchParams.get("code") ||
+      searchParams.get("birth") ||
+      searchParams.get("birthDate");
+    const nameFromUrl =
+      searchParams.get("name") || searchParams.get("studentName");
+
     if (codeFromUrl) {
-      const clean = codeFromUrl.replace(/\//g, "-").trim();
-      setInputCode(clean);
-      performLookup(clean);
+      const cleanCode = codeFromUrl.replace(/\//g, "-").trim();
+      const cleanName = (nameFromUrl || "").trim();
+      setInputCode(cleanCode);
+      if (cleanName) setInputName(cleanName);
+      performLookup(cleanCode, cleanName);
     } else {
       // محاولة استرجاع آخر تلميذ تم البحث عنه في هذا الجهاز
       try {
-        const saved = localStorage.getItem("jusoor_parent_last_code");
-        if (saved) {
-          setInputCode(saved);
-        }
+        const savedCode = localStorage.getItem("jusoor_parent_last_code");
+        const savedName = localStorage.getItem("jusoor_parent_last_name");
+        if (savedCode) setInputCode(savedCode);
+        if (savedName) setInputName(savedName);
       } catch {}
     }
   }, [searchParams]);
 
   // تنفيذ البحث والاستعلام
-  const performLookup = async (codeToSearch: string) => {
-    const clean = codeToSearch.replace(/\//g, "-").trim();
-    if (!clean) {
+  const performLookup = async (codeToSearch: string, nameToSearch?: string) => {
+    const cleanCode = codeToSearch.replace(/\//g, "-").trim();
+    const cleanName = (
+      nameToSearch !== undefined ? nameToSearch : inputName
+    ).trim();
+
+    if (!cleanCode) {
       setError("يرجى كتابة تاريخ ميلاد التلميذ (مثال: 2013-07-10)");
       return;
     }
 
     setLoading(true);
     setError(null);
+    setRequireNameNotice(false);
 
     try {
       // 1. فحص الكاش المحلي للأستاذ إذا كان على نفس الجهاز
@@ -80,16 +100,28 @@ function ParentContent() {
             try {
               const item = JSON.parse(localStorage.getItem(k) || "{}");
               const lookup = item.parentGradebookLookup;
-              if (lookup && lookup[clean]) {
-                localFound.push(...lookup[clean]);
+              if (lookup && lookup[cleanCode]) {
+                localFound.push(...lookup[cleanCode]);
               }
             } catch {}
           }
         }
       }
 
+      if (cleanName && localFound.length > 0) {
+        const normQ = normalizeArabicText(cleanName);
+        localFound = localFound.filter((rep) =>
+          normalizeArabicText(rep.studentName).includes(normQ)
+        );
+      }
+
       // 2. البحث عبر الخادم السحابي
-      const res = await fetch(`/api/parent/lookup?code=${encodeURIComponent(clean)}`);
+      let url = `/api/parent/lookup?code=${encodeURIComponent(cleanCode)}`;
+      if (cleanName) {
+        url += `&name=${encodeURIComponent(cleanName)}`;
+      }
+
+      const res = await fetch(url);
       const data = await res.json();
 
       if (data.success && Array.isArray(data.reports) && data.reports.length > 0) {
@@ -97,8 +129,13 @@ function ParentContent() {
         setSelectedStudentIndex(0);
         setSelectedTrimester(data.reports[0].activeTrimester || 1);
         try {
-          localStorage.setItem("jusoor_parent_last_code", clean);
+          localStorage.setItem("jusoor_parent_last_code", cleanCode);
+          if (cleanName) localStorage.setItem("jusoor_parent_last_name", cleanName);
         } catch {}
+      } else if (data.requireName) {
+        setReports([]);
+        setRequireNameNotice(true);
+        setError(data.error);
       } else if (localFound.length > 0) {
         // استخدام الكاش المحلي
         setReports(localFound);
@@ -106,7 +143,10 @@ function ParentContent() {
         setSelectedTrimester(localFound[0].activeTrimester || 1);
       } else {
         setReports([]);
-        setError(data.error || "لم يتم العثور على أي نتائج مسجلة بهذا التاريخ. يرجى التأكد من الصيغة (2013-07-10) أو التواصل مع الأستاذ.");
+        setError(
+          data.error ||
+            "لم يتم العثور على أي نتائج مسجلة بهذا التاريخ والاسم. يرجى التأكد من الصيغة (2013-07-10) أو مراجعة الأستاذ."
+        );
       }
     } catch (err: any) {
       setError("تعذر الاتصال بالخادم، يرجى التحقق من اتصالك بالإنترنت والمحاولة مجدداً.");
@@ -185,7 +225,7 @@ function ParentContent() {
               اطلاع الولي على نقاط وتقويم التلميذ
             </h2>
             <p className="text-xs sm:text-sm text-slate-500 max-w-lg mx-auto">
-              أدخل تاريخ ميلاد ابنك المسجل في كشف النقاط (بصيغة: سنة-شهر-يوم) للاطلاع على علاماته الكاملة وترتيبه في الفوج وملاحظات أستاذه
+              أدخل تاريخ ميلاد ابنك واسمه للاطلاع على علاماته الكاملة وترتيبه في الفوج وملاحظات أستاذه بسرية تامة
             </p>
           </div>
 
@@ -193,20 +233,53 @@ function ParentContent() {
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              performLookup(inputCode);
+              performLookup(inputCode, inputName);
             }}
-            className="max-w-md mx-auto space-y-3 pt-2"
+            className="max-w-md mx-auto space-y-3 pt-2 text-right"
           >
-            <div className="relative">
-              <input
-                type="text"
-                value={inputCode}
-                onChange={(e) => setInputCode(e.target.value)}
-                placeholder="مثال: 2013-07-10"
-                className="w-full py-3 pr-10 pl-4 rounded-2xl border-2 border-emerald-500/40 focus:border-emerald-600 bg-slate-50 hover:bg-white focus:bg-white text-base font-mono font-black text-center text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 transition shadow-inner"
-              />
-              <Calendar className="w-5 h-5 text-emerald-600 absolute right-3.5 top-3.5 pointer-events-none" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {/* حقل تاريخ الميلاد */}
+              <div className="space-y-1">
+                <label className="text-xs font-black text-slate-700 flex items-center gap-1">
+                  <Calendar className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>تاريخ الميلاد 🎂 <span className="text-rose-500">*</span></span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={inputCode}
+                    onChange={(e) => setInputCode(e.target.value)}
+                    placeholder="2013-07-10"
+                    className="w-full py-2.5 px-3 rounded-xl border-2 border-emerald-500/40 focus:border-emerald-600 bg-slate-50 hover:bg-white focus:bg-white text-sm font-mono font-black text-center text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 transition shadow-inner"
+                  />
+                </div>
+              </div>
+
+              {/* حقل اسم أو لقب التلميذ */}
+              <div className="space-y-1">
+                <label className="text-xs font-black text-slate-700 flex items-center gap-1">
+                  <User className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>اسم أو لقب التلميذ 👤</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={inputName}
+                    onChange={(e) => setInputName(e.target.value)}
+                    placeholder="مثال: محمد أو بن علي"
+                    className={`w-full py-2.5 px-3 rounded-xl border-2 ${
+                      requireNameNotice
+                        ? "border-amber-500 bg-amber-50 focus:border-amber-600 ring-2 ring-amber-400/20"
+                        : "border-emerald-500/40 focus:border-emerald-600 bg-slate-50 hover:bg-white focus:bg-white"
+                    } text-sm font-bold text-center text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 transition shadow-inner`}
+                  />
+                </div>
+              </div>
             </div>
+
+            <p className="text-[11px] text-slate-400 text-center">
+              💡 كتابة اسم التلميذ تضمن السرية التامة وتمنع أي تداخل بين الإخوة أو التوائم المشتركين في نفس تاريخ الميلاد.
+            </p>
 
             <button
               type="submit"
@@ -227,39 +300,18 @@ function ParentContent() {
             </button>
           </form>
 
-          {/* تنبيه الخطأ إن وجد */}
+          {/* تنبيه الخطأ أو طلب إدخال الاسم إن وجد */}
           {error && (
-            <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-xs font-bold text-rose-800 flex items-center justify-center gap-2 max-w-lg mx-auto">
-              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+            <div className={`p-3.5 rounded-2xl ${
+              requireNameNotice
+                ? "bg-amber-50 border border-amber-300 text-amber-900"
+                : "bg-rose-50 border border-rose-200 text-rose-800"
+            } text-xs font-bold flex items-center justify-center gap-2 max-w-lg mx-auto shadow-2xs`}>
+              <AlertCircle className={`w-4 h-4 ${requireNameNotice ? "text-amber-600" : "text-rose-600"} shrink-0`} />
               <span>{error}</span>
             </div>
           )}
         </section>
-
-        {/* ─── في حال وجود أكثر من تلميذ بنفس تاريخ الميلاد (اختر التلميذ) ─── */}
-        {reports.length > 1 && (
-          <div className="bg-amber-50 rounded-2xl p-4 border border-amber-200 space-y-2">
-            <p className="text-xs font-black text-amber-950 flex items-center gap-1.5">
-              <span>👥 وُجد أكثر من تلميذ مسجل بهذا التاريخ، اختر التلميذ المطلوب:</span>
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {reports.map((rep, idx) => (
-                <button
-                  key={rep.id}
-                  type="button"
-                  onClick={() => setSelectedStudentIndex(idx)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-black transition cursor-pointer ${
-                    selectedStudentIndex === idx
-                      ? "bg-amber-800 text-white shadow-xs"
-                      : "bg-white text-slate-800 border border-amber-300 hover:bg-amber-100"
-                  }`}
-                >
-                  {rep.studentName} ({rep.className})
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* ════════════════════════════════════════════════════════════════════
             عرض كشف نقاط التلميذ الشامل (Parent Student Report)
