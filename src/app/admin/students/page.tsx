@@ -32,7 +32,9 @@ import {
   Download,
   ClipboardCheck,
   Copy,
+  FileSpreadsheet,
 } from "lucide-react";
+import * as XLSX from "xlsx";
 import { LoginRequired } from "@/components/LoginRequired";
 import { PageExplainer } from "@/components/PageExplainer";
 import { StudentQrCardsModal } from "@/components/StudentQrCardsModal";
@@ -947,6 +949,44 @@ export default function StudentsManagementPage() {
   const isAllCurrentSelected =
     currentVisibleIds.length > 0 && currentVisibleIds.every((id) => selectedIds.has(id));
 
+  // تصدير قائمة التلاميذ كملف Excel (XLSX) متوافق مع موقع الرياضيات
+  const handleDownloadExcel = () => {
+    const targetStudents =
+      selectedClass === "all"
+        ? (students.length > 0 ? students : gridRows.filter((r) => r.studentName.trim()).map((r) => ({ ...r, className: selectedClass })))
+        : (students.filter((s) => s.className === selectedClass).length > 0
+            ? students.filter((s) => s.className === selectedClass)
+            : gridRows.filter((r) => r.studentName.trim()).map((r) => ({ ...r, className: selectedClass })));
+
+    if (targetStudents.length === 0) {
+      alert("لا يوجد تلاميذ مسجلون في هذا الفوج لتصديرهم كملف Excel!");
+      return;
+    }
+
+    const exportRows = targetStudents.map((s: any, idx: number) => ({
+      "الرقم": idx + 1,
+      "الاسم واللقب": s.studentName,
+      "القسم": s.className || (selectedClass === "all" ? "1م1" : selectedClass),
+      "الفوج الفرعي": s.groupName || "فوج 1",
+      "تاريخ الميلاد": s.birthDate || "",
+      "الجنس": s.gender === "ذكر" || s.gender === "M" ? "ذكر" : "أنثى",
+      "الحالة": s.isRepeater ? "معيد" : "جديد",
+      "هاتف الولي": s.parentPhone || "",
+      "ملاحظات": s.notes || "",
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(exportRows);
+    const workbook = XLSX.utils.book_new();
+    const sheetName = selectedClass === "all" ? "جميع التلاميذ" : `فوج ${selectedClass}`;
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName.substring(0, 31));
+
+    const fileName = selectedClass === "all"
+      ? `قائمة_جميع_التلاميذ_جسور_${new Date().toISOString().slice(0, 10)}.xlsx`
+      : `قائمة_تلاميذ_${selectedClass}_جسور_${new Date().toISOString().slice(0, 10)}.xlsx`;
+
+    XLSX.writeFile(workbook, fileName);
+  };
+
   // حفظ وتصدير قائمة وتفويج التلاميذ كملف PDF أفقي رسمي (A4 Landscape)
   const handleDownloadLandscapePDF = (isBlankTemplate: boolean = false) => {
     const printTeacherName = profile?.full_name || "الأستاذ(ة)";
@@ -1010,6 +1050,15 @@ export default function StudentsManagementPage() {
             >
               <Download className="w-3.5 h-3.5" />
               <span>حفظ PDF (معبأ) 📄</span>
+            </button>
+            <button
+              onClick={handleDownloadExcel}
+              type="button"
+              className="px-3.5 py-1.5 rounded-xl border border-teal-600 bg-teal-600 hover:bg-teal-700 text-xs font-black text-white transition shadow-sm flex items-center gap-1.5 cursor-pointer active:scale-95"
+              title="تحميل قائمة التلاميذ في ملف إكسل (Excel) لنقلها لموقع الرياضيات بسهولة"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+              <span>تحميل إكسل (Excel) 📊</span>
             </button>
             <button
               onClick={() => handleDownloadLandscapePDF(true)}
